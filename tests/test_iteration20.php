@@ -15,7 +15,7 @@ $pdo = new PDO('mysql:host=127.0.0.1;port=3306;dbname=meijitown_db;charset=utf8m
     PDO::ATTR_EMULATE_PREPARES => false,
 ]);
 
-// 1. Verify User Fidel (ID: 1) creation in meijitown_db.users
+// 1. Verify User Fidel (ID: 1) and User Mia (ID: 2) creation in meijitown_db.users
 $stmt = $pdo->prepare("
     INSERT INTO users (id, username, password_hash)
     VALUES (1, 'Fidel', '\$2y\$10\$devmockfidelhash1868000000000000000000000000000000000')
@@ -23,10 +23,21 @@ $stmt = $pdo->prepare("
 ");
 $stmt->execute();
 
+$stmt = $pdo->prepare("
+    INSERT INTO users (id, username, password_hash)
+    VALUES (2, 'Mia', '\$2y\$10\$devmockmiahash18680000000000000000000000000000000000')
+    ON DUPLICATE KEY UPDATE username = 'Mia'
+");
+$stmt->execute();
+
 $fidelUser = $pdo->query("SELECT id, username FROM users WHERE id = 1")->fetch();
 assert($fidelUser !== false, "User 1 should exist");
 assert($fidelUser['username'] === 'Fidel', "User 1 username should be Fidel");
-echo "[Pass 1/5] User 'Fidel' (ID: 1) verified in meijitown_db.users.\n";
+
+$miaUser = $pdo->query("SELECT id, username FROM users WHERE id = 2")->fetch();
+assert($miaUser !== false, "User 2 should exist");
+assert($miaUser['username'] === 'Mia', "User 2 username should be Mia");
+echo "[Pass 1/5] Users 'Fidel' (ID: 1) and 'Mia' (ID: 2) verified in meijitown_db.users.\n";
 
 // 2. Test api/session_check.php logic directly
 $_SESSION = [];

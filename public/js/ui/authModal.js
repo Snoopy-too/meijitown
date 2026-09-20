@@ -19,6 +19,7 @@ export class AuthModal {
                 <h3>Mayor Credentials & Dev Profiles</h3>
                 <div class="dev-profiles">
                   <button id="dev-user-fidel" class="btn-wood">👤 Fidel (ID: 1)</button>
+                  <button id="dev-user-mia" class="btn-wood">👤 Mia (ID: 2)</button>
                   <button id="dev-user-guest" class="btn-wood">👥 Guest</button>
                 </div>
                 <button id="auth-modal-close" class="btn-close">Close</button>
@@ -43,6 +44,14 @@ export class AuthModal {
             fidelBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 this.switchProfile('fidel');
+            });
+        }
+
+        const miaBtn = document.getElementById('dev-user-mia');
+        if (miaBtn) {
+            miaBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.switchProfile('mia');
             });
         }
 

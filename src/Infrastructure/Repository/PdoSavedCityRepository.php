@@ -13,15 +13,44 @@ use RuntimeException;
 final class PdoSavedCityRepository implements SavedCityRepositoryInterface
 {
     private PDO $pdo;
+    private ?string $userIdCol = null;
 
     public function __construct(DatabaseConnection $connection)
     {
         $this->pdo = $connection->getPdo();
+        $this->ensureTables();
+    }
+
+    private function ensureTables(): void
+    {
+        $this->pdo->exec("
+            CREATE TABLE IF NOT EXISTS `saved_cities` (
+                `id` INT AUTO_INCREMENT PRIMARY KEY,
+                `user_id` INT NOT NULL,
+                `city_name` VARCHAR(100) NOT NULL,
+                `chronicle_year` INT NOT NULL,
+                `chronicle_month` INT NOT NULL,
+                `population` INT NOT NULL,
+                `treasury` INT NOT NULL,
+                `city_data` LONGTEXT NOT NULL,
+                `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ");
+    }
+
+    private function getUserIdCol(): string
+    {
+        if ($this->userIdCol === null) {
+            $cols = $this->pdo->query("SHOW COLUMNS FROM users")->fetchAll(PDO::FETCH_COLUMN);
+            $this->userIdCol = (in_array('user_id', $cols, true) && !in_array('id', $cols, true)) ? 'user_id' : 'id';
+        }
+        return $this->userIdCol;
     }
 
     public function findUserByUsername(string $username): ?User
     {
-        $stmt = $this->pdo->prepare("SELECT id, username, password_hash, created_at FROM users WHERE username = ? LIMIT 1");
+        $idCol = $this->getUserIdCol();
+        $stmt = $this->pdo->prepare("SELECT {$idCol} AS id, username, password_hash, created_at FROM users WHERE username = ? LIMIT 1");
         $stmt->execute([$username]);
         $row = $stmt->fetch();
         if (!$row) {
@@ -38,7 +67,8 @@ final class PdoSavedCityRepository implements SavedCityRepositoryInterface
 
     public function findUserById(int $userId): ?User
     {
-        $stmt = $this->pdo->prepare("SELECT id, username, password_hash, created_at FROM users WHERE id = ? LIMIT 1");
+        $idCol = $this->getUserIdCol();
+        $stmt = $this->pdo->prepare("SELECT {$idCol} AS id, username, password_hash, created_at FROM users WHERE {$idCol} = ? LIMIT 1");
         $stmt->execute([$userId]);
         $row = $stmt->fetch();
         if (!$row) {
@@ -65,6 +95,14 @@ final class PdoSavedCityRepository implements SavedCityRepositoryInterface
             passwordHash: $passwordHash,
             createdAt: date('Y-m-d H:i:s')
         );
+    }
+
+    /**
+     * @return SavedCity[]
+     */
+    public function listCitiesByUser(int $userId): array
+    {
+        return $this->listCitiesForUser($userId);
     }
 
     /**
@@ -97,6 +135,11 @@ final class PdoSavedCityRepository implements SavedCityRepositoryInterface
         }
 
         return $results;
+    }
+
+    public function getSavedCity(int $cityId, int $userId): ?SavedCity
+    {
+        return $this->getCityById($cityId, $userId);
     }
 
     public function getCityById(int $cityId, int $userId): ?SavedCity
