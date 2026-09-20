@@ -207,9 +207,24 @@ export class SimulationEngine {
     }
 
     evaluateUpgrades() {
-        if (this.state.treasury < CONFIG.SIMULATION.PROSPERITY_TREASURY_MIN) return;
+        const treasury = this.state.treasury || 0;
+        const currentTier = this.state.milestones?.currentTier
+            || (this.state.population >= 600 ? 4 : (this.state.population >= 300 ? 3 : (this.state.population >= 100 ? 2 : 1)));
+
+        const maxUpgrades = currentTier >= 4 ? (CONFIG.SIMULATION.UPGRADE_BATCH_LIMIT_T4 || 5)
+            : (currentTier === 3 ? (CONFIG.SIMULATION.UPGRADE_BATCH_LIMIT_T3 || 3)
+            : (currentTier === 2 ? (CONFIG.SIMULATION.UPGRADE_BATCH_LIMIT_T2 || 2)
+            : (CONFIG.SIMULATION.UPGRADE_BATCH_LIMIT_T1 || 1)));
+
+        const reqT1 = CONFIG.SIMULATION.PROSPERITY_TREASURY_T1_MIN || 1000;
+        const reqT2 = CONFIG.SIMULATION.PROSPERITY_TREASURY_T2_MIN || 2500;
+        const reqT3 = CONFIG.SIMULATION.PROSPERITY_TREASURY_T3_MIN || 4500;
+
+        let upgradeCount = 0;
 
         for (const [_, tile] of this.grid.tiles.entries()) {
+            if (upgradeCount >= maxUpgrades) break;
+
             if (
                 tile.type === CONFIG.TYPES.ZONE &&
                 tile.stage === CONFIG.STAGES.BUILT &&
@@ -217,42 +232,51 @@ export class SimulationEngine {
                 this.grid.hasAdjacentRoad(tile.x, tile.y)
             ) {
                 if (tile.level === 1) {
+                    if (treasury < reqT1) continue;
+
                     if (tile.zoneType === CONFIG.ZONES.RESIDENTIAL) {
                         this.grid.startRenovation(tile.x, tile.y, 2);
-                        this.state.showToast(`Townhouse at (${tile.x}, ${tile.y}) renovating into fireproof Kura-zukuri...`);
-                        break;
+                        if (upgradeCount === 0) this.state.showToast(`Townhouse at (${tile.x}, ${tile.y}) renovating into fireproof Kura-zukuri...`);
+                        upgradeCount++;
+                        continue;
                     } else if (tile.zoneType === CONFIG.ZONES.COMMERCIAL) {
                         this.grid.startRenovation(tile.x, tile.y, 2);
-                        this.state.showToast(`Merchant shop at (${tile.x}, ${tile.y}) renovating into two-story Machiya...`);
-                        break;
+                        if (upgradeCount === 0) this.state.showToast(`Merchant shop at (${tile.x}, ${tile.y}) renovating into two-story Machiya...`);
+                        upgradeCount++;
+                        continue;
                     } else if (tile.zoneType === CONFIG.ZONES.INDUSTRIAL && (this.grid.hasAdjacentRail(tile.x, tile.y) || this.grid.hasAdjacentCanal(tile.x, tile.y) || this.isTrainDepotRoadConnected() || (this.schoolSystem && (this.schoolSystem.isSchoolAdjacent(tile.x, tile.y) || this.schoolSystem.isEducationCovered(tile.x, tile.y))))) {
                         this.grid.startRenovation(tile.x, tile.y, 2);
-                        this.state.showToast(`🏭 Meiji Industry! Workshop at (${tile.x}, ${tile.y}) upgrading into red-brick Silk Reeling Mill (Seishi-jō)...`);
-                        break;
+                        if (upgradeCount === 0) this.state.showToast(`🏭 Meiji Industry! Workshop at (${tile.x}, ${tile.y}) upgrading into red-brick Silk Reeling Mill (Seishi-jō)...`);
+                        upgradeCount++;
+                        continue;
                     }
                 } else if (tile.zoneType === CONFIG.ZONES.RESIDENTIAL) {
-                    if (tile.level === 2 && this.sanitation && this.sanitation.isBrickResidenceEligible(tile.x, tile.y)) {
+                    if (tile.level === 2 && treasury >= reqT2 && this.sanitation && this.sanitation.isBrickResidenceEligible(tile.x, tile.y)) {
                         this.grid.startRenovation(tile.x, tile.y, 3);
-                        this.state.showToast(`🏛️ Modern Sanitation! Townhouse at (${tile.x}, ${tile.y}) renovating into Western-style Brick Residence...`);
-                        break;
+                        if (upgradeCount === 0) this.state.showToast(`🏛️ Modern Sanitation! Townhouse at (${tile.x}, ${tile.y}) renovating into Western-style Brick Residence...`);
+                        upgradeCount++;
+                        continue;
                     }
                 } else if (tile.zoneType === CONFIG.ZONES.COMMERCIAL) {
-                    if (tile.level >= 2 && tile.level < 4 && this.telegraph && this.telegraph.isGinzaBrickEligible(tile.x, tile.y)) {
+                    if (tile.level >= 2 && tile.level < 4 && treasury >= reqT3 && this.telegraph && this.telegraph.isGinzaBrickEligible(tile.x, tile.y)) {
                         this.grid.startRenovation(tile.x, tile.y, 4);
-                        this.state.showToast(`🏛️ Ginza Rengagai! Commercial shop at (${tile.x}, ${tile.y}) upgrading into Western Brick Arcade...`);
-                        break;
-                    } else if (tile.level === 2) {
+                        if (upgradeCount === 0) this.state.showToast(`🏛️ Ginza Rengagai! Commercial shop at (${tile.x}, ${tile.y}) upgrading into Western Brick Arcade...`);
+                        upgradeCount++;
+                        continue;
+                    } else if (tile.level === 2 && treasury >= reqT2) {
                         const hasFireProtection = this.isWatchtowerCovered(tile.x, tile.y) || !!this.findAvailableFireDepot(tile.x, tile.y);
                         const isEducated = this.schoolSystem ? (this.schoolSystem.isEducationCovered(tile.x, tile.y) || this.schoolSystem.isSchoolAdjacent(tile.x, tile.y)) : false;
-                        if (hasFireProtection && (this.state.treasury >= 3500 || (isEducated && this.state.treasury >= 2500))) {
+                        if (hasFireProtection && (treasury >= 3500 || (isEducated && treasury >= 2500))) {
                             this.grid.startRenovation(tile.x, tile.y, 3);
-                            this.state.showToast(`🏛️ Modernization Era! Commercial shop at (${tile.x}, ${tile.y}) upgrading into Western Giyōfū Red Brick arcade...`);
-                            break;
+                            if (upgradeCount === 0) this.state.showToast(`🏛️ Modernization Era! Commercial shop at (${tile.x}, ${tile.y}) upgrading into Western Giyōfū Red Brick arcade...`);
+                            upgradeCount++;
+                            continue;
                         }
                     }
                 }
             }
         }
+        return upgradeCount;
     }
 
     attemptAutonomousSpawning() {

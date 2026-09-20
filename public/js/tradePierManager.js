@@ -193,7 +193,7 @@ export class TradePierManager {
         return { riceCount, millCount, connected: connectedCanals.size >= 2 };
     }
 
-    // Calculate export revenue dividend (+¥150 to +¥400 per export run)
+    // Calculate export revenue dividend (proportional to connected goods, up to +¥400)
     calculateExportYield(ox, oy, currentMonth = 1) {
         const { riceCount, millCount, connected } = this.scanConnectedGoods(ox, oy);
         if (!connected) return 0;
@@ -202,18 +202,18 @@ export class TradePierManager {
         // Autumn harvest export surge (M9–M11)
         const isAutumn = currentMonth >= 9 && currentMonth <= 11;
         if (riceCount > 0) {
-            const baseRiceBonus = isAutumn ? 35 : 15;
-            yieldAmt += Math.min(250, riceCount * baseRiceBonus);
+            const baseRiceBonus = isAutumn ? 40 : 20;
+            yieldAmt += Math.min(200, riceCount * baseRiceBonus);
         }
 
         // Modern Meiji Silk Reeling / Cotton Mills export dividend
         if (millCount > 0) {
-            yieldAmt += Math.min(200, millCount * 50);
+            yieldAmt += Math.min(250, millCount * 60);
         }
 
         if (yieldAmt > 0) {
-            // Clamp within historical export dividend envelope [+¥150 to +¥400]
-            yieldAmt = Math.min(400, Math.max(150, yieldAmt));
+            // Cap within historical export dividend envelope (up to +¥400)
+            yieldAmt = Math.min(400, yieldAmt);
         }
 
         return yieldAmt;

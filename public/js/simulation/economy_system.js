@@ -42,8 +42,12 @@ export class EconomySystem {
         let harborPierCount = 0;
         let powerPlantCount = 0;
         let waterworksCount = 0;
+        let suimonCount = 0;
+        let pavilionCount = 0;
         let dirtRoadCount = 0;
         let stoneRoadCount = 0;
+        let railCount = 0;
+        let canalCount = 0;
         let stoneRoadCommercialBonus = 0;
         let kobanCommercialBonus = 0;
 
@@ -54,6 +58,10 @@ export class EconomySystem {
                 } else {
                     dirtRoadCount++;
                 }
+            } else if (tile.type === CONFIG.TYPES.RAIL) {
+                railCount++;
+            } else if (tile.type === CONFIG.TYPES.CANAL) {
+                canalCount++;
             } else if (tile.type === CONFIG.TYPES.SERVICE) {
                 if (tile.serviceType === CONFIG.SERVICES.WATCHTOWER) watchtowerCount++;
                 else if (tile.serviceType === CONFIG.SERVICES.FIRE_DEPOT) fireDepotCount++;
@@ -67,6 +75,8 @@ export class EconomySystem {
                 else if (tile.serviceType === CONFIG.SERVICES.HARBOR_PIER && tile.isOrigin) harborPierCount++;
                 else if (tile.serviceType === CONFIG.SERVICES.POWER_PLANT && tile.isOrigin) powerPlantCount++;
                 else if (tile.serviceType === CONFIG.SERVICES.WATERWORKS && tile.isOrigin) waterworksCount++;
+                else if (tile.serviceType === CONFIG.SERVICES.SUIMON) suimonCount++;
+                else if (tile.serviceType === CONFIG.SERVICES.PAVILION && tile.isOrigin && tile.stage === CONFIG.STAGES.BUILT) pavilionCount++;
             } else if (tile.type === CONFIG.TYPES.ZONE && tile.zoneType === CONFIG.ZONES.COMMERCIAL && tile.stage === CONFIG.STAGES.BUILT) {
                 const baseTax = tile.level >= 4 ? (CONFIG.SIMULATION.TAX_COMMERCIAL_L4 || 70) :
                                 (tile.level >= 3 ? (CONFIG.SIMULATION.TAX_COMMERCIAL_L3 || 45) :
@@ -124,6 +134,9 @@ export class EconomySystem {
         const dirtMaintenance = dirtRoadCount * CONFIG.SIMULATION.ROAD_MAINTENANCE;
         const stoneMaintenance = stoneRoadCount * (CONFIG.SIMULATION.STONE_ROAD_MAINTENANCE || 2);
         const roadMaintenance = dirtMaintenance + stoneMaintenance;
+        const railMaintenance = railCount * (CONFIG.SIMULATION.RAIL_MAINTENANCE || 1);
+        const canalMaintenance = canalCount * (CONFIG.SIMULATION.CANAL_MAINTENANCE || 1);
+        const infraMaintenance = roadMaintenance + railMaintenance + canalMaintenance;
 
         const civicUpkeep = (watchtowerCount * CONFIG.SIMULATION.WATCHTOWER_MAINTENANCE) +
                             (fireDepotCount * (CONFIG.SIMULATION.FIRE_DEPOT_MAINTENANCE || 5)) +
@@ -131,22 +144,39 @@ export class EconomySystem {
                             (ochayaCount * (CONFIG.SIMULATION.OCHAYA_MAINTENANCE || 3)) +
                             (sentoCount * (CONFIG.SIMULATION.SENTO_MAINTENANCE || 2)) +
                             (kobanCount * (CONFIG.SIMULATION.KOBAN_MAINTENANCE || 3)) +
-                            (trainDepotCount * (CONFIG.SIMULATION.TRAIN_DEPOT_MAINTENANCE || 10)) +
-                            (schoolCount * (CONFIG.SIMULATION.SCHOOL_MAINTENANCE || 8)) +
+                            (trainDepotCount * (CONFIG.SIMULATION.TRAIN_DEPOT_MAINTENANCE || 30)) +
+                            (schoolCount * (CONFIG.SIMULATION.SCHOOL_MAINTENANCE || 20)) +
                             (telegraphCount * (CONFIG.SIMULATION.TELEGRAPH_MAINTENANCE || 6)) +
-                            (harborPierCount * (CONFIG.SIMULATION.HARBOR_PIER_MAINTENANCE || 12)) +
-                            (powerPlantCount * (CONFIG.SIMULATION.POWER_PLANT_MAINTENANCE || 25)) +
-                            (waterworksCount * (CONFIG.SIMULATION.WATERWORKS_MAINTENANCE || 15));
+                            (harborPierCount * (CONFIG.SIMULATION.HARBOR_PIER_MAINTENANCE || 35)) +
+                            (powerPlantCount * (CONFIG.SIMULATION.POWER_PLANT_MAINTENANCE || 75)) +
+                            (waterworksCount * (CONFIG.SIMULATION.WATERWORKS_MAINTENANCE || 45)) +
+                            (suimonCount * (CONFIG.SIMULATION.SUIMON_MAINTENANCE || 4)) +
+                            (pavilionCount * (CONFIG.SIMULATION.PAVILION_MAINTENANCE || 50));
 
         // Policy Upkeep (Night Watch: ¥15/mo, Clean Water: ¥10/mo)
         const policyUpkeep = (this.state.policies && typeof this.state.policies.getMonthlyFiscalImpact === 'function')
             ? this.state.policies.getMonthlyFiscalImpact()
             : 0;
 
-        const netIncome = totalTax - (roadMaintenance + civicUpkeep + policyUpkeep);
+        const netIncome = totalTax - (infraMaintenance + civicUpkeep + policyUpkeep);
 
         this.state.treasury += netIncome;
         this.state.lastCashflow = netIncome;
+        this.state.lastBudget = {
+            totalTax,
+            resTax,
+            comTax,
+            indTax,
+            harvestYield,
+            maritimeDividends,
+            infraMaintenance,
+            roadMaintenance,
+            railMaintenance,
+            canalMaintenance,
+            civicUpkeep,
+            policyUpkeep,
+            netIncome
+        };
 
         // Municipal Historical Stats Tracking
         if (!this.state.stats) this.state.stats = {};

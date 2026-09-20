@@ -75,7 +75,7 @@ export const CONFIG = {
         HARBOR_PIER: 450,// Harbor Cargo Pier (Funatsuki-ba) [¥450]
         POWER_PLANT: 600,// Coal Steam Power Plant 2x2 [¥600]
         WATERWORKS: 350, // Modern Water Filtration Basin 2x1 [¥350]
-        PAVILION: 2000,  // National Industrial Exhibition Pavilion 3x3 [¥2,000]
+        PAVILION: 6000,  // National Industrial Exhibition Pavilion 3x3 [¥6,000]
         SUIMON: 180,     // Watergate Sluice (Suimon) flood prevention [¥180]
     },
 
@@ -200,11 +200,24 @@ export const CONFIG = {
         TAX_COMMERCIAL_L1: 10,
         TAX_INDUSTRIAL_L1: 14,
         ROAD_MAINTENANCE: 1,
+        STONE_ROAD_MAINTENANCE: 2,
+        RAIL_MAINTENANCE: 1,        // Iron rail tracks ongoing maintenance (¥1/tile/mo)
+        CANAL_MAINTENANCE: 1,       // Canal water dredging & embankment upkeep (¥1/tile/mo)
+        SUIMON_MAINTENANCE: 4,      // Watergate Sluice monthly upkeep (¥4/mo)
+        PAVILION_MAINTENANCE: 50,   // National Exhibition Pavilion monthly upkeep (¥50/mo)
 
-        // Tier 2 Renovation Progression
-        // Tier 2 & Tier 3 Progression
+        // Tier 2 Renovation Progression & Tiered Prosperity Thresholds
         UPGRADE_MIN_AGE_TICKS: 4,
-        PROSPERITY_TREASURY_MIN: 3000,
+        PROSPERITY_TREASURY_MIN: 1000,    // General fallback minimum
+        PROSPERITY_TREASURY_T1_MIN: 1000, // Level 1 -> 2 renovation threshold
+        PROSPERITY_TREASURY_T2_MIN: 2500, // Level 2 -> 3 renovation threshold
+        PROSPERITY_TREASURY_T3_MIN: 4500, // Level 3/4 Ginza Western Arcade renovation threshold
+
+        // Upgrade Batching Limits (Renovations per month by town tier)
+        UPGRADE_BATCH_LIMIT_T1: 1,
+        UPGRADE_BATCH_LIMIT_T2: 2,
+        UPGRADE_BATCH_LIMIT_T3: 3,
+        UPGRADE_BATCH_LIMIT_T4: 5,
         POP_GAIN_L2: 10,
         TAX_RESIDENTIAL_L2: 9,
         TAX_COMMERCIAL_L2: 22,
@@ -227,11 +240,11 @@ export const CONFIG = {
         KOBAN_RADIUS: 8,            // 8-tile circular public order zone
         KOBAN_MAINTENANCE: 3,       // Monthly upkeep (¥3/mo)
         SCHOOL_RADIUS: 8,           // 8-tile education coverage radius
-        SCHOOL_MAINTENANCE: 8,      // Monthly upkeep (¥8/mo)
+        SCHOOL_MAINTENANCE: 20,     // Primary school operational upkeep (¥20/mo)
         TELEGRAPH_MAINTENANCE: 6,   // Meiji Telegraph Office monthly upkeep (¥6/mo)
-        HARBOR_PIER_MAINTENANCE: 12,// Harbor Cargo Pier monthly upkeep (¥12/mo)
-        POWER_PLANT_MAINTENANCE: 25,// Coal Steam Power Plant monthly upkeep (¥25/mo)
-        WATERWORKS_MAINTENANCE: 15, // Water Filtration Basin monthly upkeep (¥15/mo)
+        HARBOR_PIER_MAINTENANCE: 35,// Harbor Cargo Pier monthly upkeep (¥35/mo)
+        POWER_PLANT_MAINTENANCE: 75,// Coal Steam Power Plant monthly upkeep (¥75/mo)
+        WATERWORKS_MAINTENANCE: 45, // Water Filtration Basin monthly upkeep (¥45/mo)
         POWER_POLLUTION_RADIUS: 4,  // Coal soot pollution radius (tiles)
         POWER_POLLUTION_PENALTY: 8, // Residential satisfaction penalty (-8%)
         WATERWORKS_RADIUS: 18,      // Pressurized clean water pipe radius (tiles)
@@ -242,7 +255,7 @@ export const CONFIG = {
         TAX_COMMERCIAL_L4: 70,      // Western Brick Arcades (Ginza Rengagai) commercial tax
         POP_GAIN_L4: 25,            // Population gain for Ginza Brick Arcades
         RICE_HARVEST_BONUS: 20,     // Autumn harvest yield bonus per irrigated tile (+¥20)
-        TRAIN_DEPOT_MAINTENANCE: 10,// Rural Train Depot monthly upkeep (¥10/mo)
+        TRAIN_DEPOT_MAINTENANCE: 30,// Rural Train Depot monthly upkeep (¥30/mo)
         DEFAULT_HAPPINESS: 65,      // Default citizen satisfaction score
         FIRE_SPREAD_CHANCE: 0.40,   // Chance to spread per tick to adjacent wooden structure
         FIRE_BURN_TICKS: 3,         // Ticks before burning down to ash if unextinguished

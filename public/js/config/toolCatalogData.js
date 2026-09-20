@@ -40,7 +40,7 @@ export const TOOL_CATALOG = {
     },
     stone_road: {
         name: { en: 'Stone Paving (Ishidatami)', ja: '石畳舗装' },
-        cost: 30, upkeep: 1,
+        cost: 30, upkeep: 2,
         effect: {
             en: 'Meiji granite paving. Accelerates movement and acts as an absolute firebreak.',
             ja: '御影石の石畳。往来を円滑にし、延焼を完全に阻止する防火帯。'
@@ -49,7 +49,7 @@ export const TOOL_CATALOG = {
     },
     canal: {
         name: { en: 'Canal (Hori)', ja: '堀・水路' },
-        cost: 15, upkeep: 0,
+        cost: 15, upkeep: 1,
         effect: {
             en: 'Historical water artery for cargo barges. Serves as a wide firebreak.',
             ja: '荷船が航行する歴史的水路。広域な延焼遮断帯としても機能。'
@@ -67,7 +67,7 @@ export const TOOL_CATALOG = {
     },
     train_depot: {
         name: { en: 'Train Depot', ja: '停車場・駅' },
-        cost: 350, upkeep: 10,
+        cost: 350, upkeep: 30,
         effect: {
             en: 'Station terminal spurring high-density modernization and commerce.',
             ja: '周辺の商業近代化と集客を促す鉄道の玄関口。'
@@ -139,7 +139,7 @@ export const TOOL_CATALOG = {
     },
     school: {
         name: { en: 'Primary School (Shōgakkō)', ja: '尋常小学校' },
-        cost: 280, upkeep: 8,
+        cost: 280, upkeep: 20,
         effect: {
             en: 'Educates youth within 8 tiles, elevating citywide literacy and enlightenment.',
             ja: '半径8タイルの学童を教育し、近代化度と文明開化を推進。'
@@ -157,7 +157,7 @@ export const TOOL_CATALOG = {
     },
     harbor_pier: {
         name: { en: 'Cargo Pier (Funatsuki-ba)', ja: '船着場 (港湾荷揚場)' },
-        cost: 450, upkeep: 12,
+        cost: 450, upkeep: 35,
         effect: {
             en: 'Harbor cargo pier facilitating raw materials, silk export, and trade.',
             ja: '水運物流と生糸輸出を支え、商業・工業需要を大きく底上げ。'
@@ -166,7 +166,7 @@ export const TOOL_CATALOG = {
     },
     power_plant: {
         name: { en: 'Coal Power Plant', ja: '石炭火力発電所' },
-        cost: 600, upkeep: 25,
+        cost: 600, upkeep: 75,
         effect: {
             en: 'Steam coal facility powering industrial mills and Western brick arcades.',
             ja: '蒸気火力で近代工場群や銀座煉瓦街へ電力を供給。周辺に煤煙。'
@@ -175,7 +175,7 @@ export const TOOL_CATALOG = {
     },
     waterworks: {
         name: { en: 'Water Filtration Basin', ja: '浄水場 (近代沈殿池)' },
-        cost: 350, upkeep: 15,
+        cost: 350, upkeep: 45,
         effect: {
             en: 'Pressurized clean water grid supplying potable water across 18 tiles.',
             ja: '半径18タイルへ近代的な加圧上水を配給しコレラ等の疫病を撲滅。'
@@ -184,7 +184,7 @@ export const TOOL_CATALOG = {
     },
     monument_pavilion: {
         name: { en: 'National Exposition Pavilion', ja: '内国勧業博覧会館' },
-        cost: 2000, upkeep: 0,
+        cost: 6000, upkeep: 50,
         effect: { en: 'Grand exposition pavilion celebrating Meiji modernization.', ja: '明治の産業振興を祝う壮麗な殿堂。' },
         category: 'civic'
     },

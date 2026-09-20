@@ -199,7 +199,7 @@ export class MilestoneManager {
             this.state.showToast("Exhibition Pavilion requires Tier 4 Metropolis (Pop 600+, Rail, Telegraph, Pier) and a clear 3×3 plot!", true);
             return false;
         }
-        const cost = CONFIG.COSTS.PAVILION || 2000;
+        const cost = CONFIG.COSTS.PAVILION || 6000;
         if (!this.state.deductTreasury(cost)) {
             this.state.showToast(`Insufficient funds for Pavilion (¥${cost} needed)!`, true);
             return false;
