@@ -8,6 +8,14 @@ vendor/
 .env.*.local
 *.pem
 *.key
+src/config.local.php
+config.local.php
+
+# Planning and notes documents
+*Steps*.md
+*steps*.md
+*Plan*.md
+*plan*.md
 
 # Logs and databases
 *.log
@@ -22,3 +30,4 @@ Thumbs.db
 *.suo
 *.ntvs*
 *.njsproj
+

@@ -29,14 +29,30 @@ function createContainer(): Container
 {
     $container = new Container();
 
-    // Database Connection Singleton
+    // Database Connection Singleton (supports optional local config override for Bluehost/prod)
     $container->bind(DatabaseConnection::class, function () {
+        $dbConfig = [
+            'host' => '127.0.0.1',
+            'port' => 3306,
+            'database' => 'meijitown',
+            'username' => 'root',
+            'password' => ''
+        ];
+
+        $configFile = __DIR__ . '/config.local.php';
+        if (file_exists($configFile)) {
+            $localConfig = require $configFile;
+            if (is_array($localConfig)) {
+                $dbConfig = array_merge($dbConfig, $localConfig);
+            }
+        }
+
         return new DatabaseConnection(
-            host: '127.0.0.1',
-            port: 3306,
-            database: 'meijitown',
-            username: 'root',
-            password: ''
+            host: (string)($dbConfig['host'] ?? '127.0.0.1'),
+            port: (int)($dbConfig['port'] ?? 3306),
+            database: (string)($dbConfig['database'] ?? 'meijitown'),
+            username: (string)($dbConfig['username'] ?? 'root'),
+            password: (string)($dbConfig['password'] ?? '')
         );
     });
 
