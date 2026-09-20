@@ -5,6 +5,10 @@ header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: SAMEORIGIN');
 
+require_once __DIR__ . '/../src/bootstrap.php';
+
+use Meiji\Infrastructure\Database\DatabaseConnection;
+
 try {
     $remoteAddr = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
     if ($remoteAddr !== '127.0.0.1' && $remoteAddr !== '::1') {
@@ -35,11 +39,8 @@ try {
     }
 
     // Default or 'fidel': Profile Fidel (ID: 1)
-    $pdo = new PDO('mysql:host=127.0.0.1;port=3306;dbname=meijitown_db;charset=utf8mb4', 'root', '', [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        PDO::ATTR_EMULATE_PREPARES => false,
-    ]);
+    $container = createContainer();
+    $pdo = $container->get(DatabaseConnection::class)->getPdo();
 
     // Ensure User 1 exists with username 'Fidel' using parameter binding to avoid string interpolation warnings
     $stmt = $pdo->prepare('

@@ -21,7 +21,7 @@ final class PdoSavedCityRepository implements SavedCityRepositoryInterface
 
     public function findUserByUsername(string $username): ?User
     {
-        $stmt = $this->pdo->prepare("SELECT id, username, password_hash, created_at FROM meijitown_db.users WHERE username = ? LIMIT 1");
+        $stmt = $this->pdo->prepare("SELECT id, username, password_hash, created_at FROM users WHERE username = ? LIMIT 1");
         $stmt->execute([$username]);
         $row = $stmt->fetch();
         if (!$row) {
@@ -38,7 +38,7 @@ final class PdoSavedCityRepository implements SavedCityRepositoryInterface
 
     public function findUserById(int $userId): ?User
     {
-        $stmt = $this->pdo->prepare("SELECT id, username, password_hash, created_at FROM meijitown_db.users WHERE id = ? LIMIT 1");
+        $stmt = $this->pdo->prepare("SELECT id, username, password_hash, created_at FROM users WHERE id = ? LIMIT 1");
         $stmt->execute([$userId]);
         $row = $stmt->fetch();
         if (!$row) {
@@ -55,7 +55,7 @@ final class PdoSavedCityRepository implements SavedCityRepositoryInterface
 
     public function createUser(string $username, string $passwordHash): User
     {
-        $stmt = $this->pdo->prepare("INSERT INTO meijitown_db.users (username, password_hash) VALUES (?, ?)");
+        $stmt = $this->pdo->prepare("INSERT INTO users (username, password_hash) VALUES (?, ?)");
         $stmt->execute([$username, $passwordHash]);
         $newId = (int) $this->pdo->lastInsertId();
 
@@ -70,20 +70,20 @@ final class PdoSavedCityRepository implements SavedCityRepositoryInterface
     /**
      * @return SavedCity[]
      */
-    public function listCitiesByUser(int $userId): array
+    public function listCitiesForUser(int $userId): array
     {
         $stmt = $this->pdo->prepare("
-            SELECT id, user_id, city_name, chronicle_year, chronicle_month, population, treasury, updated_at
-            FROM meijitown_db.saved_cities
+            SELECT id, user_id, city_name, chronicle_year, chronicle_month, population, treasury, city_data, updated_at
+            FROM saved_cities
             WHERE user_id = ?
             ORDER BY updated_at DESC
         ");
         $stmt->execute([$userId]);
         $rows = $stmt->fetchAll();
 
-        $list = [];
+        $results = [];
         foreach ($rows as $row) {
-            $list[] = new SavedCity(
+            $results[] = new SavedCity(
                 id: (int) $row['id'],
                 userId: (int) $row['user_id'],
                 cityName: (string) $row['city_name'],
@@ -91,18 +91,19 @@ final class PdoSavedCityRepository implements SavedCityRepositoryInterface
                 chronicleMonth: (int) $row['chronicle_month'],
                 population: (int) $row['population'],
                 treasury: (int) $row['treasury'],
-                cityData: '',
+                cityData: (string) $row['city_data'],
                 updatedAt: (string) ($row['updated_at'] ?? '')
             );
         }
-        return $list;
+
+        return $results;
     }
 
-    public function getSavedCity(int $cityId, int $userId): ?SavedCity
+    public function getCityById(int $cityId, int $userId): ?SavedCity
     {
         $stmt = $this->pdo->prepare("
             SELECT id, user_id, city_name, chronicle_year, chronicle_month, population, treasury, city_data, updated_at
-            FROM meijitown_db.saved_cities
+            FROM saved_cities
             WHERE id = ? AND user_id = ?
             LIMIT 1
         ");
@@ -138,7 +139,7 @@ final class PdoSavedCityRepository implements SavedCityRepositoryInterface
         if ($cityId !== null && $cityId > 0) {
             // Update existing slot if owned by user
             $stmt = $this->pdo->prepare("
-                UPDATE meijitown_db.saved_cities
+                UPDATE saved_cities
                 SET city_name = ?, chronicle_year = ?, chronicle_month = ?, population = ?, treasury = ?, city_data = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ? AND user_id = ?
             ");
@@ -160,7 +161,7 @@ final class PdoSavedCityRepository implements SavedCityRepositoryInterface
 
         // Insert new slot
         $stmt = $this->pdo->prepare("
-            INSERT INTO meijitown_db.saved_cities (user_id, city_name, chronicle_year, chronicle_month, population, treasury, city_data)
+            INSERT INTO saved_cities (user_id, city_name, chronicle_year, chronicle_month, population, treasury, city_data)
             VALUES (?, ?, ?, ?, ?, ?, ?)
         ");
         $stmt->execute([
@@ -178,7 +179,7 @@ final class PdoSavedCityRepository implements SavedCityRepositoryInterface
 
     public function deleteSavedCity(int $cityId, int $userId): bool
     {
-        $stmt = $this->pdo->prepare("DELETE FROM meijitown_db.saved_cities WHERE id = ? AND user_id = ?");
+        $stmt = $this->pdo->prepare("DELETE FROM saved_cities WHERE id = ? AND user_id = ?");
         $stmt->execute([$cityId, $userId]);
         return $stmt->rowCount() > 0;
     }

@@ -3,6 +3,10 @@ declare(strict_types=1);
 
 // ponytail: single load endpoint, session-scoped slot query, stdlib PDO
 
+require_once __DIR__ . '/../src/bootstrap.php';
+
+use Meiji\Infrastructure\Database\DatabaseConnection;
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start([
         'cookie_httponly' => true,
@@ -22,11 +26,8 @@ if ($userId <= 0) {
 }
 
 try {
-    $pdo = new PDO('mysql:host=127.0.0.1;port=3306;dbname=meijitown_db;charset=utf8mb4', 'root', '', [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        PDO::ATTR_EMULATE_PREPARES => false,
-    ]);
+    $container = createContainer();
+    $pdo = $container->get(DatabaseConnection::class)->getPdo();
 
     $slotId = isset($_GET['slot_id']) ? (int) $_GET['slot_id'] : 0;
 
