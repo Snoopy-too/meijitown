@@ -30,6 +30,17 @@ export class ModalManager {
                 </div>
             `;
             document.body.appendChild(overlay);
+        } else {
+            let inputContainer = document.getElementById('confirm-modal-input-container');
+            if (!inputContainer) {
+                const messageEl = document.getElementById('confirm-modal-message');
+                inputContainer = document.createElement('div');
+                inputContainer.id = 'confirm-modal-input-container';
+                inputContainer.style.display = 'none';
+                inputContainer.style.marginBottom = '18px';
+                inputContainer.innerHTML = `<input type="text" id="confirm-modal-input" maxlength="40" style="width: 85%; padding: 8px 12px; font-family: inherit; font-size: 1rem; border: 1.5px solid #8c7355; border-radius: 4px; background: #fffdf9; color: #2b1f14; text-align: center;" />`;
+                messageEl?.parentNode?.insertBefore(inputContainer, messageEl.nextSibling);
+            }
         }
 
         this.dom = {
