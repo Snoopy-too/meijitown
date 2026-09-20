@@ -34,6 +34,9 @@ final class PdoCityRepository implements CityRepositoryInterface
         $row = $stmt->fetch();
 
         if (!$row) {
+            if ($cityId === 1) {
+                return $this->seedInitialCity(1);
+            }
             return null;
         }
 
@@ -148,13 +151,33 @@ final class PdoCityRepository implements CityRepositoryInterface
     {
         $this->pdo->beginTransaction();
         try {
-            // 1. Reset City basic attributes
-            $cityStmt = $this->pdo->prepare("
-                UPDATE cities 
-                SET treasury = 5000, population = 0, current_year = 1872, current_month = 1, last_saved = CURRENT_TIMESTAMP
-                WHERE city_id = ?
-            ");
-            $cityStmt->execute([$cityId]);
+            // 1. Ensure parent city exists
+            $check = $this->pdo->prepare("SELECT city_id FROM cities WHERE city_id = ?");
+            $check->execute([$cityId]);
+            if (!$check->fetch()) {
+                // Ensure default user exists
+                $userCheck = $this->pdo->query("SELECT id FROM users LIMIT 1");
+                $userId = $userCheck->fetchColumn();
+                if (!$userId) {
+                    $insertUser = $this->pdo->prepare("INSERT INTO users (username, password_hash) VALUES (?, ?)");
+                    $insertUser->execute(['mayor', password_hash('meiji1868', PASSWORD_DEFAULT)]);
+                    $userId = (int) $this->pdo->lastInsertId();
+                }
+
+                $insertCity = $this->pdo->prepare("
+                    INSERT INTO cities (city_id, user_id, city_name, treasury, population, current_year, current_month)
+                    VALUES (?, ?, 'Edo-Tokyo', 5000, 0, 1872, 1)
+                ");
+                $insertCity->execute([$cityId, (int) $userId]);
+            } else {
+                // Reset City basic attributes
+                $cityStmt = $this->pdo->prepare("
+                    UPDATE cities 
+                    SET treasury = 5000, population = 0, current_year = 1872, current_month = 1, last_saved = CURRENT_TIMESTAMP
+                    WHERE city_id = ?
+                ");
+                $cityStmt->execute([$cityId]);
+            }
 
             // 2. Clear Grid Tiles to empty array
             $gridStmt = $this->pdo->prepare("
@@ -186,5 +209,15 @@ final class PdoCityRepository implements CityRepositoryInterface
             $this->pdo->rollBack();
             throw new RuntimeException("Transaction failed while resetting city: " . $e->getMessage(), 0, $e);
         }
+    }
+
+    private function seedInitialCity(int $cityId): City
+    {
+        $this->resetCity($cityId);
+        $seeded = $this->getCity($cityId);
+        if ($seeded === null) {
+            throw new RuntimeException("Failed to seed initial city ID {$cityId}");
+        }
+        return $seeded;
     }
 }
