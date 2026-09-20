@@ -242,21 +242,26 @@ class GameStateManager {
     }
 
     async startNewGame() {
-        const confirmed = await modalManager.confirm({
+        const chosenName = await modalManager.prompt({
             title: i18n.t('confirm.reset_city_title', "Start a New Settlement?"),
-            message: i18n.t('confirm.reset_city_msg', "This will reset Edo-Tokyo back to the pristine Meiji dawn of 1872 with ¥5,000 in treasury.\n\nAll existing buildings will be cleared. Do you wish to proceed?"),
-            confirmText: i18n.t('confirm.reset_city_ok', "Reset City"),
+            message: i18n.t('confirm.reset_city_msg', "Name your new Meiji settlement to begin in 1872 with ¥5,000 in treasury.\n\nAll existing buildings will be cleared. Do you wish to proceed?"),
+            defaultValue: this.cityName || 'Edo-Tokyo',
+            placeholder: i18n.t('confirm.reset_city_placeholder', "Settlement Name (e.g. Edo-Tokyo, Yokohama)"),
+            confirmText: i18n.t('confirm.reset_city_ok', "Found Settlement"),
             cancelText: i18n.t('confirm.reset_city_cancel', "Keep Building"),
             icon: "⛩️"
         });
-        if (!confirmed) return;
+        if (!chosenName) return;
+
+        const newCityName = (typeof chosenName === 'string' && chosenName.trim()) ? chosenName.trim() : 'Edo-Tokyo';
 
         this.simulation.pause();
-        this.showToast(i18n.getLanguage() === 'ja' ? '明治五年 (1872年) へ集落を初期化中...' : 'Resetting settlement to Year 5 (1872)...');
+        this.showToast(i18n.getLanguage() === 'ja' ? `明治五年 (1872年) 「${newCityName}」を開拓中...` : `Founding "${newCityName}" in Meiji Year 5 (1872)...`);
 
         try {
-            await this.api.resetCity(this.cityId);
+            await this.api.resetCity(this.cityId, newCityName);
 
+            this.cityName = newCityName;
             this.treasury = CONFIG.SIMULATION.INITIAL_TREASURY || 5000;
             this.population = 0;
             this.currentYear = 1872;
@@ -281,8 +286,8 @@ class GameStateManager {
                     {
                         year: 1872,
                         month: 1,
-                        textEn: 'Founding of the Edo-Tokyo Meiji Settlement.',
-                        textJa: '明治五年一月、江戸東京開拓草創の布告。'
+                        textEn: `Founding of the ${newCityName} Meiji Settlement.`,
+                        textJa: `明治五年一月、${newCityName}開拓草創の布告。`
                     }
                 ]
             };

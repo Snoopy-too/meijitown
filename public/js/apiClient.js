@@ -101,10 +101,11 @@ export class ApiClient {
         });
     }
 
-    async resetCity(id = 1) {
+    async resetCity(id = 1, cityName = 'Edo-Tokyo') {
         return this.request('reset_city', {
             method: 'POST',
-            query: `id=${id}`
+            query: `id=${id}`,
+            body: { cityName }
         });
     }
 

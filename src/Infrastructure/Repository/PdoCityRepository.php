@@ -147,7 +147,7 @@ final class PdoCityRepository implements CityRepositoryInterface
         }
     }
 
-    public function resetCity(int $cityId): void
+    public function resetCity(int $cityId, string $cityName = 'Edo-Tokyo'): void
     {
         $this->pdo->beginTransaction();
         try {
@@ -166,17 +166,17 @@ final class PdoCityRepository implements CityRepositoryInterface
 
                 $insertCity = $this->pdo->prepare("
                     INSERT INTO cities (city_id, user_id, city_name, treasury, population, current_year, current_month)
-                    VALUES (?, ?, 'Edo-Tokyo', 5000, 0, 1872, 1)
+                    VALUES (?, ?, ?, 5000, 0, 1872, 1)
                 ");
-                $insertCity->execute([$cityId, (int) $userId]);
+                $insertCity->execute([$cityId, (int) $userId, $cityName]);
             } else {
-                // Reset City basic attributes
+                // Reset City basic attributes and name
                 $cityStmt = $this->pdo->prepare("
                     UPDATE cities 
-                    SET treasury = 5000, population = 0, current_year = 1872, current_month = 1, last_saved = CURRENT_TIMESTAMP
+                    SET city_name = ?, treasury = 5000, population = 0, current_year = 1872, current_month = 1, last_saved = CURRENT_TIMESTAMP
                     WHERE city_id = ?
                 ");
-                $cityStmt->execute([$cityId]);
+                $cityStmt->execute([$cityName, $cityId]);
             }
 
             // 2. Clear Grid Tiles to empty array

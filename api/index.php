@@ -113,9 +113,18 @@ try {
             exit(0);
         }
 
+        $rawBody = (string) file_get_contents('php://input');
+        $cityName = 'Edo-Tokyo';
+        if (!empty($rawBody)) {
+            $parsedBody = json_decode($rawBody, true);
+            if (is_array($parsedBody) && !empty($parsedBody['cityName'])) {
+                $cityName = (string) $parsedBody['cityName'];
+            }
+        }
+
         /** @var ResetCityUseCase $useCase */
         $useCase = $container->get(ResetCityUseCase::class);
-        $result = $useCase->execute($cityId);
+        $result = $useCase->execute($cityId, $cityName);
 
         echo json_encode(['success' => true, 'data' => $result], JSON_THROW_ON_ERROR);
         exit(0);

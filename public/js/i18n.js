@@ -48,8 +48,9 @@ export const TRANSLATIONS = {
         'action.new': 'New',
         'action.new_title': 'Start a completely new settlement (Meiji 1872)',
         'confirm.reset_city_title': 'Start a New Settlement?',
-        'confirm.reset_city_msg': 'This will reset Edo-Tokyo back to the pristine Meiji dawn of 1872 with ¥5,000 in treasury.\n\nAll existing buildings will be cleared. Do you wish to proceed?',
-        'confirm.reset_city_ok': 'Reset City',
+        'confirm.reset_city_msg': 'Name your new Meiji settlement to begin in 1872 with ¥5,000 in treasury.\n\nAll existing buildings will be cleared. Do you wish to proceed?',
+        'confirm.reset_city_placeholder': 'Settlement Name (e.g. Edo-Tokyo, Yokohama)',
+        'confirm.reset_city_ok': 'Found Settlement',
         'confirm.reset_city_cancel': 'Keep Building',
 
         // Build Drawer
@@ -225,8 +226,9 @@ export const TRANSLATIONS = {
         'action.new': '新規開始',
         'action.new_title': '明治五年の新たな集落造りを開始する',
         'confirm.reset_city_title': '新たな集落を開拓しますか？',
-        'confirm.reset_city_msg': '明治五年、開拓の夜明けへ戻り、国庫資金¥5,000で集落を再建します。\n\n既存の全建物が撤去されます。実行しますか？',
-        'confirm.reset_city_ok': '集落を初期化',
+        'confirm.reset_city_msg': '新たな集落名を入力して、国庫資金¥5,000で明治五年の開拓を開始します。\n\n既存の全建物が撤去されます。実行しますか？',
+        'confirm.reset_city_placeholder': '集落名 (例: 江戸東京、横浜)',
+        'confirm.reset_city_ok': '集落を建国',
         'confirm.reset_city_cancel': '建築を続ける',
 
         // Build Drawer

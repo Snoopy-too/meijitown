@@ -14,5 +14,5 @@ interface CityRepositoryInterface
 
     public function saveCityAndGrid(City $city, CityGrid $grid): void;
 
-    public function resetCity(int $cityId): void;
+    public function resetCity(int $cityId, string $cityName = 'Edo-Tokyo'): void;
 }
