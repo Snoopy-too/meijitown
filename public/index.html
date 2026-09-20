@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Project Meiji - 明治時代都市建設</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/hud.css">
+    <link rel="stylesheet" href="css/drawer.css">
+    <link rel="stylesheet" href="css/civic.css">
+
+    <!-- Three.js ESM Import Map -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+</head>
+<body>
+    <!-- 3D Three.js Viewport Container -->
+    <div id="canvas-container"></div>
+
+    <!-- Top Chronicle Header: Stats & Era Context (2-Tier Flexbox) -->
+    <header id="chronicle-banner" class="hud-topbar chronicle-banner">
+        <!-- Tier 1: Status & Vitals Row -->
+        <div class="hud-topbar-row hud-row-primary header-vitals-row">
+            <div class="header-brand-group">
+                <div class="hud-title"><span class="kanji">明治</span> Meiji</div>
+                <div class="hud-settlement-badge">
+                    <span id="val-cityname" class="hud-value hud-cityname">Edo-Tokyo</span>
+                    <span id="val-tier-badge" class="hud-tier-badge" data-i18n-title="milestone.badge_title" title="Settlement Milestone Tier">村 (Tier 1)</span>
+                </div>
+                <button id="btn-mayor-auth" class="hud-mayor-badge" title="Manage Mayor Account & Dev Profiles">👤 Mayor (Guest) - Sign In</button>
+            </div>
+
+            <div class="header-vitals-group">
+                <div class="hud-stat">
+                    <span class="hud-label" data-i18n="hud.treasury">Treasury</span>
+                    <span id="val-treasury" class="hud-value" style="color: #b58900;">¥10,000</span>
+                </div>
+                <div class="hud-stat">
+                    <span class="hud-label" data-i18n="hud.cashflow">Cashflow</span>
+                    <span id="val-cashflow" class="hud-value" style="color: #3a6332;">+¥0/mo</span>
+                </div>
+                <div class="hud-stat">
+                    <span class="hud-label" data-i18n="hud.population">Population</span>
+                    <span id="val-population" class="hud-value">0</span>
+                </div>
+                <div class="hud-stat hud-happiness-stat" data-i18n-title="hud.satisfaction_title" title="Citizen Satisfaction & Town Welfare">
+                    <span class="hud-label" data-i18n="hud.satisfaction">Satisfaction</span>
+                    <span id="val-happiness" class="hud-value" style="color: #3a6332;">65%</span>
+                </div>
+            </div>
+
+            <!-- Tier 1 Demand Group (Right) -->
+            <div class="header-demand-group">
+                <div id="rci-container" class="demand-container rci-meter" data-i18n-title="hud.rci_title" title="Zoning Demand (R: Residential, C: Commercial, I: Industrial)">
+                    <div class="demand-bar">
+                        <div class="bar-track"><div id="fill-res" class="bar-fill fill-res"></div></div>
+                        <span class="bar-tag bar-tag-r" data-i18n="hud.rci_r">R</span>
+                    </div>
+                    <div class="demand-bar">
+                        <div class="bar-track"><div id="fill-com" class="bar-fill fill-com"></div></div>
+                        <span class="bar-tag bar-tag-c" data-i18n="hud.rci_c">C</span>
+                    </div>
+                    <div class="demand-bar">
+                        <div class="bar-track"><div id="fill-ind" class="bar-fill fill-ind"></div></div>
+                        <span class="bar-tag bar-tag-i" data-i18n="hud.rci_i">I</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tier 2: Chronicle & Administration Row -->
+        <div class="hud-topbar-row hud-row-secondary header-controls-row">
+            <div class="header-date-group">
+                <span class="hud-label" data-i18n="hud.chronicle">Chronicle</span>
+                <span id="val-date" class="hud-value">Meiji 5 (1872)</span>
+            </div>
+
+            <div id="time-controls" class="time-controls header-time-group" title="Simulation Speed [Space: Pause, Shift+1: 1x, Shift+2: 2x, Shift+3: 3x, Shift+5: 5x]">
+                <button id="btn-time-pause" class="time-btn" data-speed="0" data-i18n-title="time.pause_title" title="Pause simulation [Space]">⏸</button>
+                <button id="btn-speed-1x" class="time-btn active" data-speed="1" data-i18n-title="time.speed_1x_title" title="Standard Speed (1x) [Shift+1]">1x</button>
+                <button id="btn-speed-2x" class="time-btn" data-speed="2" data-i18n-title="time.speed_2x_title" title="Fast Speed (2x) [Shift+2]">2x</button>
+                <button id="btn-speed-3x" class="time-btn" data-speed="3" data-i18n-title="time.speed_3x_title" title="Swift Speed (3x) [Shift+3]">3x</button>
+                <button id="btn-speed-5x" class="time-btn" data-speed="5" data-i18n-title="time.speed_5x_title" title="Hyper Speed (5x) [Shift+5]">5x</button>
+            </div>
+
+            <div class="header-utility-group">
+                <button id="audio-toggle-btn" class="time-btn audio-toggle-btn" title="Toggle Sound [M]">🔊 On</button>
+                <button id="lang-toggle-btn" class="time-btn lang-toggle-btn" title="Switch Language [L] / 言語切替">🌐 日本語</button>
+                <div class="time-audio-divider" aria-hidden="true"></div>
+                <button id="btn-layers-toggle" class="time-btn hud-btn-civic" data-i18n-title="hud.layers_title" title="Map Data Overlays [O] / 地図レイヤー">🗺️ <span data-i18n="hud.layers">Layers</span></button>
+                <button id="btn-policy-ledger" class="time-btn hud-btn-civic" data-i18n-title="hud.edicts_title" title="Civic Policies & Imperial Edicts [P] / 政策録">📜 <span data-i18n="hud.edicts">Edicts</span></button>
+                <!-- Washi Map Layers Dropdown Popover -->
+                <div id="layer-menu-popover" class="layer-menu-popover washi-card" style="display: none;">
+                    <div class="layer-menu-header"><h4 data-i18n="hud.layers_menu_title">Map Data Overlays</h4></div>
+                    <div class="layer-menu-options">
+                        <label class="layer-radio-item"><input type="radio" name="layer-mode" value="none" checked><span data-i18n="layer.normal">Normal View</span></label>
+                        <label class="layer-radio-item"><input type="radio" name="layer-mode" value="fire"><span data-i18n="layer.fire">🔥 Fire Hazard</span></label>
+                        <label class="layer-radio-item"><input type="radio" name="layer-mode" value="sanitation"><span data-i18n="layer.sanitation">💧 Sanitation & Water</span></label>
+                        <label class="layer-radio-item"><input type="radio" name="layer-mode" value="electric"><span data-i18n="layer.electric">⚡ Electric Grid</span></label>
+                        <label class="layer-radio-item"><input type="radio" name="layer-mode" value="pollution"><span data-i18n="layer.pollution">🏭 Coal Soot Pollution</span></label>
+                        <label class="layer-radio-item"><input type="radio" name="layer-mode" value="flood"><span data-i18n="layer.flood">🌊 Flood Risk</span></label>
+                        <div style="margin: 4px 0; border-top: 1px dashed #8c7355; opacity: 0.4;"></div>
+                        <label class="layer-radio-item" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;"><span>🧑‍💼 <span data-i18n="hud.advisor_guidance">Advisor Guidance</span></span><input type="checkbox" id="toggle-advisor-guidance" checked style="cursor: pointer;"></label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Contextual Surveyor's Scope (Bottom-Left Corner) -->
+    <div id="surveyor-scope" class="surveyor-scope scope-minimized">
+        <!-- Minimized Pill Badge (shown by default) -->
+        <button id="scope-pill-badge" class="scope-pill" title="Tap or click tile in Survey mode to expand scope">
+            🧭 Scope <span id="insp-coords">(0, 0)</span>
+        </button>
+
+        <!-- Detailed Inspector Card -->
+        <aside id="scope-card" class="scope-card">
+            <div class="scope-header">
+                <span data-i18n="scope.title">Surveyor's Scope</span>
+                <button id="scope-toggle-btn" class="scope-close-btn" title="Minimize Scope">✕</button>
+            </div>
+            <div class="scope-body">
+                <div class="scope-row">
+                    <span class="scope-label" data-i18n="scope.tile">Tile:</span>
+                    <span id="insp-type" class="scope-value">Open Meadow</span>
+                </div>
+                <div class="scope-row">
+                    <span class="scope-label" data-i18n="scope.stage">Stage:</span>
+                    <span id="insp-stage" class="scope-value">Unoccupied</span>
+                </div>
+                <div class="scope-row">
+                    <span class="scope-label" data-i18n="scope.road">Road:</span>
+                    <span id="insp-road" class="scope-value">No</span>
+                </div>
+                <div class="scope-row">
+                    <span class="scope-label" data-i18n="scope.fire_hazard">Fire Hazard:</span>
+                    <span id="insp-fire" class="scope-value">None (0%)</span>
+                </div>
+                <div class="scope-row">
+                    <span class="scope-label" data-i18n="scope.sanitation">Sanitation:</span>
+                    <span id="insp-water" class="scope-value">Clean (Safe)</span>
+                </div>
+                <div class="scope-row">
+                    <span class="scope-label" data-i18n="scope.leisure">Leisure:</span>
+                    <span id="insp-leisure" class="scope-value">None</span>
+                </div>
+                <div class="scope-row">
+                    <span class="scope-label" data-i18n="scope.order">Order:</span>
+                    <span id="insp-order" class="scope-value">Unpatrolled</span>
+                </div>
+                <div class="scope-row">
+                    <span class="scope-label" data-i18n="scope.education">Education:</span>
+                    <span id="insp-education" class="scope-value">Unserved</span>
+                </div>
+                <div id="scope-rotate-row" class="scope-row" style="display: none; margin-top: 6px; padding-top: 6px; border-top: 1px dashed rgba(60, 40, 20, 0.25);">
+                    <span class="scope-label" data-i18n="scope.facing">Facing:</span>
+                    <span class="scope-value">
+                        <span id="insp-facing">0° (North)</span>
+                        <button id="scope-rotate-btn" class="scope-action-btn" data-i18n="scope.rotate_btn" title="Rotate Structure 90° Clockwise [R]">⟳ Rotate (R)</button>
+                    </span>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Active Tool Floating Action Button (FAB) (Bottom Center) -->
+    <div id="active-tool-container" class="active-tool-container">
+        <div id="active-tool-btn" class="active-tool-fab" title="Open Construction Menu [Tap or Click]">
+            <span id="fab-tool-icon" class="fab-icon">🧭</span>
+            <span id="fab-tool-name" class="fab-name">Survey Mode</span>
+            <button id="fab-rotate-btn" class="fab-rotate-btn" title="Rotate Structure 90° [R]" style="display: none;">⟳ <span id="fab-rotate-deg">0°</span></button>
+            <button id="fab-cancel-btn" class="fab-cancel" title="Cancel tool / Survey mode [1]" style="display: none;">✕</button>
+        </div>
+    </div>
+
+    <!-- Collapsible Build Menu Drawer -->
+    <div id="drawer-overlay" class="drawer-overlay"></div>
+    <nav id="build-drawer" class="build-drawer">
+        <div class="drawer-header">
+            <div class="drawer-title"><span class="kanji">建築目録</span> <span data-i18n="drawer.title">Construction Catalogue</span></div>
+            <button id="drawer-close-btn" class="drawer-close" title="Close Menu">✕</button>
+        </div>
+
+        <!-- 4 Thumb-Friendly Category Tabs -->
+        <div class="drawer-tabs">
+            <button class="drawer-tab-btn active" data-tab="infra" data-i18n="tab.infra">
+                🛣️ Infrastructure
+            </button>
+            <button class="drawer-tab-btn" data-tab="zones" data-i18n="tab.zones">
+                🏡 Zones
+            </button>
+            <button class="drawer-tab-btn" data-tab="civic" data-i18n="tab.civic">
+                🏯 Public Services
+            </button>
+            <button class="drawer-tab-btn" data-tab="leisure" data-i18n="tab.leisure">
+                🍵 Leisure & Culture
+            </button>
+        </div>
+
+        <!-- Tab Panel 1: Infrastructure -->
+        <div id="tab-panel-infra" class="drawer-tab-panel active">
+            <div class="drawer-grid">
+                <button class="drawer-item-btn" data-tool="road" title="Construct Dirt Road [2]">
+                    <span class="item-icon">🛣️</span>
+                    <span class="item-name">Dirt Road</span>
+                    <span class="item-cost">¥10</span>
+                    <span class="item-hotkey">2</span>
+                </button>
+                <button class="drawer-item-btn" data-tool="stone_road" title="Construct / Upgrade Stone Paving (Ishidatami) [S]">
+                    <span class="item-icon">🧱</span>
+                    <span class="item-name">Stone Paving</span>
+                    <span class="item-cost">¥30 (Up: ¥20)</span>
+                    <span class="item-hotkey">S</span>
+                </button>
+                <button class="drawer-item-btn" data-tool="canal" title="Excavate Canal Waterway (Hori) [C]">
+                    <span class="item-icon">🌊</span>
+                    <span class="item-name">Canal (Hori)</span>
+                    <span class="item-cost">¥15</span>
+                    <span class="item-hotkey">C</span>
+                </button>
+                <button class="drawer-item-btn" data-tool="rail_track" title="Lay Iron Rail Tracks (Tetsudō) [T]">
+                    <span class="item-icon">🛤️</span>
+                    <span class="item-name">Rail Tracks</span>
+                    <span class="item-cost">¥20</span>
+                    <span class="item-hotkey">T</span>
+                </button>
+                <button class="drawer-item-btn" data-tool="train_depot" title="Erect Rural Train Depot Platform [D]">
+                    <span class="item-icon">🚉</span>
+                    <span class="item-name">Train Depot</span>
+                    <span class="item-cost">¥350</span>
+                    <span class="item-hotkey">D</span>
+                </button>
+                <button class="drawer-item-btn" data-tool="harbor_pier" title="Construct Harbor Cargo Pier (Funatsuki-ba) [H]">
+                    <span class="item-icon">⚓</span>
+                    <span class="item-name">Cargo Pier</span>
+                    <span class="item-cost">¥450</span>
+                    <span class="item-hotkey">H</span>
+                </button>
+                <button class="drawer-item-btn" data-tool="power_plant" title="Erect Coal Steam Power Plant [2x2]">
+                    <span class="item-icon">🏭</span>
+                    <span class="item-name">Power Plant</span>
+                    <span class="item-cost">¥600</span>
+                </button>
+                <button class="drawer-item-btn item-btn-danger" data-tool="bulldozer" title="Demolish Tile [B]">
+                    <span class="item-icon">🪓</span>
+                    <span class="item-name">Demolish</span>
+                    <span class="item-cost">¥5</span>
+                    <span class="item-hotkey">B</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Tab Panel 2: Zones -->
+        <div id="tab-panel-zones" class="drawer-tab-panel">
+            <div class="drawer-grid">
+                <button class="drawer-item-btn" data-tool="residential" title="Zone Residential Machiya (Autonomous Growth) [3]">
+                    <span class="item-icon">🏡</span>
+                    <span class="item-name">Machiya (R)</span>
+                    <span class="item-cost">¥15</span>
+                    <span class="item-hotkey">3</span>
+                </button>
+                <button class="drawer-item-btn" data-tool="commercial" title="Zone Commercial Shouten Merchant District [4]">
+                    <span class="item-icon">🏬</span>
+                    <span class="item-name">Shouten (C)</span>
+                    <span class="item-cost">¥20</span>
+                    <span class="item-hotkey">4</span>
+                </button>
+                <button class="drawer-item-btn" data-tool="industrial" title="Zone Industrial Craft Workshop & Kilns [5]">
+                    <span class="item-icon">⚒️</span>
+                    <span class="item-name">Workshop (I)</span>
+                    <span class="item-cost">¥25</span>
+                    <span class="item-hotkey">5</span>
+                </button>
+                <button class="drawer-item-btn" data-tool="rice_paddy" title="Cultivate Irrigated Rice Paddy (Suiden) [P]">
+                    <span class="item-icon">🌾</span>
+                    <span class="item-name">Rice Paddy (Suiden)</span>
+                    <span class="item-cost">¥10</span>
+                    <span class="item-hotkey">P</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Tab Panel 3: Public Services -->
+        <div id="tab-panel-civic" class="drawer-tab-panel">
+            <div class="drawer-grid">
+                <button class="drawer-item-btn" data-tool="watchtower" title="Erect Fire Watchtower (Hinomi-yagura) [6]">
+                    <span class="item-icon">🏯</span>
+                    <span class="item-name">Watchtower</span>
+                    <span class="item-cost">¥250</span>
+                    <span class="item-hotkey">6</span>
+                </button>
+                <button class="drawer-item-btn" data-tool="fire_depot" title="Erect Fire Brigade Depot (Hikeshi-sho) [7]">
+                    <span class="item-icon">🚒</span>
+                    <span class="item-name">Fire Depot</span>
+                    <span class="item-cost">¥180</span>
+                    <span class="item-hotkey">7</span>
+                </button>
+                <button class="drawer-item-btn" data-tool="well" title="Dig Communal Well (Ido) [8]">
+                    <span class="item-icon">💧</span>
+                    <span class="item-name">Well (Ido)</span>
+                    <span class="item-cost">¥60</span>
+                    <span class="item-hotkey">8</span>
+                </button>
+                <button class="drawer-item-btn" data-tool="koban" title="Erect Meiji Police Box (Kōban) [K]">
+                    <span class="item-icon">🏮</span>
+                    <span class="item-name">Police (Kōban)</span>
+                    <span class="item-cost">¥110</span>
+                    <span class="item-hotkey">K</span>
+                </button>
+                <button class="drawer-item-btn" data-tool="school" title="Erect Meiji Primary School (Shōgakkō) [G]">
+                    <span class="item-icon">🏫</span>
+                    <span class="item-name">Primary School</span>
+                    <span class="item-cost">¥280</span>
+                    <span class="item-hotkey">G</span>
+                </button>
+                <button class="drawer-item-btn" data-tool="telegraph" title="Erect Telegraph Office (Denshin-kyoku) [E]">
+                    <span class="item-icon">⚡</span>
+                    <span class="item-name">Telegraph</span>
+                    <span class="item-cost">¥220</span>
+                    <span class="item-hotkey">E</span>
+                </button>
+                <button class="drawer-item-btn" data-tool="waterworks" title="Construct Water Filtration Basin (Canal Border) [¥350, 2x1]">
+                    <span class="item-icon">💧</span>
+                    <span class="item-name">Waterworks</span>
+                    <span class="item-cost">¥350</span>
+                </button>
+                <button class="drawer-item-btn" data-tool="suimon" title="Construct Watergate Sluice (Suimon - Flood Barrier) [¥180]">
+                    <span class="item-icon">⛩️</span>
+                    <span class="item-name">Watergate</span>
+                    <span class="item-cost">¥180</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Tab Panel 4: Leisure & Culture -->
+        <div id="tab-panel-leisure" class="drawer-tab-panel">
+            <div class="drawer-grid">
+                <button class="drawer-item-btn" data-tool="tree_willow" title="Plant Weeping Willow / Sakura Tree [W]">
+                    <span class="item-icon">🌸</span>
+                    <span class="item-name">Canal Tree</span>
+                    <span class="item-cost">¥15</span>
+                    <span class="item-hotkey">W</span>
+                </button>
+                <button class="drawer-item-btn" data-tool="shrine_park" title="Erect Neighborhood Shrine Park (Jinjanoki) [J]">
+                    <span class="item-icon">⛩️</span>
+                    <span class="item-name">Shrine Park</span>
+                    <span class="item-cost">¥50</span>
+                    <span class="item-hotkey">J</span>
+                </button>
+                <button class="drawer-item-btn" data-tool="ochaya" title="Erect Traditional Teahouse (Ochaya) [9]">
+                    <span class="item-icon">🍵</span>
+                    <span class="item-name">Teahouse</span>
+                    <span class="item-cost">¥120</span>
+                    <span class="item-hotkey">9</span>
+                </button>
+                <button class="drawer-item-btn" data-tool="sento" title="Construct Public Bathhouse (Sentō) [0]">
+                    <span class="item-icon">♨️</span>
+                    <span class="item-name">Bathhouse</span>
+                    <span class="item-cost">¥90</span>
+                    <span class="item-hotkey">0</span>
+                </button>
+                <button class="drawer-item-btn" data-tool="monument_pavilion" title="Erect National Industrial Exhibition Pavilion [¥2,000, 3x3]">
+                    <span class="item-icon">🏛️</span>
+                    <span class="item-name">Exposition Pavilion</span>
+                    <span class="item-cost">¥2,000</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Dedicated Tool Inspector Strip -->
+        <div id="drawer-tool-inspector" class="washi-inspector-strip">
+            <div class="inspector-header">
+                <span id="inspector-tool-name" class="inspector-name">Select or hover over an item</span>
+                <span id="inspector-tool-cost" class="inspector-cost"></span>
+            </div>
+            <p id="inspector-tool-effect" class="inspector-desc">Hover over any building or tool (including locked items) to view its purpose and municipal benefits.</p>
+            <div id="inspector-tool-lock-status" class="inspector-lock-note"></div>
+        </div>
+    </nav>
+
+    <!-- Save / Load Persistence (Bottom Right) -->
+    <div id="hud-actions" class="hud-actions">
+        <button id="btn-save" class="action-btn btn-primary" data-i18n-title="action.save_title" title="Commit current settlement state to MySQL database">
+            <span>💾</span><span class="btn-label" data-i18n="action.save"> Save</span>
+        </button>
+        <button id="btn-reload" class="action-btn" data-i18n-title="action.reload_title" title="Reload state from MySQL database">
+            <span>🔄</span><span class="btn-label" data-i18n="action.reload"> Reload</span>
+        </button>
+        <button id="btn-new-game" class="action-btn btn-danger" data-i18n-title="action.new_title" title="Start a completely new settlement (Meiji 1872)">
+            <span>⛩️</span><span class="btn-label" data-i18n="action.new"> New</span>
+        </button>
+    </div>
+
+    <!-- Feedback Toasts & Inline Drag Badge -->
+    <div id="toast-container"></div>
+    <div id="drag-badge" style="display: none;"></div>
+
+    <!-- Map Data Overlays Popover (Hidden by default) -->
+    <div id="layer-menu-popover" class="layer-menu-popover" style="display: none;">
+        <button class="layer-option-btn active" data-layer="none">
+            <span>🗺️</span> <span data-i18n="layer.normal">Normal</span>
+        </button>
+        <button class="layer-option-btn" data-layer="fire">
+            <span>🔥</span> <span data-i18n="layer.fire">Fire Risk</span>
+        </button>
+        <button class="layer-option-btn" data-layer="water">
+            <span>💧</span> <span data-i18n="layer.water">Sanitation / Water</span>
+        </button>
+        <button class="layer-option-btn" data-layer="happiness">
+            <span>🌸</span> <span data-i18n="layer.happiness">Welfare / Value</span>
+        </button>
+        <button class="layer-option-btn" data-layer="flood">
+            <span>🌊</span> <span data-i18n="layer.flood">Flood Risk</span>
+        </button>
+    </div>
+
+    <!-- Settlement Milestone Celebration Modal (Hidden by default) -->
+    <div id="milestone-modal-scrim" class="meiji-modal-scrim">
+        <div class="meiji-parchment-card">
+            <div class="milestone-seal">勅</div>
+            <div class="milestone-header">
+                <div class="milestone-subtitle" data-i18n="milestone.imperial_decree">Imperial Settlement Charter</div>
+                <div id="milestone-title" class="milestone-title">Bustling Post Town</div>
+            </div>
+            <div id="milestone-body" class="milestone-body">
+                The settlement has flourished with industrious townsfolk and thriving commerce!
+            </div>
+            <div class="milestone-features">
+                <div class="milestone-features-title" data-i18n="milestone.unlocked_title">Civic Capabilities Unlocked</div>
+                <ul id="milestone-features-list">
+                    <li>Watchtower & Fire Depot</li>
+                    <li>Teahouse & Canal Waterways</li>
+                </ul>
+            </div>
+            <div class="milestone-reward-banner">
+                <span class="reward-label" data-i18n="milestone.charter_grant">Treasury Charter Grant:</span>
+                <span id="milestone-reward-val" class="reward-amount">+¥1,000</span>
+            </div>
+            <div class="milestone-actions"><button id="btn-milestone-claim" class="btn-milestone-claim" data-i18n="milestone.accept">Accept Imperial Charter</button></div>
+        </div>
+    </div>
+
+    <!-- Imperial Meiji Restoration Triumph Capstone Modal (Hidden by default) -->
+    <div id="triumph-modal-scrim" class="meiji-modal-scrim">
+        <div class="meiji-parchment-card triumph-modal-card" style="border: 2px solid #b8860b; max-width: 520px;">
+            <div class="milestone-seal" style="background: #b8860b;">栄</div>
+            <div class="milestone-header">
+                <div class="milestone-subtitle" style="color: #b8860b; font-weight: bold;">Imperial Meiji Restoration Triumph</div>
+                <div class="milestone-title" style="color: #8b0000; font-size: 1.4rem;">National Industrial Exposition</div>
+            </div>
+            <div class="milestone-body" style="font-size: 0.95rem; line-height: 1.6; margin: 12px 0;">
+                The National Industrial Exhibition Pavilion (内国勧業博覧会館) stands triumphant! Delegations from across the empire and foreign envoys marvel at the flourishing manufactures, railways, telegraphs, and electrified modern avenues. Your name is permanently inscribed in the Mayor's Hall of Fame.
+            </div>
+            <div class="milestone-features" style="background: rgba(212, 175, 55, 0.12); border: 1px solid #d4af37; border-radius: 4px; padding: 10px; margin: 12px 0;">
+                <div class="milestone-features-title" style="color: #725208;">🎖️ Mayor Hall of Fame Plaque Conferred</div>
+                <div style="font-size: 0.85rem; color: #423518; margin-top: 4px;">Imperial Order of the Sacred Treasure · Modern Metropolis Founder</div>
+            </div>
+            <div class="milestone-actions"><button id="btn-triumph-close" class="btn-milestone-claim" style="background: #8b0000; color: #fff;">Inscribe in Municipal History</button></div>
+        </div>
+    </div>
+
+    <!-- Civic Policy Ledger Slide-out Drawer (Hidden by default) -->
+    <div id="policy-drawer-scrim" class="policy-drawer-scrim">
+        <div id="policy-drawer" class="policy-drawer">
+            <div class="policy-header">
+                <div class="policy-header-title">
+                    <span class="policy-seal-icon">政</span>
+                    <span data-i18n="policy.title">Civic Edicts & Policies</span>
+                </div>
+                <button id="policy-close-btn" class="policy-close-btn" title="Close Policy Ledger">✕</button>
+            </div>
+            <div class="policy-body">
+                <!-- Edict 1: Night Fire Watch -->
+                <div class="policy-card" id="card-policy-night-watch">
+                    <div class="policy-card-top">
+                        <span class="policy-name" data-i18n="policy.night_watch_name">Night Fire Watch (Yakin)</span>
+                        <label class="policy-switch">
+                            <input type="checkbox" id="toggle-policy-night-watch" data-policy="night_watch">
+                            <span class="policy-slider"></span>
+                        </label>
+                    </div>
+                    <div class="policy-desc" data-i18n="policy.night_watch_desc">
+                        Vigilant citizen watchmen patrol wooden alleys with hyōshigi clappers throughout the night to detect embers early.
+                    </div>
+                    <div class="policy-effects">
+                        <span class="policy-tag pos" data-i18n="policy.night_watch_eff1">-40% Fire Outbreak Risk</span>
+                        <span class="policy-tag neg" data-i18n="policy.night_watch_eff2">-¥15/mo Upkeep</span>
+                        <span class="policy-tag neg" data-i18n="policy.night_watch_eff3">-5% Night Commerce</span>
+                    </div>
+                    <div class="policy-hint" data-i18n="policy.night_watch_hint">Recommended during dry winter months (Nov–Feb) or in dense wooden quarters.</div>
+                </div>
+
+                <!-- Edict 2: Clean Water Mandate -->
+                <div class="policy-card" id="card-policy-clean-water">
+                    <div class="policy-card-top">
+                        <span class="policy-name" data-i18n="policy.clean_water_name">Clean Water Mandate (Seisui-rei)</span>
+                        <label class="policy-switch">
+                            <input type="checkbox" id="toggle-policy-clean-water" data-policy="clean_water">
+                            <span class="policy-slider"></span>
+                        </label>
+                    </div>
+                    <div class="policy-desc" data-i18n="policy.clean_water_desc">
+                        Enforces strict well boiling and communal aqua-sanitation regulations across all serviced residential blocks.
+                    </div>
+                    <div class="policy-effects">
+                        <span class="policy-tag pos" data-i18n="policy.clean_water_eff1">+10% Population Growth</span>
+                        <span class="policy-tag neg" data-i18n="policy.clean_water_eff2">-¥10/mo Public Health Cost</span>
+                    </div>
+                    <div class="policy-hint" data-i18n="policy.clean_water_hint">Recommended when population growth stagnates or disease outbreak occurs.</div>
+                </div>
+
+                <!-- Edict 3: Modernization Subsidy -->
+                <div class="policy-card" id="card-policy-modernization-subsidy">
+                    <div class="policy-card-top">
+                        <span class="policy-name" data-i18n="policy.modernization_name">Modernization Subsidy (Bunmei Kaika)</span>
+                        <label class="policy-switch">
+                            <input type="checkbox" id="toggle-policy-modernization-subsidy" data-policy="modernization_subsidy">
+                            <span class="policy-slider"></span>
+                        </label>
+                    </div>
+                    <div class="policy-desc" data-i18n="policy.modernization_desc">
+                        Municipal co-financing to accelerate the conversion of wooden machiya into fireproof Kura-zukuri and Giyōfū brick structures.
+                    </div>
+                    <div class="policy-effects">
+                        <span class="policy-tag pos" data-i18n="policy.modernization_eff1">+50% Renovation Speed</span>
+                        <span class="policy-tag neg" data-i18n="policy.modernization_eff2">-¥50 per Building Conversion</span>
+                    </div>
+                    <div class="policy-hint" data-i18n="policy.modernization_hint">Recommended only when treasury exceeds ¥500 and brickworks are available.</div>
+                </div>
+            </div>
+            <div class="policy-footer">
+                <span id="policy-active-count">0 Edicts Enacted</span>
+                <span id="policy-monthly-cost">¥0/mo Fiscal Impact</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Historical Chronicle & Municipal Ledger Modal (Hidden by default) -->
+    <div id="chronicle-ledger-modal" class="meiji-modal-scrim" style="display: none;">
+        <div class="meiji-parchment-card chronicle-modal-card" style="max-width: 540px; width: 90%; max-height: 85vh; overflow-y: auto;">
+            <button id="chronicle-close-btn" class="scope-close-btn" title="Close">✕</button>
+            <div class="milestone-seal">史</div>
+            <div class="milestone-header">
+                <div class="milestone-subtitle" data-i18n="chronicle.subtitle">Meiji Town Chronicle & Municipal Archives</div>
+                <div class="milestone-title" data-i18n="chronicle.title">Historical Ledger</div>
+            </div>
+            
+            <div class="chronicle-section" style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.82rem; background: rgba(0,0,0,0.04); padding: 8px; border-radius: 4px;">
+                <div><strong>Founding:</strong> <span id="ledger-founding-date">Meiji 5 (1872)</span></div>
+                <div><strong>Current:</strong> <span id="ledger-current-date">Meiji 5 (1872)</span></div>
+                <div><strong>Total Taxes:</strong> <span id="ledger-stat-taxes" style="color: #3a6332; font-weight: bold;">¥0</span></div>
+                <div><strong>Fires Extinguished:</strong> <span id="ledger-stat-fires" style="color: #2c4765; font-weight: bold;">0</span></div>
+                <div style="grid-column: span 2;"><strong>Peak Population:</strong> <span id="ledger-stat-peak-pop" style="font-weight: bold;">0 citizens</span></div>
+            </div>
+
+            <div class="milestone-features" style="margin-top: 14px;">
+                <div class="milestone-features-title" data-i18n="chronicle.charters">Imperial Charters Earned</div>
+                <ul id="ledger-charters-list" style="list-style: none; padding: 0; margin: 6px 0; display: flex; flex-direction: column; gap: 4px;"></ul>
+            </div>
+            <div class="milestone-features" style="margin-top: 14px;">
+                <div class="milestone-features-title" data-i18n="chronicle.events">Historical Events & Milestones</div>
+                <ul id="ledger-events-list" style="list-style: none; padding: 0; margin: 6px 0; max-height: 160px; overflow-y: auto; font-size: 0.8rem; display: flex; flex-direction: column; gap: 4px;"></ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mayor Credentials & Dev Profiles Modal -->
+    <div id="auth-modal" class="modal-overlay hidden" style="display:none;">
+      <div class="modal-card washi-card">
+        <h3>Mayor Credentials & Dev Profiles</h3>
+        <div class="dev-profiles"><button id="dev-user-fidel" class="btn-wood">👤 Fidel (ID: 1)</button><button id="dev-user-guest" class="btn-wood">👥 Guest</button></div>
+        <button id="auth-modal-close" class="btn-close">Close</button>
+      </div>
+    </div>
+
+    <!-- Reusable Washi Confirmation Modal -->
+    <div id="confirmation-modal" class="modal-overlay hidden" style="display: none;">
+      <div class="modal-card washi-card confirmation-card">
+        <div id="confirm-modal-icon" class="modal-seal" style="font-size: 2.2rem; margin-bottom: 8px;">⛩️</div>
+        <h3 id="confirm-modal-title" style="margin-top: 0;"></h3>
+        <p id="confirm-modal-message" class="confirm-modal-message" style="margin: 14px 0 20px; font-size: 0.92rem; line-height: 1.5; color: #3c2a1d; white-space: pre-line;"></p>
+        <div class="modal-actions" style="display: flex; gap: 12px; justify-content: center;"><button id="confirm-modal-cancel" class="btn-wood-cancel">Cancel</button><button id="confirm-modal-ok" class="btn-wood-confirm">Confirm</button></div>
+      </div>
+    </div>
+
+    <!-- Application Bootstrap -->
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>

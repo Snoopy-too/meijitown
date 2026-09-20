@@ -1,0 +1,425 @@
+/* Project Meiji - Build Drawer & Floating Action Button Styles */
+
+/* --- Active Tool Floating Action Button (FAB) --- */
+.active-tool-container {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 25;
+}
+
+.active-tool-fab {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 18px;
+    background: var(--panel-bg);
+    border: 2px solid var(--panel-border);
+    border-radius: 30px;
+    box-shadow: var(--shadow-soft);
+    cursor: pointer;
+    font-family: var(--font-sans);
+    font-weight: 700;
+    font-size: 0.88rem;
+    color: var(--text-sumi);
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    backdrop-filter: blur(6px);
+}
+
+.active-tool-fab:hover {
+    background: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.fab-icon {
+    font-size: 1.25rem;
+    display: flex;
+    align-items: center;
+}
+
+.fab-name {
+    letter-spacing: 0.02em;
+}
+
+.fab-cancel {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #fff0ed;
+    border: 1px solid #d9534f;
+    color: #9e2a2b;
+    font-size: 0.75rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    margin-left: 2px;
+}
+
+.fab-cancel:hover {
+    background: #d9534f;
+    color: #fff;
+}
+
+/* --- Collapsible Build Menu Drawer --- */
+.drawer-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(18, 16, 14, 0.45);
+    backdrop-filter: blur(2px);
+    z-index: 40;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.22s ease;
+}
+
+.drawer-overlay.overlay-active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.build-drawer {
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translate(-50%, 105%);
+    width: min(94vw, 680px);
+    max-height: 80vh;
+    background: var(--panel-bg);
+    border: 2px solid var(--panel-border);
+    border-bottom: none;
+    border-radius: 14px 14px 0 0;
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.35);
+    z-index: 50;
+    transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.build-drawer.drawer-open {
+    transform: translate(-50%, 0);
+}
+
+.drawer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 18px;
+    background: #f0e6d6;
+    border-bottom: 2px solid var(--panel-border);
+}
+
+.drawer-title {
+    font-family: var(--font-serif);
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: var(--accent-vermilion);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.drawer-title .kanji {
+    font-size: 1.15rem;
+    color: var(--text-sumi);
+}
+
+.drawer-close {
+    background: #fffaf2;
+    border: 1px solid #c4b5a2;
+    border-radius: 50%;
+    width: 26px;
+    height: 26px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-sumi);
+    transition: all 0.15s ease;
+}
+
+.drawer-close:hover {
+    background: #fff0ed;
+    color: var(--accent-vermilion);
+}
+
+.drawer-tabs {
+    display: flex;
+    background: #e8decc;
+    border-bottom: 1px solid var(--panel-border);
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.drawer-tab-btn {
+    flex: 1;
+    padding: 10px 8px;
+    background: none;
+    border: none;
+    font-family: var(--font-sans);
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+    border-bottom: 3px solid transparent;
+}
+
+.drawer-tab-btn:hover {
+    color: var(--text-sumi);
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.drawer-tab-btn.active {
+    color: var(--accent-vermilion);
+    background: var(--panel-bg);
+    border-bottom: 3px solid var(--accent-vermilion);
+}
+
+.drawer-tab-panel {
+    display: none;
+    padding: 14px 18px;
+    overflow-y: auto;
+    max-height: 48vh;
+}
+
+.drawer-tab-panel.active {
+    display: block;
+}
+
+.drawer-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 10px;
+}
+
+.drawer-item-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 6px;
+    background: #fffaf2;
+    border: 1px solid #c4b5a2;
+    border-radius: 8px;
+    cursor: pointer;
+    position: relative;
+    box-sizing: border-box;
+    transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+    gap: 3px;
+}
+
+.drawer-item-btn:hover {
+    background: #fff0db;
+    border-color: var(--panel-border);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.1);
+}
+
+.drawer-item-btn.active {
+    background: #fbeee0;
+    border: 2px solid var(--accent-vermilion);
+    box-shadow: inset 0 0 6px rgba(179, 57, 39, 0.25);
+}
+
+.drawer-item-btn.tool-locked {
+    opacity: 0.55;
+    filter: grayscale(0.85);
+    cursor: help;
+}
+
+.drawer-item-btn.tool-locked:hover {
+    opacity: 0.85;
+    filter: grayscale(0.4);
+    background: #fdf5ea;
+    border-color: #d8cfc0;
+}
+
+.item-lock-badge {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    background: rgba(30, 20, 15, 0.88);
+    color: #f1c40f;
+    font-size: 0.58rem;
+    font-weight: bold;
+    padding: 1px 4px;
+    border-radius: 4px;
+    line-height: 1.2;
+    pointer-events: none;
+}
+
+.item-icon {
+    font-size: 1.5rem;
+    line-height: 1.1;
+}
+
+.item-name {
+    font-size: 0.76rem;
+    font-weight: 700;
+    color: var(--text-sumi);
+    text-align: center;
+}
+
+.item-cost {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+}
+
+.item-hotkey {
+    position: absolute;
+    top: 4px;
+    right: 5px;
+    font-size: 0.58rem;
+    background: rgba(0, 0, 0, 0.08);
+    padding: 1px 4px;
+    border-radius: 3px;
+    color: var(--text-muted);
+}
+
+.item-btn-danger {
+    background: #fff5f3;
+}
+
+.item-btn-danger:hover {
+    background: #ffebe6;
+    border-color: #d9534f;
+}
+
+/* --- Mobile Responsive Rules (@media <= 768px) --- */
+@media (max-width: 768px) {
+    .active-tool-container {
+        bottom: max(12px, env(safe-area-inset-bottom));
+    }
+
+    .active-tool-fab {
+        padding: 6px 12px;
+        font-size: 0.78rem;
+        gap: 6px;
+    }
+
+    .fab-icon {
+        font-size: 1.05rem;
+    }
+
+    .build-drawer {
+        width: 100vw;
+        border-radius: 14px 14px 0 0;
+        max-height: 75vh;
+        padding-bottom: max(12px, env(safe-area-inset-bottom));
+    }
+
+    .drawer-header {
+        padding: 10px 14px;
+    }
+
+    .drawer-title {
+        font-size: 0.95rem;
+    }
+
+    .drawer-tab-btn {
+        padding: 8px 6px;
+        font-size: 0.72rem;
+    }
+
+    .drawer-tab-panel {
+        padding: 10px 12px;
+        max-height: 52vh;
+    }
+
+    .drawer-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+    }
+
+    .drawer-item-btn {
+        padding: 8px 4px;
+    }
+
+    .item-icon {
+        font-size: 1.25rem;
+    }
+
+    .item-name {
+        font-size: 0.72rem;
+    }
+
+    .item-cost {
+        font-size: 0.60rem;
+    }
+}
+
+/* Dedicated Tool Inspector Strip */
+.washi-inspector-strip {
+    background: #fbf7ee;
+    border-top: 1px solid #d8cfc0;
+    padding: 8px 14px;
+    height: 84px;
+    min-height: 84px;
+    max-height: 84px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    flex-shrink: 0;
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+    overflow: hidden;
+}
+
+.inspector-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+    line-height: 1.2;
+}
+
+.inspector-name {
+    font-weight: bold;
+    color: #2c2416;
+    font-size: 13.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.inspector-cost {
+    color: #8c2d19;
+    font-weight: 600;
+    font-size: 12.5px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.inspector-desc {
+    font-size: 11.5px;
+    color: #5a5043;
+    margin: 3px 0 0 0;
+    line-height: 1.35;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.inspector-lock-note {
+    font-size: 11.5px;
+    color: #b03a2e;
+    font-weight: bold;
+    margin-top: 3px;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: none;
+}
+

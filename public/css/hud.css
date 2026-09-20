@@ -1,0 +1,556 @@
+/* =========================================================
+   Project Meiji - 2-Tier Chronicle Header & HUD Styles (hud.css)
+   ponytail: modular 2-tier flexbox layout, washi RCI contrast polish
+   ========================================================= */
+
+#chronicle-banner, #hud-topbar, .hud-topbar, .chronicle-banner {
+    position: absolute;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    background: var(--panel-bg);
+    border: 2px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 6px 14px;
+    box-shadow: var(--shadow-soft);
+    backdrop-filter: blur(6px);
+    max-width: min(95vw, 960px);
+    width: min(95vw, 960px);
+    overflow: visible;
+    box-sizing: border-box;
+}
+
+/* --- Row Structure: Tier 1 & Tier 2 --- */
+.hud-topbar-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 12px;
+}
+
+.header-vitals-row, .hud-row-primary {
+    gap: 14px;
+}
+
+.header-controls-row, .hud-row-secondary {
+    border-top: 1px solid rgba(90, 70, 50, 0.12);
+    padding-top: 4px;
+    gap: 12px;
+}
+
+/* --- Tier 1: Brand & Identity Group (Left) --- */
+.header-brand-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.hud-title {
+    font-family: var(--font-serif);
+    font-size: 1.12rem;
+    font-weight: 700;
+    color: var(--accent-vermilion);
+    letter-spacing: 0.05em;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+}
+
+.hud-title .kanji {
+    font-size: 1.25rem;
+    color: var(--text-sumi);
+}
+
+.hud-settlement-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+}
+
+.hud-cityname {
+    font-family: var(--font-serif);
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--text-sumi);
+}
+
+/* --- Tier 1: Vitals Metric Group (Center) --- */
+.header-vitals-group {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    flex-grow: 1;
+}
+
+.hud-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.hud-happiness-stat {
+    border-left: 1px solid rgba(0, 0, 0, 0.12);
+    padding-left: 10px;
+}
+
+.hud-label {
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.hud-value {
+    font-family: var(--font-serif);
+    font-weight: 700;
+    font-size: 0.96rem;
+    white-space: nowrap;
+}
+
+/* --- Tier 1: Demand Group (Right) & RCI Visual Contrast Polish --- */
+.header-demand-group {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.demand-container, #rci-container, #rci-meter {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(139, 107, 73, 0.25);
+    border-radius: 4px;
+    padding: 4px 8px;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.demand-bar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+.bar-track {
+    width: 9px;
+    height: 22px;
+    background: #d4c8b8;
+    border-radius: 2px;
+    display: flex;
+    align-items: flex-end;
+    overflow: hidden;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.bar-fill {
+    width: 100%;
+    transition: height 0.3s ease;
+}
+
+.fill-res { background: var(--accent-green, #3a6332); height: 60%; }
+.fill-com { background: var(--accent-indigo, #24446b); height: 40%; }
+.fill-ind { background: var(--accent-ochre, #b58900); height: 30%; }
+
+.bar-tag {
+    font-size: 0.62rem;
+    font-weight: 700;
+    line-height: 1;
+    text-align: center;
+    display: block;
+}
+
+.bar-tag-r { color: var(--accent-green, #3a6332); }
+.bar-tag-c { color: var(--accent-indigo, #24446b); }
+.bar-tag-i { color: var(--accent-ochre, #b58900); }
+
+/* --- Tier 2: Date Display (Left) --- */
+.header-date-group {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* --- Tier 2: Time Controls (Center) --- */
+.header-time-group, #time-controls, .time-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    gap: 3px;
+    overflow: visible;
+}
+
+.time-btn {
+    padding: 2px 7px;
+    margin-bottom: 0;
+    background: #fffaf2;
+    border: 1px solid #c4b5a2;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.68rem;
+    font-weight: 600;
+    font-family: var(--font-sans);
+    color: var(--text-sumi);
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    outline: none;
+}
+
+.time-btn:focus-visible {
+    outline: 1.5px solid var(--accent-vermilion);
+    outline-offset: 1px;
+}
+
+.time-btn:hover {
+    background: #fff0db;
+    border-color: var(--panel-border);
+}
+
+.time-btn.active {
+    background: var(--accent-vermilion);
+    border-color: #832012;
+    color: #ffffff;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+/* --- Tier 2: Utility Toggles (Right) --- */
+.header-utility-group {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    overflow: visible;
+}
+
+.time-audio-divider {
+    width: 1px;
+    height: 14px;
+    background: #c4b5a2;
+    margin: 0 2px;
+    opacity: 0.8;
+}
+
+.audio-toggle-btn.muted {
+    opacity: 0.65;
+    background: #e5dac9;
+    border-color: #a89a87;
+    color: var(--text-muted);
+}
+
+/* --- Mobile Responsive Layout (@media <= 768px) --- */
+@media (max-width: 768px) {
+    #chronicle-banner, #hud-topbar, .hud-topbar, .chronicle-banner {
+        top: max(4px, env(safe-area-inset-top));
+        left: 6px;
+        right: 6px;
+        transform: none;
+        max-width: none;
+        width: auto;
+        padding: 5px 8px;
+        gap: 4px;
+    }
+
+    .hud-topbar-row {
+        flex-wrap: wrap;
+        gap: 4px;
+        justify-content: space-between;
+    }
+
+    .header-brand-group {
+        gap: 5px;
+    }
+
+    .hud-title {
+        font-size: 0.90rem;
+    }
+
+    .hud-title .kanji {
+        font-size: 1.05rem;
+    }
+
+    .hud-cityname {
+        font-size: 0.80rem;
+    }
+
+    .header-vitals-group {
+        gap: 8px;
+    }
+
+    .hud-label {
+        font-size: 0.54rem;
+    }
+
+    .hud-value {
+        font-size: 0.78rem;
+    }
+
+    .time-btn {
+        padding: 2px 5px;
+        font-size: 0.62rem;
+    }
+
+    .demand-container, #rci-container, #rci-meter {
+        padding: 2px 4px;
+        gap: 4px;
+    }
+
+    .bar-track {
+        height: 18px;
+        width: 7px;
+    }
+}
+
+/* Mayor Credentials & Dev Profiles Modal */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 15, 10, 0.7);
+    backdrop-filter: blur(2px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+}
+
+.modal-overlay.hidden {
+    display: none !important;
+}
+
+.modal-card.washi-card {
+    background: #fbf5e6;
+    background-image: radial-gradient(#ece3d0 1px, transparent 0);
+    background-size: 16px 16px;
+    border: 3px double #7a5d38;
+    border-radius: 8px;
+    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.45);
+    max-width: 420px;
+    width: 90%;
+    padding: 24px;
+    color: #2b1f14;
+    text-align: center;
+    box-sizing: border-box;
+}
+
+.modal-card.washi-card h3 {
+    margin: 0 0 16px 0;
+    font-size: 1.15rem;
+    color: #4a2c11;
+    border-bottom: 1px solid #d4c5a9;
+    padding-bottom: 8px;
+}
+
+.dev-profiles {
+    display: flex;
+    gap: 12px;
+    margin: 18px 0;
+    justify-content: center;
+}
+
+.btn-wood {
+    flex: 1;
+    padding: 10px 14px;
+    background: #8b5a2b;
+    color: #ffffff;
+    border: 1px solid #5c3a1e;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.btn-wood:hover {
+    background: #9d6732;
+    transform: translateY(-1px);
+}
+
+.btn-wood:active {
+    transform: translateY(0);
+}
+
+.btn-close {
+    padding: 6px 18px;
+    background: #e0d8c3;
+    border: 1px solid #c4b998;
+    border-radius: 4px;
+    color: #4a4031;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 0.85rem;
+    transition: background 0.15s ease;
+}
+
+.btn-close:hover {
+    background: #d5cbaf;
+}
+
+.confirmation-card {
+    max-width: 440px !important;
+}
+
+.btn-wood-confirm {
+    padding: 10px 20px;
+    background: #a93226;
+    color: #fffaf0;
+    border: 1px solid #78281f;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.25);
+    transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.btn-wood-confirm:hover {
+    background: #c0392b;
+    transform: translateY(-1px);
+}
+
+.btn-wood-cancel {
+    padding: 10px 20px;
+    background: #e8dcbe;
+    color: #4a2c11;
+    border: 1px solid #a89473;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+    transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.btn-wood-cancel:hover {
+    background: #ded0af;
+    transform: translateY(-1px);
+}
+
+/* Dedicated Tool Inspector Strip */
+.washi-inspector-strip {
+    background: #fbf7ee;
+    border-top: 1px solid #d8cfc0;
+    padding: 8px 14px;
+    height: 84px;
+    min-height: 84px;
+    max-height: 84px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.inspector-name {
+    font-weight: bold;
+    color: #2c2416;
+    font-size: 13.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.inspector-cost {
+    color: #8c2d19;
+    font-weight: 600;
+    font-size: 12.5px;
+    float: right;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.inspector-desc {
+    font-size: 11.5px;
+    color: #5a5043;
+    margin: 3px 0 0 0;
+    line-height: 1.35;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.inspector-lock-note {
+    font-size: 11.5px;
+    color: #b03a2e;
+    font-weight: bold;
+    margin-top: 3px;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Washi Map Data Layers Popover Menu */
+.layer-menu-popover {
+    position: absolute;
+    top: 54px;
+    right: 80px;
+    z-index: 1200;
+    min-width: 210px;
+    background: #fbf5e6;
+    background-image: radial-gradient(#ece3d0 1px, transparent 0);
+    background-size: 16px 16px;
+    border: 2px solid #7a5d38;
+    border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    padding: 10px 14px;
+    color: #2b1f14;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    text-align: left;
+}
+
+.layer-menu-header h4 {
+    margin: 0 0 6px 0;
+    font-size: 0.88rem;
+    color: #4a2c11;
+    border-bottom: 1px solid #d4c5a9;
+    padding-bottom: 4px;
+}
+
+.layer-menu-options {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.layer-radio-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: 0.82rem;
+    padding: 4px 6px;
+    border-radius: 4px;
+    color: #3b2a1a;
+    transition: background 0.15s ease;
+}
+
+.layer-radio-item:hover {
+    background: rgba(122, 93, 56, 0.12);
+}
+
+.layer-radio-item input[type="radio"] {
+    accent-color: #8b5a2b;
+    cursor: pointer;
+}
+
+

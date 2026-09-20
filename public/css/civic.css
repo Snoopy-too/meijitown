@@ -1,0 +1,802 @@
+/* Project Meiji - Civic Edicts, Settlement Milestones & Map Overlays Styling */
+/* ponytail: native CSS flex/grid, parchment woodblock aesthetics, no UI frameworks */
+
+/* Settlement Tier Badge in HUD */
+.hud-tier-badge {
+    display: inline-block;
+    background: rgba(181, 137, 0, 0.18);
+    border: 1px solid #b58900;
+    color: #5c4403;
+    padding: 1px 7px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: bold;
+    margin-left: 6px;
+    vertical-align: middle;
+    letter-spacing: 0.5px;
+    transition: all 0.3s ease;
+}
+
+.hud-tier-badge.tier-glow {
+    animation: tierBadgePulse 1.8s infinite alternate ease-in-out;
+}
+
+@keyframes tierBadgePulse {
+    0% { box-shadow: 0 0 2px rgba(181, 137, 0, 0.3); }
+    100% { box-shadow: 0 0 10px rgba(181, 137, 0, 0.85); background: rgba(181, 137, 0, 0.3); }
+}
+
+/* Header Action Buttons for Layers & Edicts */
+.hud-btn-civic {
+    background: #e6dac6;
+    border: 1px solid #8c7355;
+    color: #2b1f14;
+    font-size: 12px;
+    font-weight: bold;
+    padding: 3px 9px;
+    border-radius: 4px;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+
+.hud-btn-civic:hover {
+    background: #f0e6d6;
+    border-color: #5c4403;
+}
+
+.hud-btn-civic:active {
+    transform: translateY(1px);
+}
+
+.hud-btn-civic.active {
+    background: #5c4403;
+    border-color: #3b2c01;
+    color: #fff9ed;
+}
+
+/* Edict button dynamic states */
+.hud-btn-civic.edicts-active {
+    background: #c28728;
+    border-color: #7d5006;
+    color: #fffbf2;
+    box-shadow: 0 0 6px rgba(194, 135, 40, 0.45);
+}
+
+.hud-btn-civic.edicts-cashflow-warning {
+    position: relative;
+    border-color: #b33927;
+}
+
+.hud-btn-civic.edicts-cashflow-warning::after {
+    content: '';
+    position: absolute;
+    top: -3px;
+    right: -3px;
+    width: 8px;
+    height: 8px;
+    background: #b33927;
+    border: 1.5px solid #fff;
+    border-radius: 50%;
+    box-shadow: 0 0 5px #b33927;
+    animation: edictPulse 1.2s infinite ease-in-out;
+}
+
+@keyframes edictPulse {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+        box-shadow: 0 0 4px #b33927;
+    }
+    50% {
+        transform: scale(1.35);
+        opacity: 0.85;
+        box-shadow: 0 0 8px #e64522;
+    }
+}
+
+/* Layer Overlays Dropdown / Bar */
+.layer-menu-popover {
+    position: absolute;
+    top: 72px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #fcf8f0;
+    border: 2px solid #5c4403;
+    border-radius: 6px;
+    padding: 6px 10px;
+    box-shadow: 0 6px 18px rgba(30, 20, 10, 0.35);
+    display: flex;
+    gap: 8px;
+    z-index: 950;
+    font-family: inherit;
+}
+
+.layer-option-btn {
+    background: #f2e9dc;
+    border: 1px solid #a8947c;
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: bold;
+    color: #3a2b1c;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: all 0.15s ease;
+}
+
+.layer-option-btn:hover {
+    background: #fff;
+    border-color: #5c4403;
+}
+
+.layer-option-btn.active {
+    background: #8b2616;
+    border-color: #5a1408;
+    color: #fff;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.3);
+}
+
+/* Meiji Parchment Modal Base */
+.meiji-modal-scrim {
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 15, 10, 0.65);
+    backdrop-filter: blur(2px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+}
+
+.meiji-modal-scrim.visible {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.meiji-parchment-card {
+    background: #fbf5e6;
+    background-image: radial-gradient(#ece3d0 1px, transparent 0);
+    background-size: 16px 16px;
+    border: 3px double #7a5d38;
+    border-radius: 8px;
+    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.45);
+    max-width: 520px;
+    width: 90%;
+    padding: 24px;
+    color: #2b1f14;
+    position: relative;
+    transform: scale(0.92);
+    transition: transform 0.25s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+}
+
+.meiji-modal-scrim.visible .meiji-parchment-card {
+    transform: scale(1);
+}
+
+.milestone-seal {
+    position: absolute;
+    top: -16px;
+    right: 20px;
+    width: 48px;
+    height: 48px;
+    background: #b22222;
+    color: #fff;
+    border: 2px solid #800000;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    font-weight: bold;
+    box-shadow: 0 4px 10px rgba(178, 34, 34, 0.4);
+    transform: rotate(-6deg);
+}
+
+.milestone-header {
+    text-align: center;
+    border-bottom: 2px dashed #bfa88c;
+    padding-bottom: 12px;
+    margin-bottom: 16px;
+}
+
+.milestone-subtitle {
+    font-size: 12px;
+    letter-spacing: 2px;
+    color: #8b2616;
+    text-transform: uppercase;
+    font-weight: bold;
+}
+
+.milestone-title {
+    font-size: 24px;
+    font-weight: 800;
+    margin: 4px 0;
+    color: #2b1f14;
+}
+
+.milestone-body {
+    font-size: 14px;
+    line-height: 1.6;
+    margin-bottom: 20px;
+}
+
+.milestone-features {
+    background: rgba(181, 137, 0, 0.08);
+    border: 1px solid #d4be92;
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin: 12px 0;
+}
+
+.milestone-features-title {
+    font-weight: bold;
+    font-size: 12px;
+    color: #70501a;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.milestone-features ul {
+    margin: 0;
+    padding-left: 18px;
+    font-size: 13px;
+}
+
+.milestone-reward-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #e9dec9;
+    border: 1px solid #a8947c;
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin: 16px 0;
+}
+
+.reward-label {
+    font-size: 13px;
+    font-weight: bold;
+    color: #4a3828;
+}
+
+.reward-amount {
+    font-size: 18px;
+    font-weight: 800;
+    color: #3a6332;
+}
+
+.milestone-actions {
+    display: flex;
+    justify-content: center;
+}
+
+.btn-milestone-claim {
+    background: #8b2616;
+    color: #fff;
+    border: 1px solid #5a1408;
+    border-radius: 6px;
+    padding: 10px 24px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(139, 38, 22, 0.35);
+    transition: background 0.15s, transform 0.1s;
+}
+
+.btn-milestone-claim:hover {
+    background: #a3321f;
+}
+
+.btn-milestone-claim:active {
+    transform: translateY(1px);
+}
+
+/* Civic Policy Ledger Slide-out Modal */
+.policy-drawer-scrim {
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 15, 10, 0.55);
+    z-index: 990;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.policy-drawer-scrim.open {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.policy-drawer {
+    position: fixed;
+    top: 0;
+    right: -420px;
+    width: 390px;
+    max-width: 90vw;
+    height: 100%;
+    background: #fbf6ec;
+    border-left: 3px double #7a5d38;
+    box-shadow: -6px 0 25px rgba(0, 0, 0, 0.35);
+    z-index: 995;
+    transition: right 0.3s cubic-bezier(0.18, 0.89, 0.32, 1);
+    display: flex;
+    flex-direction: column;
+    color: #2b1f14;
+}
+
+.policy-drawer.open {
+    right: 0;
+}
+
+.policy-header {
+    background: #ebdcc5;
+    padding: 18px 20px;
+    border-bottom: 2px solid #bfa88c;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.policy-header-title {
+    font-size: 18px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.policy-seal-icon {
+    display: inline-block;
+    background: #8b2616;
+    color: #fff;
+    font-size: 13px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: bold;
+}
+
+.policy-close-btn {
+    background: transparent;
+    border: none;
+    font-size: 20px;
+    color: #5c4403;
+    cursor: pointer;
+    padding: 4px;
+    line-height: 1;
+}
+
+.policy-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.policy-card {
+    background: #f3e9d8;
+    border: 1px solid #c9b79c;
+    border-radius: 6px;
+    padding: 14px;
+    transition: border-color 0.2s, background 0.2s;
+}
+
+.policy-card.active {
+    background: #fdfaf3;
+    border: 2px solid #8b2616;
+    box-shadow: 0 2px 8px rgba(139, 38, 22, 0.15);
+}
+
+.policy-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.policy-name {
+    font-size: 15px;
+    font-weight: bold;
+    color: #2b1f14;
+}
+
+/* Toggle Switch */
+.policy-switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+}
+
+.policy-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.policy-slider,
+.edict-slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background-color: #d1c7b7; /* stone-gray / warm beige */
+    transition: 0.25s;
+    border-radius: 24px;
+}
+
+.policy-slider:before,
+.edict-slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: #fbf7ee; /* light warm beige knob */
+    transition: 0.25s;
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+input:checked + .policy-slider,
+input:checked + .edict-slider {
+    background-color: #8c2d19; /* Meiji lacquer red */
+}
+
+input:checked + .policy-slider:before,
+input:checked + .edict-slider:before {
+    background-color: #ffffff;
+    transform: translateX(20px);
+}
+
+.policy-desc {
+    font-size: 12px;
+    line-height: 1.45;
+    color: #554433;
+    margin-bottom: 10px;
+}
+
+.policy-effects {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.policy-hint {
+    font-size: 11px;
+    font-style: italic;
+    color: #634b35;
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px dashed rgba(140, 115, 85, 0.3);
+    line-height: 1.35;
+}
+
+.policy-hint::before {
+    content: '💡 ';
+    font-style: normal;
+}
+
+.policy-tag {
+    font-size: 11px;
+    font-weight: bold;
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+.policy-tag.pos {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.policy-tag.neg {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+/* Beginner Advisor Notification Box */
+.advisor-container {
+    position: fixed;
+    bottom: 80px;
+    right: 24px;
+    width: 320px;
+    background: #fbf7ee;
+    border: 2px solid #8c2d19;
+    border-radius: 6px;
+    padding: 12px 14px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+    z-index: 1200;
+    transition: transform 0.25s ease, opacity 0.25s ease;
+    font-family: 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+}
+
+.advisor-container.hidden {
+    display: none;
+}
+
+.advisor-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid #d1c7b7;
+    padding-bottom: 4px;
+}
+
+.advisor-avatar {
+    font-size: 18px;
+}
+
+.advisor-title {
+    font-weight: bold;
+    font-size: 13px;
+    color: #5c4403;
+    flex: 1;
+}
+
+.advisor-close-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 12px;
+    color: #8c7355;
+    padding: 0 4px;
+}
+
+.advisor-body {
+    font-size: 12px;
+    line-height: 1.45;
+    color: #3b2819;
+    margin-bottom: 10px;
+}
+
+.advisor-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.advisor-btn-action {
+    background: #8c2d19;
+    color: #ffffff;
+    border: 1px solid #5c180a;
+    border-radius: 3px;
+    padding: 4px 10px;
+    font-size: 11px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background 0.15s;
+}
+
+.advisor-btn-action:hover {
+    background: #a3351e;
+}
+
+.advisor-btn-dismiss {
+    background: #e6dac6;
+    color: #4a3828;
+    border: 1px solid #a89680;
+    border-radius: 3px;
+    padding: 4px 8px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.advisor-btn-dismiss:hover {
+    background: #f0e6d6;
+}
+
+.policy-footer {
+    background: #ebdcc5;
+    padding: 12px 18px;
+    border-top: 1px solid #bfa88c;
+    font-size: 12px;
+    color: #5c4403;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Multi-User Mayor Badge & Auth Modal Styling */
+.hud-mayor-badge {
+    background: rgba(43, 31, 20, 0.7);
+    color: #f7e6c4;
+    border: 1px solid #7a5d38;
+    border-radius: 12px;
+    padding: 2px 8px;
+    font-size: 11px;
+    cursor: pointer;
+    margin-left: 6px;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.hud-mayor-badge:hover {
+    background: #8b2616;
+    border-color: #b58900;
+}
+
+.hud-mayor-badge.logged-in {
+    background: #2a4724;
+    border-color: #5a8a4f;
+    color: #e2f7dc;
+}
+
+.auth-modal-card {
+    max-width: 440px;
+    width: 90%;
+    position: relative;
+}
+
+.auth-tabs {
+    display: flex;
+    border-bottom: 2px solid #8b2616;
+    margin-bottom: 16px;
+}
+
+.auth-tab-btn {
+    flex: 1;
+    background: none;
+    border: none;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-weight: bold;
+    color: #6e5842;
+    cursor: pointer;
+    transition: color 0.15s, background 0.15s;
+}
+
+.auth-tab-btn.active {
+    color: #8b2616;
+    border-bottom: 3px solid #8b2616;
+    background: rgba(139, 38, 22, 0.08);
+}
+
+.auth-form-body {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.auth-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    text-align: left;
+    font-size: 12px;
+    color: #3b2817;
+    font-weight: bold;
+}
+
+.auth-field input {
+    padding: 8px 10px;
+    border: 1px solid #7a5d38;
+    border-radius: 4px;
+    background: #fff;
+    font-size: 13px;
+    font-family: inherit;
+    color: #2b1f14;
+}
+
+.auth-field input:focus {
+    outline: none;
+    border-color: #8b2616;
+    box-shadow: 0 0 0 2px rgba(139, 38, 22, 0.2);
+}
+
+.auth-error-text {
+    font-size: 12px;
+    color: #8b2616;
+    font-weight: bold;
+    min-height: 16px;
+    text-align: center;
+}
+
+.auth-submit-btn {
+    width: 100%;
+    margin-top: 4px;
+}
+
+.auth-slots-list {
+    max-height: 240px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.slot-card {
+    background: rgba(255, 255, 255, 0.65);
+    border: 1px solid #bfa88c;
+    border-radius: 6px;
+    padding: 8px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    text-align: left;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.slot-card.active {
+    border-color: #8b2616;
+    background: rgba(139, 38, 22, 0.08);
+}
+
+.slot-name {
+    font-size: 13px;
+    font-weight: bold;
+    color: #2b1f14;
+}
+
+.slot-meta {
+    font-size: 11px;
+    color: #5c4403;
+}
+
+.slot-date {
+    font-size: 10px;
+    color: #887460;
+}
+
+.slot-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.btn-slot-load, .btn-slot-overwrite, .btn-slot-delete {
+    padding: 4px 8px;
+    font-size: 11px;
+    border-radius: 4px;
+    cursor: pointer;
+    border: 1px solid #7a5d38;
+}
+
+.btn-slot-load {
+    background: #3a6332;
+    color: #fff;
+    border-color: #264221;
+}
+
+.btn-slot-overwrite {
+    background: #b58900;
+    color: #fff;
+    border-color: #806000;
+}
+
+.btn-slot-delete {
+    background: #e0d0c0;
+    color: #8b2616;
+    border-color: #bfa88c;
+}
+
+.auth-slots-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    border-top: 1px solid #bfa88c;
+    padding-top: 12px;
+}
+
+.auth-btn-text {
+    background: none;
+    border: none;
+    color: #8b2616;
+    font-size: 12px;
+    cursor: pointer;
+    text-decoration: underline;
+}

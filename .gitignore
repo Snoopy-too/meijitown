@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+vendor/
+
+# Environment and sensitive configuration
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Logs and databases
+*.log
+*.sqlite
+*.sql.gz
+
+# IDE and OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
