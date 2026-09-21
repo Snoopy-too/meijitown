@@ -159,27 +159,33 @@ export class AudioManager {
         }
     }
 
-    // Historical bronze fire alarm bell (Hanshō / 半鐘)
+    // Historical bronze fire alarm bell (Hanshō / 半鐘 - rapid emergency double strike)
     playBellChime() {
         this.init();
         if (!this.ctx) return;
 
         const now = this.ctx.currentTime;
-        const freqs = [880, 1318, 1760];
+        const strikes = [
+            { timeOffset: 0.00, freqs: [784, 1175, 1568], gainLevel: 0.28 },
+            { timeOffset: 0.16, freqs: [880, 1320, 1760], gainLevel: 0.24 }
+        ];
 
-        for (const f of freqs) {
-            const osc = this.ctx.createOscillator();
-            const gain = this.ctx.createGain();
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(f, now);
+        for (const s of strikes) {
+            const t = now + s.timeOffset;
+            for (const f of s.freqs) {
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(f, t);
 
-            gain.gain.setValueAtTime(0.22, now);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + 1.8);
+                gain.gain.setValueAtTime(s.gainLevel, t);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.75);
 
-            osc.connect(gain);
-            gain.connect(this.getDestination());
-            osc.start(now);
-            osc.stop(now + 1.8);
+                osc.connect(gain);
+                gain.connect(this.getDestination());
+                osc.start(t);
+                osc.stop(t + 0.78);
+            }
         }
     }
 

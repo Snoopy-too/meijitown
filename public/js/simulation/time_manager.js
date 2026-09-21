@@ -61,16 +61,28 @@ export class TimeManager {
 
         // 1. Advance Calendar (1 Month per tick)
         this.state.currentMonth++;
+        let isNewYear = false;
         if (this.state.currentMonth > 12) {
             this.state.currentMonth = 1;
             this.state.currentYear++;
-            SOUND.playNewYearBell();
-            this.state.showToast(`🔔 New Year Dawn! Welcome to Meiji ${this.state.currentYear - 1867} (${this.state.currentYear})`);
-        } else {
-            SOUND.playMonthAdvance();
+            isNewYear = true;
         }
 
-        // 2. Dynamic Seasonality foliage, Day/Night lighting & ambient cues
+        // 2. Play month advance chime on all 12 transitions; add Bonshō bell on New Year
+        SOUND.playMonthAdvance();
+        if (isNewYear) {
+            SOUND.playNewYearBell();
+            if (typeof this.state.showToast === 'function') {
+                this.state.showToast(`🔔 New Year Dawn! Welcome to Meiji ${this.state.currentYear - 1867} (${this.state.currentYear})`);
+            }
+        }
+
+        // 3. Immediately synchronize visual HUD date display with the chime
+        if (typeof this.state.updateHUD === 'function') {
+            this.state.updateHUD();
+        }
+
+        // 4. Dynamic Seasonality foliage, Day/Night lighting & ambient cues
         if (this.state.renderer) {
             if (typeof this.state.renderer.updateSeason === 'function') {
                 this.state.renderer.updateSeason(this.state.currentMonth);
@@ -81,9 +93,13 @@ export class TimeManager {
         }
         SOUND.updateAmbience(this.state.currentMonth);
 
-        // 3. Delegate tick execution to simulation orchestrator
+        // 5. Delegate tick execution to simulation orchestrator
         if (typeof this.onTick === 'function') {
-            this.onTick();
+            try {
+                this.onTick();
+            } catch (err) {
+                console.error('[TimeManager] Error during simulation tick:', err);
+            }
         }
     }
 }
