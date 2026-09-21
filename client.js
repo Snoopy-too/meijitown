@@ -239,6 +239,25 @@ function mountMeijiClient(container, config) {
     document.head.appendChild(importMap);
   }
 
+  let latestSyncState = null;
+  function applySyncState(state) {
+    if (!state || !window.game || !state.G) return;
+    const G = state.G;
+    if (G.vitals && G.vitals.treasury !== undefined) {
+      window.game.treasury = G.vitals.treasury;
+    }
+    if (G.chronicle) {
+      window.game.currentYear = G.chronicle.currentYear;
+      window.game.currentMonth = G.chronicle.currentMonth;
+    }
+    if (G.gridSnapshot && window.game.grid) {
+      try {
+        window.game.grid.loadFromMap(G.gridSnapshot);
+      } catch (e) {}
+    }
+    window.game.updateHUD();
+  }
+
   // Connect to boardgame.io Socket.IO namespace
   let socket = null;
   if (typeof io !== 'undefined') {
@@ -254,22 +273,8 @@ function mountMeijiClient(container, config) {
     socket.on('sync', (mId, syncData) => {
       if (mId === matchID && syncData && syncData.state) {
         console.log('[Meiji] Synced state from match:', syncData.state);
-        if (window.game && syncData.state.G) {
-          const G = syncData.state.G;
-          if (G.vitals && G.vitals.treasury !== undefined) {
-            window.game.treasury = G.vitals.treasury;
-          }
-          if (G.chronicle) {
-            window.game.currentYear = G.chronicle.currentYear;
-            window.game.currentMonth = G.chronicle.currentMonth;
-          }
-          if (G.gridSnapshot && window.game.grid) {
-            try {
-              window.game.grid.loadFromMap(G.gridSnapshot);
-            } catch (e) {}
-          }
-          window.game.updateHUD();
-        }
+        latestSyncState = syncData.state;
+        applySyncState(syncData.state);
       }
     });
   }
@@ -280,6 +285,9 @@ function mountMeijiClient(container, config) {
       if (GameStateManager) {
         window.game = new GameStateManager(container);
         console.log('[Meiji] GameStateManager mounted inside lounge container.');
+        if (latestSyncState) {
+          applySyncState(latestSyncState);
+        }
 
         // Override save handler to save via boardgame.io move -> MySQL
         const saveBtn = container.querySelector('#btn-save');

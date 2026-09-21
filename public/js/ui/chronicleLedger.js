@@ -46,7 +46,7 @@ export class ChronicleLedger {
             eventsList: getEl('ledger-events-list'),
         };
 
-        if (hasDoc) {
+        if (root) {
             this.bindEvents();
         }
     }

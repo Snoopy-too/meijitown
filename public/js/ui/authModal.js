@@ -133,7 +133,7 @@ export class AuthModal {
     }
 
     updateBadge() {
-        const btn = document.getElementById('btn-mayor-auth') || this.badgeBtn;
+        const btn = this.getEl('btn-mayor-auth') || this.badgeBtn;
         if (!btn) return;
         if (this.currentUser) {
             btn.textContent = `👤 Mayor: ${this.currentUser.username}`;
@@ -145,6 +145,9 @@ export class AuthModal {
     }
 
     async checkAuthStatus() {
+        if (this.game?.isLoungeMode) {
+            return;
+        }
         try {
             const data = await this.api.sessionCheck();
             if (data && data.authenticated) {
