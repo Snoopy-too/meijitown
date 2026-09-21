@@ -209,7 +209,11 @@ class GameStateManager {
             this.currentMonth = city.currentMonth;
 
             if (city.metrics) this.metrics = city.metrics;
-            if (gridData && gridData.tiles) this.grid.loadFromMap(gridData.tiles);
+            if (gridData) {
+                if (gridData.width) this.grid.width = gridData.width;
+                if (gridData.height) this.grid.height = gridData.height;
+                if (gridData.tiles) this.grid.loadFromMap(gridData.tiles);
+            }
 
             this.updateHUD();
             if (this.milestones) this.milestones.checkPopulation(this.population);

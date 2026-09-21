@@ -2,8 +2,8 @@
 // ponytail: single source of truth for grid constants, economics, atmosphere, and models
 
 export const CONFIG = {
-    GRID_WIDTH: 32,
-    GRID_HEIGHT: 32,
+    GRID_WIDTH: 35,
+    GRID_HEIGHT: 35,
     TILE_SIZE: 2.0,
 
     TYPES: {
