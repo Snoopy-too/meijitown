@@ -40,7 +40,11 @@ export const TOOL_TIER_REQUIREMENTS = {
 };
 
 export class BuildDrawer {
-    constructor(onToolSelectCallback, onRotateCallback = null) {
+    constructor(onToolSelectCallback, onRotateCallback = null, rootContainer = null) {
+        this.root = rootContainer || (typeof document !== 'undefined' ? document : null);
+        const getEl = (id) => (this.root && this.root.getElementById ? this.root.getElementById(id) : (this.root && this.root.querySelector ? this.root.querySelector('#' + id) : (typeof document !== 'undefined' ? document.getElementById(id) : null)));
+        const getAll = (sel) => (this.root && this.root.querySelectorAll ? this.root.querySelectorAll(sel) : (typeof document !== 'undefined' ? document.querySelectorAll(sel) : []));
+
         this.onToolSelect = onToolSelectCallback;
         this.onRotate = onRotateCallback;
         this.currentTool = CONFIG.TOOLS.INSPECT;
@@ -49,23 +53,23 @@ export class BuildDrawer {
         this._inspectorDebounce = null;
 
         this.dom = {
-            fab: document.getElementById('active-tool-btn'),
-            fabIcon: document.getElementById('fab-tool-icon'),
-            fabName: document.getElementById('fab-tool-name'),
-            fabRotate: document.getElementById('fab-rotate-btn'),
-            fabRotateDeg: document.getElementById('fab-rotate-deg'),
-            fabCancel: document.getElementById('fab-cancel-btn'),
-            drawer: document.getElementById('build-drawer'),
-            drawerOverlay: document.getElementById('drawer-overlay'),
-            tabButtons: document.querySelectorAll('.drawer-tab-btn'),
-            tabPanels: document.querySelectorAll('.drawer-tab-panel'),
-            itemButtons: document.querySelectorAll('.drawer-item-btn'),
-            closeBtn: document.getElementById('drawer-close-btn'),
-            inspector: document.getElementById('drawer-tool-inspector'),
-            inspectorName: document.getElementById('inspector-tool-name'),
-            inspectorCost: document.getElementById('inspector-tool-cost'),
-            inspectorEffect: document.getElementById('inspector-tool-effect'),
-            inspectorLock: document.getElementById('inspector-tool-lock-status'),
+            fab: getEl('active-tool-btn'),
+            fabIcon: getEl('fab-tool-icon'),
+            fabName: getEl('fab-tool-name'),
+            fabRotate: getEl('fab-rotate-btn'),
+            fabRotateDeg: getEl('fab-rotate-deg'),
+            fabCancel: getEl('fab-cancel-btn'),
+            drawer: getEl('build-drawer'),
+            drawerOverlay: getEl('drawer-overlay'),
+            tabButtons: getAll('.drawer-tab-btn'),
+            tabPanels: getAll('.drawer-tab-panel'),
+            itemButtons: getAll('.drawer-item-btn'),
+            closeBtn: getEl('drawer-close-btn'),
+            inspector: getEl('drawer-tool-inspector'),
+            inspectorName: getEl('inspector-tool-name'),
+            inspectorCost: getEl('inspector-tool-cost'),
+            inspectorEffect: getEl('inspector-tool-effect'),
+            inspectorLock: getEl('inspector-tool-lock-status'),
         };
 
         this.bindEvents();

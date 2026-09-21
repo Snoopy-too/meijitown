@@ -7,25 +7,27 @@ import { RailAutoTiler } from '../renderer/railAutoTiler.js';
 
 export class SurveyorScope {
     constructor(scopeElement, stateManager) {
-        this.dom = {
-            card: scopeElement || document.getElementById('surveyor-scope'),
-            coords: document.getElementById('insp-coords'),
-            type: document.getElementById('insp-type'),
-            stage: document.getElementById('insp-stage'),
-            road: document.getElementById('insp-road'),
-            fire: document.getElementById('insp-fire'),
-            water: document.getElementById('insp-water'),
-            leisure: document.getElementById('insp-leisure'),
-            order: document.getElementById('insp-order'),
-            education: document.getElementById('insp-education'),
-            rotateRow: document.getElementById('scope-rotate-row'),
-            facing: document.getElementById('insp-facing'),
-            rotateBtn: document.getElementById('scope-rotate-btn'),
-            toggleBtn: document.getElementById('scope-toggle-btn'),
-            pillBadge: document.getElementById('scope-pill-badge'),
-        };
-
         this.state = stateManager;
+        const root = stateManager?.root || (typeof document !== 'undefined' ? document : null);
+        const getEl = (id) => (root && root.getElementById ? root.getElementById(id) : (root && root.querySelector ? root.querySelector('#' + id) : (typeof document !== 'undefined' ? document.getElementById(id) : null)));
+
+        this.dom = {
+            card: scopeElement || getEl('surveyor-scope'),
+            coords: getEl('insp-coords'),
+            type: getEl('insp-type'),
+            stage: getEl('insp-stage'),
+            road: getEl('insp-road'),
+            fire: getEl('insp-fire'),
+            water: getEl('insp-water'),
+            leisure: getEl('insp-leisure'),
+            order: getEl('insp-order'),
+            education: getEl('insp-education'),
+            rotateRow: getEl('scope-rotate-row'),
+            facing: getEl('insp-facing'),
+            rotateBtn: getEl('scope-rotate-btn'),
+            toggleBtn: getEl('scope-toggle-btn'),
+            pillBadge: getEl('scope-pill-badge'),
+        };
         this.isExpanded = false;
         this.lastCoord = null;
         this.lastGrid = null;

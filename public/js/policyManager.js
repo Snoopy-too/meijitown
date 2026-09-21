@@ -45,23 +45,26 @@ export class PolicyManager {
         this.storageKey = `meiji_policies_${this.state.cityId || 1}`;
         this.loadPolicies();
 
+        const root = this.state?.root || (typeof document !== 'undefined' ? document : null);
+        const getEl = (id) => (root && root.getElementById ? root.getElementById(id) : (root && root.querySelector ? root.querySelector('#' + id) : (typeof document !== 'undefined' ? document.getElementById(id) : null)));
+
         this.dom = {
-            btnToggle: document.getElementById('btn-policy-ledger'),
-            scrim: document.getElementById('policy-drawer-scrim'),
-            drawer: document.getElementById('policy-drawer'),
-            closeBtn: document.getElementById('policy-close-btn'),
+            btnToggle: getEl('btn-policy-ledger'),
+            scrim: getEl('policy-drawer-scrim'),
+            drawer: getEl('policy-drawer'),
+            closeBtn: getEl('policy-close-btn'),
             toggles: {
-                night_watch: document.getElementById('toggle-policy-night-watch'),
-                clean_water: document.getElementById('toggle-policy-clean-water'),
-                modernization_subsidy: document.getElementById('toggle-policy-modernization-subsidy'),
+                night_watch: getEl('toggle-policy-night-watch'),
+                clean_water: getEl('toggle-policy-clean-water'),
+                modernization_subsidy: getEl('toggle-policy-modernization-subsidy'),
             },
             cards: {
-                night_watch: document.getElementById('card-policy-night-watch'),
-                clean_water: document.getElementById('card-policy-clean-water'),
-                modernization_subsidy: document.getElementById('card-policy-modernization-subsidy'),
+                night_watch: getEl('card-policy-night-watch'),
+                clean_water: getEl('card-policy-clean-water'),
+                modernization_subsidy: getEl('card-policy-modernization-subsidy'),
             },
-            activeCount: document.getElementById('policy-active-count'),
-            monthlyCost: document.getElementById('policy-monthly-cost'),
+            activeCount: getEl('policy-active-count'),
+            monthlyCost: getEl('policy-monthly-cost'),
         };
 
         this.bindEvents();

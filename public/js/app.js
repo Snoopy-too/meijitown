@@ -22,7 +22,11 @@ import { modalManager } from './ui/modalManager.js';
 import { i18n } from './i18n.js';
 
 class GameStateManager {
-    constructor() {
+    constructor(rootContainer = null) {
+        this.root = rootContainer || (typeof document !== 'undefined' ? document : null);
+        this.isLoungeMode = !!rootContainer || (typeof window !== 'undefined' && !!window.__MEIJI_MANUAL_MOUNT__);
+        const getEl = (id) => (this.root && this.root.getElementById ? this.root.getElementById(id) : (this.root && this.root.querySelector ? this.root.querySelector('#' + id) : (typeof document !== 'undefined' ? document.getElementById(id) : null)));
+
         this.cityId = 1;
         this.cityName = 'Edo-Tokyo';
         this.treasury = CONFIG.SIMULATION.INITIAL_TREASURY || 5000;
@@ -44,14 +48,15 @@ class GameStateManager {
 
         // Domain & Renderer Core
         this.grid = new CityGridModel(CONFIG.GRID_WIDTH, CONFIG.GRID_HEIGHT);
-        this.renderer = new WorldRenderer(document.getElementById('canvas-container'), this.grid);
+        const canvasContainer = getEl('canvas-container');
+        this.renderer = new WorldRenderer(canvasContainer, this.grid, this.root);
         this.renderer.setGameState(this);
 
         // UI Subsystems & Civic Systems
         this.api = new ApiClient();
-        this.toast = new ToastManager();
+        this.toast = new ToastManager(getEl('toast-container'));
         this.authModal = new AuthModal(this.api, this);
-        this.scope = new SurveyorScope(document.getElementById('surveyor-scope'), this);
+        this.scope = new SurveyorScope(getEl('surveyor-scope'), this);
         this.banner = new ChronicleBanner(this);
         this.milestones = new MilestoneManager(this);
         this.policies = new PolicyManager(this);
@@ -61,7 +66,8 @@ class GameStateManager {
         this.saveManager = new SaveManager(this, this.api);
         this.drawer = new BuildDrawer(
             (tool) => this.tools.setActiveTool(tool, false),
-            () => this.tools.rotatePlacement()
+            () => this.tools.rotatePlacement(),
+            this.root
         );
         this.drawer.updateTownTier(this.milestones.currentTier);
 
@@ -85,17 +91,19 @@ class GameStateManager {
         window.addEventListener('keydown', initAudio);
 
         this.initButtons();
+        i18n.updateDOM(this.root);
         this.loadCityFromApi().then(() => {
             this.simulation.start();
         });
     }
 
     initButtons() {
+        const getEl = (id) => (this.root && this.root.getElementById ? this.root.getElementById(id) : (this.root && this.root.querySelector ? this.root.querySelector('#' + id) : (typeof document !== 'undefined' ? document.getElementById(id) : null)));
         this.dom = {
-            dragBadge: document.getElementById('drag-badge'),
-            btnSave: document.getElementById('btn-save'),
-            btnReload: document.getElementById('btn-reload'),
-            btnNewGame: document.getElementById('btn-new-game'),
+            dragBadge: getEl('drag-badge'),
+            btnSave: getEl('btn-save'),
+            btnReload: getEl('btn-reload'),
+            btnNewGame: getEl('btn-new-game'),
         };
 
         if (this.dom.btnSave) this.dom.btnSave.addEventListener('click', () => this.saveCityToApi());
@@ -173,6 +181,12 @@ class GameStateManager {
     }
 
     async loadCityFromApi() {
+        if (this.isLoungeMode) {
+            console.log('[Meiji] Lounge mode active: match state synchronized via boardgame.io socket.');
+            this.updateHUD();
+            return;
+        }
+
         if (!this.authModal?.currentUser) {
             try {
                 const sess = await this.api.sessionCheck();

@@ -5,14 +5,19 @@ export class AuthModal {
     constructor(apiClient, gameState) {
         this.api = apiClient;
         this.game = gameState;
+        this.root = gameState?.root || (typeof document !== 'undefined' ? document : null);
         this.currentUser = null;
 
         this.ensureDOM();
         this.init();
     }
 
+    getEl(id) {
+        return this.root && this.root.getElementById ? this.root.getElementById(id) : (this.root && this.root.querySelector ? this.root.querySelector('#' + id) : (typeof document !== 'undefined' ? document.getElementById(id) : null));
+    }
+
     ensureDOM() {
-        if (!document.getElementById('auth-modal')) {
+        if (!this.getEl('auth-modal')) {
             const modalHtml = `
             <div id="auth-modal" class="modal-overlay hidden" style="display:none;">
               <div class="modal-card washi-card">
@@ -25,12 +30,15 @@ export class AuthModal {
                 <button id="auth-modal-close" class="btn-close">Close</button>
               </div>
             </div>`;
-            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            const mountTarget = this.root === document ? (document.body || document.documentElement) : (this.root.querySelector ? (this.root.querySelector('.meiji-module-root') || this.root) : this.root);
+            if (mountTarget && typeof mountTarget.insertAdjacentHTML === 'function') {
+                mountTarget.insertAdjacentHTML('beforeend', modalHtml);
+            }
         }
     }
 
     init() {
-        const btn = document.getElementById('btn-mayor-auth');
+        const btn = this.getEl('btn-mayor-auth');
         if (btn) {
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -39,7 +47,7 @@ export class AuthModal {
         }
         this.badgeBtn = btn;
 
-        const fidelBtn = document.getElementById('dev-user-fidel');
+        const fidelBtn = this.getEl('dev-user-fidel');
         if (fidelBtn) {
             fidelBtn.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -47,7 +55,7 @@ export class AuthModal {
             });
         }
 
-        const miaBtn = document.getElementById('dev-user-mia');
+        const miaBtn = this.getEl('dev-user-mia');
         if (miaBtn) {
             miaBtn.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -55,7 +63,7 @@ export class AuthModal {
             });
         }
 
-        const guestBtn = document.getElementById('dev-user-guest');
+        const guestBtn = this.getEl('dev-user-guest');
         if (guestBtn) {
             guestBtn.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -63,7 +71,7 @@ export class AuthModal {
             });
         }
 
-        const closeBtn = document.getElementById('auth-modal-close');
+        const closeBtn = this.getEl('auth-modal-close');
         if (closeBtn) {
             closeBtn.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -71,7 +79,7 @@ export class AuthModal {
             });
         }
 
-        const modal = document.getElementById('auth-modal');
+        const modal = this.getEl('auth-modal');
         if (modal) {
             modal.addEventListener('click', (e) => {
                 if (e.target === modal) this.close();
@@ -82,7 +90,7 @@ export class AuthModal {
     }
 
     open() {
-        const modal = document.getElementById('auth-modal');
+        const modal = this.getEl('auth-modal');
         if (!modal) return;
         modal.classList.remove('hidden');
         modal.style.display = 'flex';
@@ -90,7 +98,7 @@ export class AuthModal {
     }
 
     close() {
-        const modal = document.getElementById('auth-modal');
+        const modal = this.getEl('auth-modal');
         if (!modal) return;
         modal.classList.add('hidden');
         modal.style.display = 'none';

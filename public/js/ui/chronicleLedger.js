@@ -31,18 +31,19 @@ export class ChronicleLedger {
             ];
         }
 
-        const hasDoc = typeof document !== 'undefined';
+        const root = this.state?.root || (typeof document !== 'undefined' ? document : null);
+        const getEl = (id) => (root && root.getElementById ? root.getElementById(id) : (root && root.querySelector ? root.querySelector('#' + id) : (typeof document !== 'undefined' ? document.getElementById(id) : null)));
         this.dom = {
-            modalScrim: hasDoc ? document.getElementById('chronicle-ledger-modal') : null,
-            closeBtn: hasDoc ? document.getElementById('chronicle-close-btn') : null,
-            dateTrigger: hasDoc ? document.getElementById('val-date') : null,
-            foundingDate: hasDoc ? document.getElementById('ledger-founding-date') : null,
-            currentDate: hasDoc ? document.getElementById('ledger-current-date') : null,
-            statTaxes: hasDoc ? document.getElementById('ledger-stat-taxes') : null,
-            statFires: hasDoc ? document.getElementById('ledger-stat-fires') : null,
-            statPeakPop: hasDoc ? document.getElementById('ledger-stat-peak-pop') : null,
-            chartersList: hasDoc ? document.getElementById('ledger-charters-list') : null,
-            eventsList: hasDoc ? document.getElementById('ledger-events-list') : null,
+            modalScrim: getEl('chronicle-ledger-modal'),
+            closeBtn: getEl('chronicle-close-btn'),
+            dateTrigger: getEl('val-date'),
+            foundingDate: getEl('ledger-founding-date'),
+            currentDate: getEl('ledger-current-date'),
+            statTaxes: getEl('ledger-stat-taxes'),
+            statFires: getEl('ledger-stat-fires'),
+            statPeakPop: getEl('ledger-stat-peak-pop'),
+            chartersList: getEl('ledger-charters-list'),
+            eventsList: getEl('ledger-events-list'),
         };
 
         if (hasDoc) {

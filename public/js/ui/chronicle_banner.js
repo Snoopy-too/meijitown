@@ -8,21 +8,24 @@ import { i18n } from '../i18n.js';
 export class ChronicleBanner {
     constructor(stateManager) {
         this.state = stateManager;
+        const root = stateManager?.root || (typeof document !== 'undefined' ? document : null);
+        const getEl = (id) => (root && root.getElementById ? root.getElementById(id) : (root && root.querySelector ? root.querySelector('#' + id) : (typeof document !== 'undefined' ? document.getElementById(id) : null)));
+        const getAll = (sel) => (root && root.querySelectorAll ? root.querySelectorAll(sel) : (typeof document !== 'undefined' ? document.querySelectorAll(sel) : []));
 
         this.dom = {
-            cityName: document.getElementById('val-cityname'),
-            treasury: document.getElementById('val-treasury'),
-            cashflow: document.getElementById('val-cashflow'),
-            population: document.getElementById('val-population'),
-            date: document.getElementById('val-date'),
-            fillRes: document.getElementById('fill-res'),
-            fillCom: document.getElementById('fill-com'),
-            fillInd: document.getElementById('fill-ind'),
-            valHappiness: document.getElementById('val-happiness'),
-            timeButtons: document.querySelectorAll('#time-controls .time-btn'),
-            btnAudioMute: document.getElementById('audio-toggle-btn') || document.getElementById('btn-audio-mute'),
-            btnLang: document.getElementById('lang-toggle-btn'),
-            btnPolicyLedger: document.getElementById('btn-policy-ledger'),
+            cityName: getEl('val-cityname'),
+            treasury: getEl('val-treasury'),
+            cashflow: getEl('val-cashflow'),
+            population: getEl('val-population'),
+            date: getEl('val-date'),
+            fillRes: getEl('fill-res'),
+            fillCom: getEl('fill-com'),
+            fillInd: getEl('fill-ind'),
+            valHappiness: getEl('val-happiness'),
+            timeButtons: getAll('#time-controls .time-btn'),
+            btnAudioMute: getEl('audio-toggle-btn') || getEl('btn-audio-mute'),
+            btnLang: getEl('lang-toggle-btn'),
+            btnPolicyLedger: getEl('btn-policy-ledger'),
         };
 
         this.bindTimeControls();

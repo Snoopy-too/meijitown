@@ -74,16 +74,19 @@ export class MilestoneManager {
             this.hasTriumphCompleted = false;
         }
 
+        const root = this.state?.root || (typeof document !== 'undefined' ? document : null);
+        const getEl = (id) => (root && root.getElementById ? root.getElementById(id) : (root && root.querySelector ? root.querySelector('#' + id) : (typeof document !== 'undefined' ? document.getElementById(id) : null)));
+
         this.dom = {
-            badge: document.getElementById('val-tier-badge'),
-            modalScrim: document.getElementById('milestone-modal-scrim'),
-            modalTitle: document.getElementById('milestone-title'),
-            modalBody: document.getElementById('milestone-body'),
-            featuresList: document.getElementById('milestone-features-list'),
-            rewardVal: document.getElementById('milestone-reward-val'),
-            claimBtn: document.getElementById('btn-milestone-claim'),
-            triumphScrim: document.getElementById('triumph-modal-scrim'),
-            triumphCloseBtn: document.getElementById('btn-triumph-close'),
+            badge: getEl('val-tier-badge'),
+            modalScrim: getEl('milestone-modal-scrim'),
+            modalTitle: getEl('milestone-title'),
+            modalBody: getEl('milestone-body'),
+            featuresList: getEl('milestone-features-list'),
+            rewardVal: getEl('milestone-reward-val'),
+            claimBtn: getEl('btn-milestone-claim'),
+            triumphScrim: getEl('triumph-modal-scrim'),
+            triumphCloseBtn: getEl('btn-triumph-close'),
         };
 
         this.bindEvents();

@@ -6,9 +6,15 @@
 
 window.GameModules = window.GameModules || {};
 
-function getTemplateHtml(mode = 'standard', playerName = 'Mayor') {
+function getTemplateHtml(mode = 'standard', playerName = 'Mayor', gameName = 'meiji-town') {
   return `
     <div class="meiji-module-root">
+      <link rel="stylesheet" href="/game_modules/${gameName}/style.css">
+      <link rel="stylesheet" href="/game_modules/${gameName}/public/css/style.css">
+      <link rel="stylesheet" href="/game_modules/${gameName}/public/css/hud.css">
+      <link rel="stylesheet" href="/game_modules/${gameName}/public/css/drawer.css">
+      <link rel="stylesheet" href="/game_modules/${gameName}/public/css/civic.css">
+
       <!-- 3D Three.js Viewport Container -->
       <div id="canvas-container"></div>
 
@@ -218,7 +224,7 @@ function mountMeijiClient(container, config) {
   window.__MEIJI_MANUAL_MOUNT__ = true;
 
   // Render HTML scaffolding into Shadow DOM container
-  container.innerHTML = getTemplateHtml(mode, playerName);
+  container.innerHTML = getTemplateHtml(mode, playerName, gameName);
 
   // Setup Three.js ESM import map if not present
   if (!document.querySelector('script[type="importmap"]')) {
@@ -272,7 +278,7 @@ function mountMeijiClient(container, config) {
   import(`/game_modules/${gameName}/public/js/app.js`)
     .then(({ GameStateManager }) => {
       if (GameStateManager) {
-        window.game = new GameStateManager();
+        window.game = new GameStateManager(container);
         console.log('[Meiji] GameStateManager mounted inside lounge container.');
 
         // Override save handler to save via boardgame.io move -> MySQL
@@ -317,6 +323,9 @@ function unmountMeijiClient() {
     if (window.game.simulation && typeof window.game.simulation.stop === 'function') {
       window.game.simulation.stop();
     }
+    if (window.game.renderer && typeof window.game.renderer.destroy === 'function') {
+      window.game.renderer.destroy();
+    }
     window.game = null;
   }
   console.log('[Meiji] Unmounted Meiji Town client.');
@@ -326,3 +335,4 @@ window.GameModules['meiji-town'] = {
   mountClient: mountMeijiClient,
   unmountClient: unmountMeijiClient
 };
+window.GameModules['meijitown'] = window.GameModules['meiji-town'];

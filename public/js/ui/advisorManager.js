@@ -48,22 +48,27 @@ export class AdvisorManager {
     }
 
     initDOM() {
-        let container = document.getElementById('advisor-notification-container');
+        const root = this.state?.root || (typeof document !== 'undefined' ? document : null);
+        const getEl = (id) => (root && root.getElementById ? root.getElementById(id) : (root && root.querySelector ? root.querySelector('#' + id) : (typeof document !== 'undefined' ? document.getElementById(id) : null)));
+        let container = getEl('advisor-notification-container');
         if (!container) {
             container = document.createElement('div');
             container.id = 'advisor-notification-container';
             container.className = 'advisor-container washi-card hidden';
             container.innerHTML = `<div class="advisor-header"><span class="advisor-avatar">🧑‍💼</span><span class="advisor-title" data-i18n="advisor.title">Municipal Advisor</span><button class="advisor-close-btn" id="advisor-btn-dismiss-x" title="Dismiss">✕</button></div><div class="advisor-body" id="advisor-message-body"></div><div class="advisor-actions"><button class="advisor-btn-action" id="advisor-btn-open-edicts">📜 <span data-i18n="advisor.open_edicts">Open Edicts</span></button><button class="advisor-btn-dismiss" id="advisor-btn-dismiss">✕ <span data-i18n="advisor.dismiss">Dismiss</span></button></div>`;
-            document.body.appendChild(container);
+            const mountTarget = root === document ? (document.body || document.documentElement) : (root.querySelector ? (root.querySelector('.meiji-module-root') || root) : root);
+            if (mountTarget && typeof mountTarget.appendChild === 'function') {
+                mountTarget.appendChild(container);
+            }
         }
 
         this.dom = {
             container,
-            message: document.getElementById('advisor-message-body'),
-            btnOpenEdicts: document.getElementById('advisor-btn-open-edicts'),
-            btnDismiss: document.getElementById('advisor-btn-dismiss'),
-            btnCloseX: document.getElementById('advisor-btn-dismiss-x'),
-            toggleCheckbox: document.getElementById('toggle-advisor-guidance')
+            message: getEl('advisor-message-body'),
+            btnOpenEdicts: getEl('advisor-btn-open-edicts'),
+            btnDismiss: getEl('advisor-btn-dismiss'),
+            btnCloseX: getEl('advisor-btn-dismiss-x'),
+            toggleCheckbox: getEl('toggle-advisor-guidance')
         };
         if (this.dom.toggleCheckbox) this.dom.toggleCheckbox.checked = this.enabled;
     }

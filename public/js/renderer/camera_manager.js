@@ -7,11 +7,11 @@ import { CONFIG } from '../config.js';
 
 export class CameraManager {
     constructor(container, domElement) {
-        this.container = container;
+        this.container = container || (typeof document !== 'undefined' ? document.body : null);
         this.domElement = domElement;
 
-        const width = this.container.clientWidth || window.innerWidth;
-        const height = this.container.clientHeight || window.innerHeight;
+        const width = (this.container && this.container.clientWidth > 0) ? this.container.clientWidth : window.innerWidth;
+        const height = (this.container && this.container.clientHeight > 0) ? this.container.clientHeight : window.innerHeight;
 
         this.camera = new THREE.PerspectiveCamera(35, width / height, 0.5, 1000);
         const centerOffset = (CONFIG.GRID_WIDTH * CONFIG.TILE_SIZE) / 2;
@@ -96,8 +96,8 @@ export class CameraManager {
     }
 
     handleResize(renderer) {
-        const w = this.container.clientWidth || window.innerWidth;
-        const h = this.container.clientHeight || window.innerHeight;
+        const w = (this.container && this.container.clientWidth > 0) ? this.container.clientWidth : window.innerWidth;
+        const h = (this.container && this.container.clientHeight > 0) ? this.container.clientHeight : window.innerHeight;
         this.camera.aspect = w / h;
         this.camera.updateProjectionMatrix();
         renderer.setSize(w, h);

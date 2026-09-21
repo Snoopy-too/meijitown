@@ -6,10 +6,11 @@ import { CONFIG } from '../config.js';
 import { OverlayRenderer } from './overlayRenderer.js';
 
 export class OverlaySystem {
-    constructor(scene, gridModel, stateManager) {
+    constructor(scene, gridModel, stateManager, rootContainer = null) {
         this.scene = scene;
         this.grid = gridModel;
         this.state = stateManager;
+        this.root = rootContainer || stateManager?.root || (typeof document !== 'undefined' ? document : null);
         this.currentMode = 'none'; // 'none' | 'fire' | 'sanitation' | 'electric' | 'pollution'
         this.simulation = null;
 
@@ -64,11 +65,14 @@ export class OverlaySystem {
     }
 
     initUI() {
+        const getEl = (id) => (this.root && this.root.getElementById ? this.root.getElementById(id) : (this.root && this.root.querySelector ? this.root.querySelector('#' + id) : (typeof document !== 'undefined' ? document.getElementById(id) : null)));
+        const getAll = (sel) => (this.root && this.root.querySelectorAll ? this.root.querySelectorAll(sel) : (typeof document !== 'undefined' ? document.querySelectorAll(sel) : []));
+
         this.dom = {
-            btnToggle: document.getElementById('btn-layers-toggle'),
-            popover: document.getElementById('layer-menu-popover'),
-            optionBtns: document.querySelectorAll('.layer-option-btn'),
-            radioInputs: document.querySelectorAll('input[name="layer-mode"]')
+            btnToggle: getEl('btn-layers-toggle'),
+            popover: getEl('layer-menu-popover'),
+            optionBtns: getAll('.layer-option-btn'),
+            radioInputs: getAll('input[name="layer-mode"]')
         };
 
         if (this.dom.btnToggle && this.dom.popover) {
@@ -137,7 +141,8 @@ export class OverlaySystem {
             });
         }
 
-        const activeRadio = document.querySelector(`input[name="layer-mode"][value="${mode}"]`);
+        const queryEl = (sel) => (this.root && this.root.querySelector ? this.root.querySelector(sel) : (typeof document !== 'undefined' ? document.querySelector(sel) : null));
+        const activeRadio = queryEl(`input[name="layer-mode"][value="${mode}"]`);
         if (activeRadio) {
             activeRadio.checked = true;
         }

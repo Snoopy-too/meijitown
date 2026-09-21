@@ -419,11 +419,12 @@ class I18nManager {
         return `Meiji ${meijiYear} (${year}) - ${ENGLISH_MONTHS[m - 1]}`;
     }
 
-    updateDOM() {
+    updateDOM(root = null) {
         if (typeof document === 'undefined') return;
+        const target = root || (window.game && window.game.root) || document;
 
         // Text Content updates
-        const elements = document.querySelectorAll('[data-i18n]');
+        const elements = target.querySelectorAll ? target.querySelectorAll('[data-i18n]') : document.querySelectorAll('[data-i18n]');
         elements.forEach(el => {
             const key = el.getAttribute('data-i18n');
             const translation = this.t(key);
@@ -433,7 +434,7 @@ class I18nManager {
         });
 
         // Title / Tooltip attribute updates
-        const titledElements = document.querySelectorAll('[data-i18n-title]');
+        const titledElements = target.querySelectorAll ? target.querySelectorAll('[data-i18n-title]') : document.querySelectorAll('[data-i18n-title]');
         titledElements.forEach(el => {
             const key = el.getAttribute('data-i18n-title');
             const translation = this.t(key);
@@ -443,14 +444,16 @@ class I18nManager {
         });
 
         // Language toggle button text & tooltip
-        const langBtn = document.getElementById('lang-toggle-btn');
+        const langBtn = target.getElementById ? target.getElementById('lang-toggle-btn') : (target.querySelector ? target.querySelector('#lang-toggle-btn') : document.getElementById('lang-toggle-btn'));
         if (langBtn) {
             langBtn.textContent = this.t('hud.lang_btn');
             langBtn.title = this.t('hud.lang_title');
         }
 
         // HTML lang attribute
-        document.documentElement.lang = this.lang;
+        if (document.documentElement) {
+            document.documentElement.lang = this.lang;
+        }
     }
 }
 

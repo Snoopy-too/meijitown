@@ -23,8 +23,12 @@ import { InstancingManager } from './renderer/instancingManager.js';
 import { AgricultureManager } from './agricultureManager.js';
 
 export class WorldRenderer {
-    constructor(containerElement, gridModel) {
-        this.container = containerElement;
+    constructor(containerElement, gridModel, rootElement = null) {
+        this.root = rootElement || (containerElement && containerElement.getRootNode ? containerElement.getRootNode() : document);
+        this.container = containerElement
+            || (this.root && this.root.querySelector ? this.root.querySelector('#canvas-container') : null)
+            || (typeof document !== 'undefined' ? document.getElementById('canvas-container') : null)
+            || (typeof document !== 'undefined' ? document.body : null);
         this.grid = gridModel;
         this.tileMeshes = new Map();
         this.modelCache = new Map();
@@ -48,7 +52,7 @@ export class WorldRenderer {
         this.fx = new ParticleManager(this.scene);
         this.traffic = new TrafficManager(this.scene, this.grid, this.getTileWorldPos.bind(this), this.fx);
         this.canalTraffic = new CanalTrafficManager(this.scene, this.grid, this.getTileWorldPos.bind(this), this.modelCache);
-        this.overlay = new OverlaySystem(this.scene, this.grid, null);
+        this.overlay = new OverlaySystem(this.scene, this.grid, null, this.root);
 
         this.bindEvents();
         this.loadAssets();
@@ -74,8 +78,8 @@ export class WorldRenderer {
     get controls() { return this.cameraManager.controls; }
 
     initScene() {
-        const width = this.container.clientWidth || window.innerWidth;
-        const height = this.container.clientHeight || window.innerHeight;
+        const width = (this.container && this.container.clientWidth > 0) ? this.container.clientWidth : window.innerWidth;
+        const height = (this.container && this.container.clientHeight > 0) ? this.container.clientHeight : window.innerHeight;
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(CONFIG.ATMOSPHERE.BACKGROUND);
         this.scene.fog = new THREE.FogExp2(CONFIG.ATMOSPHERE.FOG, CONFIG.ATMOSPHERE.FOG_DENSITY);
@@ -85,7 +89,20 @@ export class WorldRenderer {
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         this.renderer.shadowMap.enabled = true;
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-        this.container.appendChild(this.renderer.domElement);
+        if (this.container && typeof this.container.appendChild === 'function') {
+            this.container.appendChild(this.renderer.domElement);
+        } else if (typeof document !== 'undefined' && document.body) {
+            document.body.appendChild(this.renderer.domElement);
+        }
+
+        if (typeof ResizeObserver !== 'undefined' && this.container) {
+            this.resizeObserver = new ResizeObserver(() => {
+                if (this.cameraManager) {
+                    this.cameraManager.handleResize(this.renderer);
+                }
+            });
+            this.resizeObserver.observe(this.container);
+        }
     }
 
     initGround() {
@@ -390,7 +407,8 @@ export class WorldRenderer {
     dispatchBrigadeCart(roadPath, onArrival) { this.traffic.dispatchBrigadeCart(roadPath, onArrival); }
 
     animate() {
-        requestAnimationFrame(this.animate);
+        if (this.isDestroyed) return;
+        this.animFrameId = requestAnimationFrame(this.animate);
         this.cameraManager.update();
         const isSimRunning = !this.simulation || this.simulation.isRunning;
         const speedMult = isSimRunning ? (this.simulation ? (this.simulation.speedMultiplier || 1) : 1) : 0;
@@ -402,5 +420,23 @@ export class WorldRenderer {
         if (this.fx) this.fx.update(0.016);
         if (this.lighting && typeof this.lighting.update === 'function') this.lighting.update(0.016);
         this.renderer.render(this.scene, this.camera);
+    }
+
+    destroy() {
+        this.isDestroyed = true;
+        if (this.animFrameId) {
+            cancelAnimationFrame(this.animFrameId);
+            this.animFrameId = null;
+        }
+        if (this.resizeObserver) {
+            this.resizeObserver.disconnect();
+            this.resizeObserver = null;
+        }
+        if (this.renderer && this.renderer.domElement && this.renderer.domElement.parentNode) {
+            this.renderer.domElement.parentNode.removeChild(this.renderer.domElement);
+        }
+        if (this.renderer && typeof this.renderer.dispose === 'function') {
+            this.renderer.dispose();
+        }
     }
 }
