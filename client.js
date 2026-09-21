@@ -35,7 +35,7 @@ function getTemplateHtml(mode = 'standard', playerName = 'Mayor', gameName = 'me
           <div class="header-vitals-group">
             <div class="hud-stat">
               <span class="hud-label">Treasury</span>
-              <span id="val-treasury" class="hud-value" style="color: #b58900;">${mode === 'sandbox' ? '¥∞' : '¥10,000'}</span>
+              <span id="val-treasury" class="hud-value" style="color: #b58900;">${mode === 'sandbox' ? '¥∞' : '¥5,000'}</span>
             </div>
             <div class="hud-stat">
               <span class="hud-label">Cashflow</span>

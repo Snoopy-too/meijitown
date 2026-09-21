@@ -19,7 +19,7 @@
     {
       "id": "standard",
       "name": "Standard Era",
-      "description": "1872 Start with ¥10,000 treasury, standard civic unlocks, and historical simulation rules.",
+      "description": "1872 Start with ¥5,000 treasury, standard civic unlocks, and historical simulation rules.",
       "isDefault": true
     },
     {

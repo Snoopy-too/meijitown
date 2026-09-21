@@ -27,7 +27,7 @@ const MeijiTownGame = {
       },
       vitals: {
         cityName: 'Edo-Tokyo',
-        treasury: isSandbox ? 9999999 : 10000,
+        treasury: isSandbox ? 9999999 : 5000,
         cashflow: 0,
         population: 0,
         satisfaction: 65,
