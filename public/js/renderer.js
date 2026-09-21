@@ -21,6 +21,8 @@ import { TrainTrafficManager } from './renderer/trainTraffic.js';
 import { OverlaySystem } from './renderer/overlaySystem.js';
 import { InstancingManager } from './renderer/instancingManager.js';
 import { AgricultureManager } from './agricultureManager.js';
+import { BackdropManager } from './renderer/backdropManager.js';
+import { CloudManager } from './renderer/cloudManager.js';
 
 export class WorldRenderer {
     constructor(containerElement, gridModel, rootElement = null) {
@@ -40,6 +42,8 @@ export class WorldRenderer {
         this.lighting = SceneLighting.initLights(this.scene);
         this.raycast = new RaycastManager(this.scene);
         this.ghostCursor = new GhostCursorManager(this.scene);
+        this.backdrop = BackdropManager.init(this.scene);
+        this.clouds = CloudManager.init(this.scene);
 
         this.initGround();
 
@@ -147,6 +151,7 @@ export class WorldRenderer {
         }
         if (this.seasonalFoliageMaterial) this.seasonalFoliageMaterial.color.setHex(color);
         if (this.instancing) this.instancing.setSeasonalMaterial(this.seasonalFoliageMaterial);
+        if (this.backdrop) this.backdrop.updateSeason(month);
         for (const [_, tile] of this.grid.tiles.entries()) {
             if (tile.type === CONFIG.TYPES.AGRICULTURE) this.updateTileMesh(tile.x, tile.y, tile);
         }
@@ -154,6 +159,7 @@ export class WorldRenderer {
 
     updateDayNight(month) {
         if (this.lighting && typeof this.lighting.updateMonth === 'function') this.lighting.updateMonth(month);
+        if (this.clouds && typeof this.clouds.updateDayNight === 'function') this.clouds.updateDayNight(month);
     }
 
     getTileWorldPos(x, y) {
@@ -419,6 +425,7 @@ export class WorldRenderer {
         if (this.simulation?.typhoon) this.simulation.typhoon.updateRain(0.016);
         if (this.fx) this.fx.update(0.016);
         if (this.lighting && typeof this.lighting.update === 'function') this.lighting.update(0.016);
+        if (this.clouds) this.clouds.update(0.016, isSimRunning ? speedMult : 1, !!this.simulation?.typhoon?.isStormActive);
         this.renderer.render(this.scene, this.camera);
     }
 
@@ -432,11 +439,9 @@ export class WorldRenderer {
             this.resizeObserver.disconnect();
             this.resizeObserver = null;
         }
-        if (this.renderer && this.renderer.domElement && this.renderer.domElement.parentNode) {
-            this.renderer.domElement.parentNode.removeChild(this.renderer.domElement);
-        }
-        if (this.renderer && typeof this.renderer.dispose === 'function') {
-            this.renderer.dispose();
-        }
+        if (this.backdrop?.group) this.scene.remove(this.backdrop.group);
+        if (this.clouds?.group) this.scene.remove(this.clouds.group);
+        if (this.renderer?.domElement?.parentNode) this.renderer.domElement.parentNode.removeChild(this.renderer.domElement);
+        if (typeof this.renderer?.dispose === 'function') this.renderer.dispose();
     }
 }
