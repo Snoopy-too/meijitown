@@ -1,0 +1,57 @@
+/* Project Meiji - Scoped Theme & HUD for The Flying Dutchmen Platform */
+/* Scoped to :host and internal containers inside Shadow DOM */
+
+:host {
+    display: block;
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: #1a1e22;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+
+    --bg-parchment: #f4ede2;
+    --panel-bg: rgba(248, 243, 235, 0.96);
+    --panel-border: #5a4632;
+    --text-sumi: #231f20;
+    --text-muted: #6b5c4d;
+    --accent-vermilion: #b33927;
+    --accent-indigo: #2c4765;
+    --accent-ochre: #b58900;
+    --accent-green: #3a6332;
+    --road-color: #8c7355;
+    --stone-color: #4a4e54;
+    --shadow-soft: 0 4px 16px rgba(0, 0, 0, 0.25);
+    --font-serif: "Yu Mincho", "Hiragino Mincho ProN", "MS PMincho", "Times New Roman", serif;
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+}
+
+@import url('/game_modules/meiji-town/public/css/style.css');
+@import url('/game_modules/meiji-town/public/css/hud.css');
+@import url('/game_modules/meiji-town/public/css/drawer.css');
+@import url('/game_modules/meiji-town/public/css/civic.css');
+
+#canvas-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    touch-action: none;
+}
+
+canvas {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+}
+
+.meiji-module-root {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}

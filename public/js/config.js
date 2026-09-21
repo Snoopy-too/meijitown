@@ -1,7 +1,24 @@
-// Project Meiji - Simulation Configuration & Constants
-// ponytail: single source of truth for grid constants, economics, atmosphere, and models
+// Determine dynamic asset base path (standalone vs game_modules/meiji-town module)
+export function getAssetBase() {
+    if (typeof window !== 'undefined' && window.__MEIJI_ASSET_BASE__) {
+        return window.__MEIJI_ASSET_BASE__;
+    }
+    // Check if running inside lobby game_modules
+    if (typeof window !== 'undefined' && window.location.pathname.includes('/game_modules/')) {
+        return '/game_modules/meiji-town/public/';
+    }
+    return '';
+}
+
+export function assetUrl(relativePath) {
+    const base = getAssetBase();
+    if (!relativePath) return relativePath;
+    if (relativePath.startsWith('/') || relativePath.startsWith('http')) return relativePath;
+    return `${base}${relativePath}`;
+}
 
 export const CONFIG = {
+
     GRID_WIDTH: 35,
     GRID_HEIGHT: 35,
     TILE_SIZE: 2.0,

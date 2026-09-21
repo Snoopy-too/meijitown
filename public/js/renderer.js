@@ -3,7 +3,7 @@
 
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { CONFIG } from './config.js';
+import { CONFIG, assetUrl } from './config.js';
 import { ParticleManager } from './fx.js';
 import { CameraManager } from './renderer/camera_manager.js';
 import { SceneLighting } from './renderer/scene_lighting.js';
@@ -155,8 +155,9 @@ export class WorldRenderer {
         const loader = new GLTFLoader();
         const loadModel = (key, url) => {
             if (!url) return Promise.resolve(false);
+            const resolvedUrl = assetUrl(url);
             return new Promise((resolve) => {
-                loader.load(url, (gltf) => {
+                loader.load(resolvedUrl, (gltf) => {
                     gltf.scene.traverse((child) => {
                         if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; }
                     });

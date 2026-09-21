@@ -1,0 +1,31 @@
+{
+  "id": "meiji-town",
+  "name": "Meiji Town",
+  "description": "Historical Meiji period city simulation. Plan districts, lay streets, balance fire prevention, sanitation, and industrial modernization.",
+  "playerCounts": [1],
+  "minPlayers": 1,
+  "maxPlayers": 1,
+  "version": "1.0.0",
+  "status": "active",
+  "author": "Meiji Town Team",
+  "tags": [
+    "simulation",
+    "city-builder",
+    "historical",
+    "strategy"
+  ],
+  "icon": "bi-buildings",
+  "modes": [
+    {
+      "id": "standard",
+      "name": "Standard Era",
+      "description": "1872 Start with ¥10,000 treasury, standard civic unlocks, and historical simulation rules.",
+      "isDefault": true
+    },
+    {
+      "id": "sandbox",
+      "name": "Unlimited Funds",
+      "description": "Free build mode with unlimited treasury and instant unlocks."
+    }
+  ]
+}

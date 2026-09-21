@@ -359,6 +359,10 @@ class GameStateManager {
     }
 }
 
+export { GameStateManager };
+
 window.addEventListener('DOMContentLoaded', () => {
-    window.game = new GameStateManager();
+    if (!window.__MEIJI_MANUAL_MOUNT__) {
+        window.game = new GameStateManager();
+    }
 });
