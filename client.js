@@ -289,32 +289,53 @@ function mountMeijiClient(container, config) {
           applySyncState(latestSyncState);
         }
 
+        let lastSaveTime = 0;
+        window.game.saveMatch = (isAuto = false) => {
+          const now = Date.now();
+          if (now - lastSaveTime < 800) return;
+          lastSaveTime = now;
+
+          if (socket && window.game) {
+            const snapshot = {
+              vitals: {
+                cityName: window.game.cityName,
+                treasury: window.game.treasury,
+                population: window.game.population,
+                satisfaction: window.game.metrics?.townHappiness || 65
+              },
+              chronicle: {
+                currentYear: window.game.currentYear,
+                currentMonth: window.game.currentMonth
+              },
+              gridSnapshot: window.game.grid ? window.game.grid.exportToArray() : []
+            };
+
+            socket.emit('makeMove', 'syncCityState', [snapshot], matchID, String(playerID), credentials);
+            if (window.game.showToast) {
+              window.game.showToast(isAuto ? '💾 Auto-saved settlement to database.' : '💾 Settlement saved to database!');
+            }
+          }
+        };
+
         // Override save handler to save via boardgame.io move -> MySQL
         const saveBtn = container.querySelector('#btn-save');
         if (saveBtn) {
           saveBtn.addEventListener('click', () => {
-            if (socket && window.game) {
-              const snapshot = {
-                vitals: {
-                  cityName: window.game.cityName,
-                  treasury: window.game.treasury,
-                  population: window.game.population,
-                  satisfaction: window.game.metrics?.townHappiness || 65
-                },
-                chronicle: {
-                  currentYear: window.game.currentYear,
-                  currentMonth: window.game.currentMonth
-                },
-                gridSnapshot: window.game.grid ? window.game.grid.exportToArray() : []
-              };
-
-              socket.emit('makeMove', 'syncCityState', [snapshot], matchID, String(playerID), credentials);
-              if (window.game.showToast) {
-                window.game.showToast('💾 Match state saved to lounge database!');
-              }
+            if (window.game && typeof window.game.saveMatch === 'function') {
+              window.game.saveMatch(false);
             }
           });
         }
+
+        // Automatic background save every 60 seconds
+        if (window.__meijiAutoSaveTimer) {
+          clearInterval(window.__meijiAutoSaveTimer);
+        }
+        window.__meijiAutoSaveTimer = setInterval(() => {
+          if (window.game && typeof window.game.saveMatch === 'function') {
+            window.game.saveMatch(true);
+          }
+        }, 60000);
       }
     })
     .catch((err) => {
@@ -323,6 +344,10 @@ function mountMeijiClient(container, config) {
 }
 
 function unmountMeijiClient() {
+  if (window.__meijiAutoSaveTimer) {
+    clearInterval(window.__meijiAutoSaveTimer);
+    window.__meijiAutoSaveTimer = null;
+  }
   if (window.__currentMeijiSocket) {
     try { window.__currentMeijiSocket.disconnect(); } catch (e) {}
     window.__currentMeijiSocket = null;

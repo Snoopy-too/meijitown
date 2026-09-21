@@ -17,6 +17,7 @@ export class AuthModal {
     }
 
     ensureDOM() {
+        if (this.game?.isLoungeMode) return;
         if (!this.getEl('auth-modal')) {
             const modalHtml = `
             <div id="auth-modal" class="modal-overlay hidden" style="display:none;">
@@ -38,6 +39,7 @@ export class AuthModal {
     }
 
     init() {
+        if (this.game?.isLoungeMode) return;
         const btn = this.getEl('btn-mayor-auth');
         if (btn) {
             btn.addEventListener('click', (e) => {
@@ -90,6 +92,7 @@ export class AuthModal {
     }
 
     open() {
+        if (this.game?.isLoungeMode) return;
         const modal = this.getEl('auth-modal');
         if (!modal) return;
         modal.classList.remove('hidden');
