@@ -42,13 +42,13 @@ export class SaveManager {
         }
     }
 
-    async loadCity(slotId = null) {
-        this.game.showToast('Fetching settlement from MySQL...');
+    async loadCity(slotId = null, silent = false) {
+        if (!silent) this.game.showToast('Fetching settlement from MySQL...');
         try {
             const res = await this.api.loadCity(slotId);
             const city = res.city;
             if (!city) {
-                this.game.showToast('No saved settlement found.', true);
+                if (!silent) this.game.showToast('No saved settlement found.', true);
                 return null;
             }
 

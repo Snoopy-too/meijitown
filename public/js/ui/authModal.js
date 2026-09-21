@@ -113,6 +113,9 @@ export class AuthModal {
                 }
             }
             this.close();
+            if (this.game?.onMayorChanged) {
+                await this.game.onMayorChanged();
+            }
         } catch (err) {
             console.error('Dev login switcher error:', err);
             if (this.game?.showToast) {

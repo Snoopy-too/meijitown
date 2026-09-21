@@ -241,6 +241,51 @@ class GameStateManager {
         await this.saveManager.saveCurrentCity();
     }
 
+    async onMayorChanged() {
+        if (this.saveManager) {
+            this.saveManager.currentSlotId = null;
+        }
+
+        if (this.authModal?.currentUser) {
+            try {
+                const loaded = await this.saveManager.loadCity(null, true);
+                if (loaded) {
+                    return;
+                }
+            } catch (err) {
+                console.warn('Could not load city on mayor change:', err);
+            }
+
+            // If this mayor has no saved city yet, present a clean fresh settlement
+            const userName = this.authModal.currentUser.username;
+            this.cityName = `${userName}'s Edo`;
+            this.treasury = CONFIG.SIMULATION.INITIAL_TREASURY || 5000;
+            this.population = 0;
+            this.currentYear = 1872;
+            this.currentMonth = 1;
+            this.lastCashflow = 0;
+            this.metrics = {
+                traditionModernityBalance: 50,
+                fireRisk: 0,
+                choleraRisk: 0,
+                townHappiness: 65,
+                industrialDemand: 30,
+                commercialDemand: 40,
+                residentialDemand: 60,
+            };
+            this.grid.loadFromMap({});
+            if (this.milestones) this.milestones.reset();
+            if (this.policies) this.policies.resetDefaults();
+            if (this.advisor) this.advisor.hide();
+            this.updateHUD();
+            if (this.renderer) {
+                this.renderer.updateSeason(this.currentMonth);
+                this.renderer.updateDayNight(this.currentMonth);
+            }
+            this.showToast(`✨ Fresh settlement ready for Mayor ${userName}!`);
+        }
+    }
+
     async startNewGame() {
         const chosenName = await modalManager.prompt({
             title: i18n.t('confirm.reset_city_title', "Start a New Settlement?"),
