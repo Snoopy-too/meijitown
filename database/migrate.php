@@ -53,18 +53,50 @@ try {
         $insertCity->execute([$userId, 'Edo-Tokyo', 15000, 120, 1872, 1]);
         $cityId = (int) $pdo->lastInsertId();
 
-        // Seed initial empty 32x32 grid
-        $defaultTiles = [];
-        $insertGrid = $pdo->prepare("INSERT INTO city_grids (city_id, grid_width, grid_height, tile_data) VALUES (?, ?, ?, ?)");
-        $insertGrid->execute([$cityId, 32, 32, json_encode($defaultTiles, JSON_THROW_ON_ERROR)]);
+        // Drop obsolete tables if they exist
+        $pdo->exec("DROP TABLE IF EXISTS `city_grids`, `city_metrics`;");
 
-        // Seed initial metrics
-        $insertMetrics = $pdo->prepare("INSERT INTO city_metrics (city_id, tradition_modernity_balance, fire_risk, cholera_risk, industrial_demand, commercial_demand, residential_demand) VALUES (?, ?, ?, ?, ?, ?, ?)");
-        $insertMetrics->execute([$cityId, 50, 25, 15, 30, 40, 60]);
+        // Seed initial empty 32x32 grid & metrics into data/city_config.json
+        $configFile = dirname(__DIR__) . '/data/city_config.json';
+        if (!file_exists($configFile)) {
+            $configData = [
+                'defaults' => [
+                    'grid_width' => 32,
+                    'grid_height' => 32,
+                    'tiles' => [],
+                    'metrics' => [
+                        'tradition_modernity_balance' => 50,
+                        'fire_risk' => 25,
+                        'cholera_risk' => 15,
+                        'industrial_demand' => 30,
+                        'commercial_demand' => 40,
+                        'residential_demand' => 60
+                    ]
+                ],
+                'cities' => [
+                    (string)$cityId => [
+                        'grid_width' => 32,
+                        'grid_height' => 32,
+                        'tiles' => [],
+                        'metrics' => [
+                            'tradition_modernity_balance' => 50,
+                            'fire_risk' => 25,
+                            'cholera_risk' => 15,
+                            'industrial_demand' => 30,
+                            'commercial_demand' => 40,
+                            'residential_demand' => 60
+                        ]
+                    ]
+                ]
+            ];
+            file_put_contents($configFile, json_encode($configData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        }
 
-        echo "[Seed] Created default city 'Edo-Tokyo' (City ID: {$cityId}) with initial 32x32 grid.\n";
+        echo "[Seed] Created default city 'Edo-Tokyo' (City ID: {$cityId}) with initial 32x32 grid in config.\n";
     } else {
-        echo "[Migration] Seed data already present.\n";
+        // Cleanup obsolete tables even if seed already present
+        $pdo->exec("DROP TABLE IF EXISTS `city_grids`, `city_metrics`;");
+        echo "[Migration] Seed data already present. Obsolete tables dropped.\n";
     }
 
     echo "[Success] Migration completed.\n";

@@ -1,8 +1,13 @@
 -- Project Meiji Database Schema
 -- Engine: InnoDB with Foreign Key constraints and strict integrity
+-- Tables kept: users, cities, saved_cities (city_grids and city_metrics moved to data/city_config.json)
 
 CREATE DATABASE IF NOT EXISTS `meijitown` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE `meijitown`;
+
+-- Drop obsolete tables if migrating
+DROP TABLE IF EXISTS `city_grids`;
+DROP TABLE IF EXISTS `city_metrics`;
 
 -- 1. Users Table
 CREATE TABLE IF NOT EXISTS `users` (
@@ -26,25 +31,17 @@ CREATE TABLE IF NOT EXISTS `cities` (
         REFERENCES `users` (`user_id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- 3. City Grids (Spatial JSON storage)
-CREATE TABLE IF NOT EXISTS `city_grids` (
-    `city_id` INT PRIMARY KEY,
-    `grid_width` INT NOT NULL DEFAULT 32,
-    `grid_height` INT NOT NULL DEFAULT 32,
-    `tile_data` LONGTEXT NOT NULL,
-    CONSTRAINT `fk_grids_city` FOREIGN KEY (`city_id`)
-        REFERENCES `cities` (`city_id`) ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- 4. City Metrics
-CREATE TABLE IF NOT EXISTS `city_metrics` (
-    `city_id` INT PRIMARY KEY,
-    `tradition_modernity_balance` INT NOT NULL DEFAULT 50,
-    `fire_risk` INT NOT NULL DEFAULT 20,
-    `cholera_risk` INT NOT NULL DEFAULT 10,
-    `industrial_demand` INT NOT NULL DEFAULT 30,
-    `commercial_demand` INT NOT NULL DEFAULT 40,
-    `residential_demand` INT NOT NULL DEFAULT 60,
-    CONSTRAINT `fk_metrics_city` FOREIGN KEY (`city_id`)
-        REFERENCES `cities` (`city_id`) ON DELETE CASCADE ON UPDATE CASCADE
+-- 3. Saved Cities Table (Multi-User Saves)
+CREATE TABLE IF NOT EXISTS `saved_cities` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `user_id` INT NOT NULL,
+    `city_name` VARCHAR(100) NOT NULL,
+    `chronicle_year` INT NOT NULL,
+    `chronicle_month` INT NOT NULL,
+    `population` INT NOT NULL,
+    `treasury` INT NOT NULL,
+    `city_data` LONGTEXT NOT NULL,
+    `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT `fk_saved_cities_user` FOREIGN KEY (`user_id`)
+        REFERENCES `users` (`user_id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

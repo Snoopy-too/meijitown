@@ -1,0 +1,30 @@
+{
+    "defaults": {
+        "grid_width": 32,
+        "grid_height": 32,
+        "tiles": [],
+        "metrics": {
+            "tradition_modernity_balance": 50,
+            "fire_risk": 20,
+            "cholera_risk": 10,
+            "industrial_demand": 30,
+            "commercial_demand": 40,
+            "residential_demand": 60
+        }
+    },
+    "cities": {
+        "1": {
+            "grid_width": 32,
+            "grid_height": 32,
+            "tiles": [],
+            "metrics": {
+                "tradition_modernity_balance": 50,
+                "fire_risk": 20,
+                "cholera_risk": 10,
+                "industrial_demand": 30,
+                "commercial_demand": 40,
+                "residential_demand": 60
+            }
+        }
+    }
+}
