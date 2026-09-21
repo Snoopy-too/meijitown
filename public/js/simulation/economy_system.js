@@ -50,6 +50,8 @@ export class EconomySystem {
         let canalCount = 0;
         let stoneRoadCommercialBonus = 0;
         let kobanCommercialBonus = 0;
+        let orderDeficitPenalty = 0;
+        let educationDeficitPenalty = 0;
 
         for (const [_, tile] of this.grid.tiles.entries()) {
             if (tile.type === CONFIG.TYPES.ROAD) {
@@ -86,8 +88,21 @@ export class EconomySystem {
                     stoneRoadCommercialBonus += Math.round(baseTax * 0.25);
                 }
                 // Kōban Public Order boosts commercial revenue / satisfaction by +10%
-                if (this.happiness && this.happiness.isOrderCovered(tile.x, tile.y)) {
+                const isOrderCovered = this.happiness && this.happiness.isOrderCovered(tile.x, tile.y);
+                if (isOrderCovered) {
                     kobanCommercialBonus += Math.round(baseTax * 0.10);
+                } else if (tile.level >= 2) {
+                    // Expectation Deficit: Unpatrolled commercial district suffers street crime and robberies
+                    const penaltyRate = tile.level >= 3 ? 0.30 : 0.15;
+                    orderDeficitPenalty += Math.round(baseTax * penaltyRate);
+                }
+
+                // Expectation Deficit: Level 3+ modern commercial arcades require literate clerks & accounting
+                const hasEdu = (this.state.schoolSystem && typeof this.state.schoolSystem.isEducationCovered === 'function')
+                    ? (this.state.schoolSystem.isEducationCovered(tile.x, tile.y) || this.state.schoolSystem.isSchoolAdjacent(tile.x, tile.y))
+                    : false;
+                if (!hasEdu && tile.level >= 3) {
+                    educationDeficitPenalty += Math.round(baseTax * 0.20);
                 }
             }
         }
@@ -103,7 +118,11 @@ export class EconomySystem {
             ((counts.comL3 || 0) * (CONFIG.SIMULATION.TAX_COMMERCIAL_L3 || 45)) +
             ((counts.comL4 || 0) * (CONFIG.SIMULATION.TAX_COMMERCIAL_L4 || 70)) +
             stoneRoadCommercialBonus +
-            kobanCommercialBonus;
+            kobanCommercialBonus -
+            orderDeficitPenalty -
+            educationDeficitPenalty;
+
+        comTax = Math.max(0, comTax);
 
         // Policy: Night Fire Watch dampens night commercial revenue by -5%
         if (this.state.policies && typeof this.state.policies.isNightWatchActive === 'function' && this.state.policies.isNightWatchActive()) {
@@ -167,6 +186,8 @@ export class EconomySystem {
             resTax,
             comTax,
             indTax,
+            orderDeficitPenalty,
+            educationDeficitPenalty,
             harvestYield,
             maritimeDividends,
             infraMaintenance,

@@ -344,8 +344,22 @@ export class SurveyorScope {
         if (this.dom.order) {
             if (tile.type === CONFIG.TYPES.ZONE) {
                 const isSecured = simulation ? simulation.isOrderCovered(x, y) : false;
-                this.dom.order.textContent = isSecured ? (isJa ? '警邏巡回中' : 'Secured') : (isJa ? '警備巡回なし' : 'Unpatrolled');
-                this.dom.order.style.color = isSecured ? '#3a6332' : '#b33927';
+                const lvl = tile.level || 1;
+                if (isSecured) {
+                    this.dom.order.textContent = isJa ? '警邏巡回中 (+10%治安増益)' : 'Secured (+10% Revenue)';
+                    this.dom.order.style.color = '#3a6332';
+                } else if (tile.zoneType === CONFIG.ZONES.COMMERCIAL && lvl >= 2) {
+                    const pen = lvl >= 3 ? '-30%' : '-15%';
+                    this.dom.order.textContent = isJa ? `警備巡回なし (${pen} 盗難被害)` : `Unpatrolled (${pen} Crime)`;
+                    this.dom.order.style.color = '#b33927';
+                } else if (tile.zoneType === CONFIG.ZONES.RESIDENTIAL && lvl >= 2) {
+                    const pen = lvl >= 3 ? '-25%' : '-20%';
+                    this.dom.order.textContent = isJa ? `警備巡回なし (${pen} 治安不満)` : `Unpatrolled (${pen} Morale)`;
+                    this.dom.order.style.color = '#b33927';
+                } else {
+                    this.dom.order.textContent = isJa ? '警備巡回なし' : 'Unpatrolled';
+                    this.dom.order.style.color = '#8c7355';
+                }
             } else if (tile.type === CONFIG.TYPES.SERVICE && tile.serviceType === CONFIG.SERVICES.KOBAN) {
                 this.dom.order.textContent = isJa ? '警視本署・交番' : 'Headquarters';
                 this.dom.order.style.color = '#2c4765';
@@ -365,8 +379,20 @@ export class SurveyorScope {
                 this.dom.education.textContent = isJa ? '文部省認可校' : 'Primary School';
                 this.dom.education.style.color = '#2c4765';
             } else if (tile.type === CONFIG.TYPES.ZONE) {
-                this.dom.education.textContent = hasEdu ? (isJa ? '就学済 (教育圏内)' : 'Educated') : (isJa ? '未就学' : 'Unserved');
-                this.dom.education.style.color = hasEdu ? '#3a6332' : '#8c7355';
+                const lvl = tile.level || 1;
+                if (hasEdu) {
+                    this.dom.education.textContent = isJa ? '就学済 (教育圏内)' : 'Educated';
+                    this.dom.education.style.color = '#3a6332';
+                } else if (tile.zoneType === CONFIG.ZONES.COMMERCIAL && lvl >= 3) {
+                    this.dom.education.textContent = isJa ? '未就学 (-20% 帳簿人材不足)' : 'Unserved (-20% Clerks)';
+                    this.dom.education.style.color = '#b33927';
+                } else if (tile.zoneType === CONFIG.ZONES.RESIDENTIAL && lvl >= 3) {
+                    this.dom.education.textContent = isJa ? '未就学 (-25% 教育不満)' : 'Unserved (-25% Morale)';
+                    this.dom.education.style.color = '#b33927';
+                } else {
+                    this.dom.education.textContent = isJa ? '未就学' : 'Unserved';
+                    this.dom.education.style.color = '#8c7355';
+                }
             } else {
                 this.dom.education.textContent = isJa ? '対象外' : 'N/A';
                 this.dom.education.style.color = '#8c7355';
