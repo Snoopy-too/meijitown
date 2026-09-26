@@ -25,6 +25,8 @@ export class ChronicleBanner {
             timeButtons: getAll('#time-controls .time-btn'),
             btnAudioMute: getEl('audio-toggle-btn') || getEl('btn-audio-mute'),
             btnLang: getEl('lang-toggle-btn'),
+            btnLangEn: getEl('btn-lang-en'),
+            btnLangJa: getEl('btn-lang-ja'),
             btnPolicyLedger: getEl('btn-policy-ledger'),
         };
 
@@ -44,6 +46,43 @@ export class ChronicleBanner {
     }
 
     bindLanguageControls() {
+        const root = this.state?.root || (typeof document !== 'undefined' ? document : null);
+
+        const updateLangButtons = () => {
+            const current = i18n.getLanguage();
+            if (this.dom.btnLangEn) {
+                if (current === 'en') this.dom.btnLangEn.classList.add('active');
+                else this.dom.btnLangEn.classList.remove('active');
+            }
+            if (this.dom.btnLangJa) {
+                if (current === 'ja') this.dom.btnLangJa.classList.add('active');
+                else this.dom.btnLangJa.classList.remove('active');
+            }
+            if (this.dom.btnLang) {
+                this.dom.btnLang.textContent = i18n.t('hud.lang_btn');
+                this.dom.btnLang.title = i18n.t('hud.lang_title');
+                if (current === 'ja') this.dom.btnLang.classList.add('active');
+                else this.dom.btnLang.classList.remove('active');
+            }
+        };
+
+        if (this.dom.btnLangEn) {
+            this.dom.btnLangEn.addEventListener('click', () => {
+                if (i18n.getLanguage() !== 'en') {
+                    i18n.setLanguage('en');
+                    this.state.showToast('Language switched to English');
+                }
+            });
+        }
+        if (this.dom.btnLangJa) {
+            this.dom.btnLangJa.addEventListener('click', () => {
+                if (i18n.getLanguage() !== 'ja') {
+                    i18n.setLanguage('ja');
+                    this.state.showToast('言語を日本語に切り替えました');
+                }
+            });
+        }
+
         if (this.dom.btnLang) {
             this.dom.btnLang.addEventListener('click', () => {
                 const newLang = i18n.toggleLanguage();
@@ -54,18 +93,19 @@ export class ChronicleBanner {
         window.addEventListener('keydown', (e) => {
             if (e.key === 'l' || e.key === 'L') {
                 if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
-                if (this.dom.btnLang) {
-                    this.dom.btnLang.click();
-                }
+                const newLang = i18n.toggleLanguage();
+                this.state.showToast(newLang === 'ja' ? '言語を日本語に切り替えました' : 'Language switched to English');
             }
         });
 
         i18n.onChange(() => {
+            updateLangButtons();
             this.update();
             this.updateAudioIcon(audioManager.isMuted);
         });
 
-        i18n.updateDOM();
+        updateLangButtons();
+        i18n.updateDOM(root);
     }
 
     updateAudioIcon(isMuted) {

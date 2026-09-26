@@ -18,8 +18,8 @@ export const TRANSLATIONS = {
         'hud.rci_i': 'I',
         'hud.audio_on': '🔊 On',
         'hud.audio_mute': '🔇 Mute',
-        'hud.lang_btn': '🌐 日本語',
-        'hud.lang_title': 'Switch Language to Japanese [L]',
+        'hud.lang_btn': '🌐 EN',
+        'hud.lang_title': 'Switch Language to Japanese [L] / 日本語に切り替え',
         'hud.layers': 'Layers',
         'hud.layers_title': 'Map Data Overlays [O] / 地図レイヤー',
         'hud.layers_menu_title': 'Map Data Overlays',
@@ -196,8 +196,8 @@ export const TRANSLATIONS = {
         'hud.rci_i': '工',
         'hud.audio_on': '🔊 オン',
         'hud.audio_mute': '🔇 消音',
-        'hud.lang_btn': '🌐 English',
-        'hud.lang_title': '英語に切り替え [L]',
+        'hud.lang_btn': '🌐 日本語',
+        'hud.lang_title': '英語に切り替え [L] / Switch to English',
         'hud.layers': '階層地図',
         'hud.layers_title': '地図データレイヤー切替 [O]',
         'hud.layers_menu_title': '地図データレイヤー',
@@ -448,6 +448,18 @@ class I18nManager {
         if (langBtn) {
             langBtn.textContent = this.t('hud.lang_btn');
             langBtn.title = this.t('hud.lang_title');
+            if (this.lang === 'ja') langBtn.classList.add('active');
+            else langBtn.classList.remove('active');
+        }
+        const btnEn = target.querySelector ? target.querySelector('#btn-lang-en') : document.getElementById('btn-lang-en');
+        const btnJa = target.querySelector ? target.querySelector('#btn-lang-ja') : document.getElementById('btn-lang-ja');
+        if (btnEn) {
+            if (this.lang === 'en') btnEn.classList.add('active');
+            else btnEn.classList.remove('active');
+        }
+        if (btnJa) {
+            if (this.lang === 'ja') btnJa.classList.add('active');
+            else btnJa.classList.remove('active');
         }
 
         // HTML lang attribute

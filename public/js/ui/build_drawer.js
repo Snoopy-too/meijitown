@@ -363,6 +363,30 @@ export class BuildDrawer {
         }
     }
 
+    updateTabs() {
+        if (!this.dom.tabButtons) return;
+        const tabLabels = {
+            infra: i18n.t('tab.infra', '🛣️ Infrastructure'),
+            zones: i18n.t('tab.zones', '🏡 Zones'),
+            civic: i18n.t('tab.civic', '🏯 Public Services'),
+            leisure: i18n.t('tab.leisure', '🍵 Leisure & Culture')
+        };
+        this.dom.tabButtons.forEach(btn => {
+            const k = btn.dataset.tab;
+            if (k && tabLabels[k]) btn.textContent = tabLabels[k];
+        });
+    }
+
+    updateDrawerHeader() {
+        const titleEl = this.dom.drawer ? this.dom.drawer.querySelector('.drawer-title') : null;
+        if (!titleEl) return;
+        const isJa = i18n.getLanguage() === 'ja';
+        const sub = titleEl.querySelector('.drawer-subtitle') || titleEl.querySelector('span:not(.kanji)');
+        if (sub) {
+            sub.textContent = isJa ? '(都市造営・普請)' : 'Construction Catalogue';
+        }
+    }
+
     updateDrawerItems() {
         if (!this.dom.itemButtons) return;
         this.dom.itemButtons.forEach(btn => {
@@ -390,63 +414,26 @@ export class BuildDrawer {
                 if (badge) badge.remove();
             }
         });
+        this.updateTabs();
+        this.updateDrawerHeader();
     }
 
     getToolMetadata(toolName) {
-        switch (toolName) {
-            case CONFIG.TOOLS.ROAD:
-                return { name: i18n.t('tool.road', 'Dirt Road'), iconHtml: '🛣️' };
-            case CONFIG.TOOLS.STONE_ROAD:
-                return { name: i18n.t('tool.stone_road', 'Stone Paving'), iconHtml: '🧱' };
-            case CONFIG.TOOLS.CANAL:
-                return { name: i18n.t('tool.canal', 'Canal (Hori)'), iconHtml: '🌊' };
-            case CONFIG.TOOLS.RAIL_TRACK:
-                return { name: i18n.t('tool.rail_track', 'Rail Tracks'), iconHtml: '🛤️' };
-            case CONFIG.TOOLS.TRAIN_DEPOT:
-                return { name: i18n.t('tool.train_depot', 'Train Depot'), iconHtml: '🚉' };
-            case CONFIG.TOOLS.TREE_WILLOW:
-                return { name: i18n.t('tool.tree_willow', 'Canal Tree'), iconHtml: '🌸' };
-            case CONFIG.TOOLS.SHRINE_PARK:
-                return { name: i18n.t('tool.shrine_park', 'Shrine Park'), iconHtml: '⛩️' };
-            case CONFIG.TOOLS.RESIDENTIAL:
-                return { name: i18n.t('tool.residential', 'Machiya (R)'), iconHtml: '🏡' };
-            case CONFIG.TOOLS.COMMERCIAL:
-                return { name: i18n.t('tool.commercial', 'Shouten (C)'), iconHtml: '🏬' };
-            case CONFIG.TOOLS.INDUSTRIAL:
-                return { name: i18n.t('tool.industrial', 'Workshop (I)'), iconHtml: '⚒️' };
-            case CONFIG.TOOLS.RICE_PADDY:
-                return { name: i18n.t('tool.rice_paddy', 'Rice Paddy'), iconHtml: '🌾' };
-            case CONFIG.TOOLS.WATCHTOWER:
-                return { name: i18n.t('tool.watchtower', 'Watchtower'), iconHtml: '🏯' };
-            case CONFIG.TOOLS.FIRE_DEPOT:
-                return { name: i18n.t('tool.fire_depot', 'Fire Depot'), iconHtml: '🚒' };
-            case CONFIG.TOOLS.WELL:
-                return { name: i18n.t('tool.well', 'Well (Ido)'), iconHtml: '💧' };
-            case CONFIG.TOOLS.OCHAYA:
-                return { name: i18n.t('tool.ochaya', 'Teahouse'), iconHtml: '🍵' };
-            case CONFIG.TOOLS.SENTO:
-                return { name: i18n.t('tool.sento', 'Bathhouse'), iconHtml: '♨️' };
-            case CONFIG.TOOLS.KOBAN:
-                return { name: i18n.t('tool.koban', 'Police (Kōban)'), iconHtml: '🏮' };
-            case CONFIG.TOOLS.SCHOOL:
-                return { name: i18n.t('tool.school', 'Primary School'), iconHtml: '🏫' };
-            case CONFIG.TOOLS.TELEGRAPH:
-                return { name: i18n.t('tool.telegraph', 'Telegraph'), iconHtml: '⚡' };
-            case CONFIG.TOOLS.HARBOR_PIER:
-                return { name: i18n.t('tool.harbor_pier', 'Cargo Pier'), iconHtml: '⚓' };
-            case CONFIG.TOOLS.POWER_PLANT:
-                return { name: i18n.t('tool.power_plant', 'Power Plant'), iconHtml: '🏭' };
-            case CONFIG.TOOLS.WATERWORKS:
-                return { name: i18n.t('tool.waterworks', 'Waterworks'), iconHtml: '💧' };
-            case CONFIG.TOOLS.PAVILION:
-                return { name: i18n.t('tool.pavilion', 'Pavilion (Exposition)'), iconHtml: '🏛️' };
-            case CONFIG.TOOLS.SUIMON:
-                return { name: i18n.t('tool.suimon', 'Watergate Sluice'), iconHtml: '⛩️' };
-            case CONFIG.TOOLS.BULLDOZER:
-                return { name: i18n.t('tool.bulldozer', 'Demolish'), iconHtml: '🪓' };
-            case CONFIG.TOOLS.INSPECT:
-            default:
-                return { name: i18n.t('tool.survey', 'Survey Mode'), iconHtml: '🧭' };
-        }
+        const key = toolName === 'monument_pavilion' ? CONFIG.TOOLS.PAVILION : toolName;
+        const entry = getToolCatalogEntry(key);
+        const lang = i18n.getLanguage() === 'ja' ? 'ja' : 'en';
+        const icons = {
+            [CONFIG.TOOLS.ROAD]: '🛣️', [CONFIG.TOOLS.STONE_ROAD]: '🧱', [CONFIG.TOOLS.CANAL]: '🌊',
+            [CONFIG.TOOLS.RAIL_TRACK]: '🛤️', [CONFIG.TOOLS.TRAIN_DEPOT]: '🚉', [CONFIG.TOOLS.TREE_WILLOW]: '🌸',
+            [CONFIG.TOOLS.SHRINE_PARK]: '⛩️', [CONFIG.TOOLS.RESIDENTIAL]: '🏡', [CONFIG.TOOLS.COMMERCIAL]: '🏬',
+            [CONFIG.TOOLS.INDUSTRIAL]: '⚒️', [CONFIG.TOOLS.RICE_PADDY]: '🌾', [CONFIG.TOOLS.WATCHTOWER]: '🏯',
+            [CONFIG.TOOLS.FIRE_DEPOT]: '🚒', [CONFIG.TOOLS.WELL]: '💧', [CONFIG.TOOLS.OCHAYA]: '🍵',
+            [CONFIG.TOOLS.SENTO]: '♨️', [CONFIG.TOOLS.KOBAN]: '🏮', [CONFIG.TOOLS.SCHOOL]: '🏫',
+            [CONFIG.TOOLS.TELEGRAPH]: '⚡', [CONFIG.TOOLS.HARBOR_PIER]: '⚓', [CONFIG.TOOLS.POWER_PLANT]: '🏭',
+            [CONFIG.TOOLS.WATERWORKS]: '💧', [CONFIG.TOOLS.PAVILION]: '🏛️', [CONFIG.TOOLS.SUIMON]: '⛩️',
+            [CONFIG.TOOLS.BULLDOZER]: '🪓', [CONFIG.TOOLS.INSPECT]: '🧭'
+        };
+        const defaultName = entry?.name?.[lang] || i18n.t(`tool.${key}`, key);
+        return { name: defaultName, iconHtml: icons[key] || '🧭' };
     }
 }
