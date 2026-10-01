@@ -72,6 +72,15 @@ class MeijiWebhookHandler {
         execSync(`git config --global --add safe.directory "${this.repoDir}"`, { stdio: 'ignore' });
       } catch (_) {}
 
+      // Auto-stash any dirty working tree so local changes are never lost
+      try {
+        const dirty = execSync('git status --porcelain', { cwd: this.repoDir, encoding: 'utf8' }).trim();
+        if (dirty) {
+          this.log('Notice: Dirty working tree detected. Stashing local changes before sync...');
+          execSync(`git stash push -u -m "Auto-stashed before deploy on ${new Date().toISOString()}"`, { cwd: this.repoDir, stdio: 'ignore' });
+        }
+      } catch (_) {}
+
       // Fetch and reset hard to origin/main to prevent line-ending/merge halts
       const output = execSync('git fetch origin main && git reset --hard origin/main', {
         cwd: this.repoDir,
