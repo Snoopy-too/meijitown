@@ -1,6 +1,9 @@
 <?php
 declare(strict_types=1);
 
+ini_set('display_errors', '0');
+error_reporting(E_ALL);
+
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: SAMEORIGIN');
@@ -11,9 +14,11 @@ use Meiji\Infrastructure\Database\DatabaseConnection;
 
 try {
     if (session_status() === PHP_SESSION_NONE) {
+        $isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443);
         session_start([
             'cookie_httponly' => true,
             'cookie_samesite' => 'Lax',
+            'cookie_secure' => $isSecure,
         ]);
     }
 

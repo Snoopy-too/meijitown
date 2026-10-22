@@ -15,6 +15,7 @@ final class Tile
     public const TYPE_CANAL = 'canal';
     public const TYPE_RAIL = 'rail';
     public const TYPE_PARK = 'park';
+    public const TYPE_AGRICULTURE = 'agriculture';
 
     public const ZONE_RESIDENTIAL = 'residential';
     public const ZONE_COMMERCIAL = 'commercial';
@@ -25,6 +26,24 @@ final class Tile
     public const STAGE_BUILT = 'built';
     public const STAGE_ON_FIRE = 'on_fire';
     public const STAGE_BURNED = 'burned';
+
+    public const ALLOWED_SERVICES = [
+        'watchtower',
+        'fire_depot',
+        'well',
+        'ochaya',
+        'sento',
+        'koban',
+        'shrine_park',
+        'train_depot',
+        'school',
+        'telegraph',
+        'harbor_pier',
+        'power_plant',
+        'waterworks',
+        'pavilion',
+        'suimon',
+    ];
 
     public function __construct(
         public readonly int $x,
@@ -51,7 +70,8 @@ final class Tile
             self::TYPE_SERVICE,
             self::TYPE_CANAL,
             self::TYPE_RAIL,
-            self::TYPE_PARK
+            self::TYPE_PARK,
+            self::TYPE_AGRICULTURE,
         ], true)) {
             throw new InvalidArgumentException("Invalid tile type: {$this->type}");
         }
@@ -59,6 +79,12 @@ final class Tile
         if ($this->type === self::TYPE_ZONE) {
             if ($this->zoneType === null || !in_array($this->zoneType, [self::ZONE_RESIDENTIAL, self::ZONE_COMMERCIAL, self::ZONE_INDUSTRIAL], true)) {
                 throw new InvalidArgumentException("Invalid zone type for zoned tile: {$this->zoneType}");
+            }
+        }
+
+        if ($this->type === self::TYPE_SERVICE && $this->serviceType !== null) {
+            if (!in_array($this->serviceType, self::ALLOWED_SERVICES, true)) {
+                throw new InvalidArgumentException("Invalid service type: {$this->serviceType}");
             }
         }
 
@@ -91,9 +117,10 @@ final class Tile
 
     public static function fromArray(array $data): self
     {
+        $y = isset($data['y']) ? (int) $data['y'] : (isset($data['z']) ? (int) $data['z'] : 0);
         return new self(
             x: (int) ($data['x'] ?? 0),
-            y: (int) ($data['y'] ?? 0),
+            y: $y,
             type: (string) ($data['type'] ?? self::TYPE_EMPTY),
             zoneType: isset($data['zoneType']) && $data['zoneType'] !== '' ? (string) $data['zoneType'] : null,
             level: (int) ($data['level'] ?? 0),

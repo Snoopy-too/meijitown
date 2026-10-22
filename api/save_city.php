@@ -3,14 +3,19 @@ declare(strict_types=1);
 
 // ponytail: single save endpoint, strict session auth, INSERT ... ON DUPLICATE KEY UPDATE
 
+ini_set('display_errors', '0');
+error_reporting(E_ALL);
+
 require_once __DIR__ . '/../src/bootstrap.php';
 
 use Meiji\Infrastructure\Database\DatabaseConnection;
 
 if (session_status() === PHP_SESSION_NONE) {
+    $isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443);
     session_start([
         'cookie_httponly' => true,
         'cookie_samesite' => 'Lax',
+        'cookie_secure' => $isSecure,
     ]);
 }
 
@@ -72,7 +77,7 @@ try {
     }
 
     $activeEdicts = is_array($payload['activeEdicts'] ?? null) ? $payload['activeEdicts'] : [];
-    $cityName = trim((string) ($payload['cityName'] ?? 'Edo-Tokyo'));
+    $cityName = htmlspecialchars(strip_tags(trim((string) ($payload['cityName'] ?? 'Edo-Tokyo'))), ENT_QUOTES, 'UTF-8');
     if ($cityName === '') {
         $cityName = 'Edo-Tokyo';
     }

@@ -45,3 +45,25 @@ CREATE TABLE IF NOT EXISTS `saved_cities` (
     CONSTRAINT `fk_saved_cities_user` FOREIGN KEY (`user_id`)
         REFERENCES `users` (`user_id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 4. City Tiles Table
+CREATE TABLE IF NOT EXISTS `city_tiles` (
+    `tile_id` INT AUTO_INCREMENT PRIMARY KEY,
+    `city_id` INT NOT NULL,
+    `x` INT NOT NULL,
+    `y` INT NOT NULL,
+    `type` VARCHAR(50) NOT NULL DEFAULT 'empty',
+    `zone_type` VARCHAR(50) NULL,
+    `level` INT NOT NULL DEFAULT 0,
+    `occupied` TINYINT(1) NOT NULL DEFAULT 0,
+    `stage` VARCHAR(50) NOT NULL DEFAULT 'none',
+    `service_type` VARCHAR(50) NULL,
+    `road_tier` INT NOT NULL DEFAULT 1,
+    `has_bridge` TINYINT(1) NOT NULL DEFAULT 0,
+    `sub_type` VARCHAR(50) NULL,
+    `rotation` INT NOT NULL DEFAULT 0,
+    `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY `uk_city_xy` (`city_id`, `x`, `y`),
+    CONSTRAINT `fk_city_tiles_city` FOREIGN KEY (`city_id`)
+        REFERENCES `cities` (`city_id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

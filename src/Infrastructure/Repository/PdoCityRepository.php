@@ -6,6 +6,7 @@ namespace Meiji\Infrastructure\Repository;
 use Meiji\Domain\Model\City;
 use Meiji\Domain\Model\CityGrid;
 use Meiji\Domain\Model\CityMetrics;
+use Meiji\Domain\Model\Tile;
 use Meiji\Domain\Repository\CityRepositoryInterface;
 use Meiji\Infrastructure\Database\DatabaseConnection;
 use PDO;
@@ -15,6 +16,7 @@ final class PdoCityRepository implements CityRepositoryInterface
 {
     private PDO $pdo;
     private string $configFilePath;
+    private ?bool $hasCityTiles = null;
 
     public function __construct(DatabaseConnection $connection, ?string $configFilePath = null)
     {
@@ -53,13 +55,45 @@ final class PdoCityRepository implements CityRepositoryInterface
 
     public function getGrid(int $cityId): ?CityGrid
     {
+        $width = 32;
+        $height = 32;
         $gridConfig = $this->loadGridFromConfig($cityId);
+        if ($gridConfig !== null) {
+            $width = (int) ($gridConfig['grid_width'] ?? 32);
+            $height = (int) ($gridConfig['grid_height'] ?? 32);
+        }
+
+        if ($this->hasTable('city_tiles')) {
+            $stmt = $this->pdo->prepare("SELECT * FROM city_tiles WHERE city_id = ?");
+            $stmt->execute([$cityId]);
+            $rows = $stmt->fetchAll();
+            if (!empty($rows)) {
+                $tiles = [];
+                foreach ($rows as $row) {
+                    $tile = new Tile(
+                        x: (int) $row['x'],
+                        y: (int) $row['y'],
+                        type: (string) $row['type'],
+                        zoneType: $row['zone_type'] !== null && $row['zone_type'] !== '' ? (string) $row['zone_type'] : null,
+                        level: (int) $row['level'],
+                        occupied: (bool) $row['occupied'],
+                        stage: (string) $row['stage'],
+                        serviceType: $row['service_type'] !== null && $row['service_type'] !== '' ? (string) $row['service_type'] : null,
+                        roadTier: (int) $row['road_tier'],
+                        hasBridge: (bool) $row['has_bridge'],
+                        subType: $row['sub_type'] !== null && $row['sub_type'] !== '' ? (string) $row['sub_type'] : null,
+                        rotation: (int) $row['rotation']
+                    );
+                    $tiles["{$tile->x}_{$tile->y}"] = $tile->toArray();
+                }
+                return CityGrid::fromArray($cityId, $width, $height, $tiles);
+            }
+        }
+
         if ($gridConfig === null) {
             return null;
         }
 
-        $width = (int) ($gridConfig['grid_width'] ?? 32);
-        $height = (int) ($gridConfig['grid_height'] ?? 32);
         $tileData = is_array($gridConfig['tiles'] ?? null) ? $gridConfig['tiles'] : [];
 
         return CityGrid::fromArray(
@@ -88,7 +122,39 @@ final class PdoCityRepository implements CityRepositoryInterface
                 $city->cityId,
             ]);
 
-            // 2. Save Grid & Metrics into single config file
+            // 2. Persist tiles to city_tiles table within transaction
+            if ($this->hasTable('city_tiles')) {
+                $delStmt = $this->pdo->prepare("DELETE FROM city_tiles WHERE city_id = ?");
+                $delStmt->execute([$city->cityId]);
+
+                $insertTile = $this->pdo->prepare("
+                    INSERT INTO city_tiles 
+                        (city_id, x, y, type, zone_type, level, occupied, stage, service_type, road_tier, has_bridge, sub_type, rotation)
+                    VALUES 
+                        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ");
+                foreach ($grid->toArray() as $t) {
+                    if (is_array($t)) {
+                        $insertTile->execute([
+                            $city->cityId,
+                            (int) ($t['x'] ?? 0),
+                            (int) ($t['y'] ?? 0),
+                            (string) ($t['type'] ?? 'empty'),
+                            isset($t['zoneType']) ? (string) $t['zoneType'] : null,
+                            (int) ($t['level'] ?? 0),
+                            !empty($t['occupied']) ? 1 : 0,
+                            (string) ($t['stage'] ?? 'none'),
+                            isset($t['serviceType']) ? (string) $t['serviceType'] : null,
+                            (int) ($t['roadTier'] ?? 1),
+                            !empty($t['hasBridge']) ? 1 : 0,
+                            isset($t['subType']) ? (string) $t['subType'] : null,
+                            (int) ($t['rotation'] ?? 0),
+                        ]);
+                    }
+                }
+            }
+
+            // 3. Save Grid & Metrics into single config file
             $metricsArr = null;
             if ($city->metrics !== null) {
                 $metricsArr = [
@@ -154,7 +220,13 @@ final class PdoCityRepository implements CityRepositoryInterface
                 $cityStmt->execute([$cityName, $cityId]);
             }
 
-            // 2. Reset Grid & Metrics in config file
+            // 2. Clear tiles from city_tiles table if present
+            if ($this->hasTable('city_tiles')) {
+                $delTiles = $this->pdo->prepare("DELETE FROM city_tiles WHERE city_id = ?");
+                $delTiles->execute([$cityId]);
+            }
+
+            // 3. Reset Grid & Metrics in config file
             $defaultConfig = $this->getDefaultConfig();
             $this->updateConfigForCity($cityId, [
                 'grid_width' => (int) ($defaultConfig['grid_width'] ?? 32),
@@ -305,5 +377,32 @@ final class PdoCityRepository implements CityRepositoryInterface
         }
 
         $this->writeConfigFile($config);
+    }
+
+    private function hasTable(string $table): bool
+    {
+        if ($table === 'city_tiles' && $this->hasCityTiles !== null) {
+            return $this->hasCityTiles;
+        }
+
+        try {
+            $driver = (string) $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+            if ($driver === 'sqlite') {
+                $stmt = $this->pdo->prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = ?");
+                $stmt->execute([$table]);
+                $exists = (bool) $stmt->fetch();
+            } else {
+                $cleanTable = preg_replace('/[^a-zA-Z0-9_]/', '', $table);
+                $stmt = $this->pdo->query("SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = '{$cleanTable}'");
+                $exists = (bool) ($stmt && $stmt->fetch());
+            }
+        } catch (\Throwable) {
+            $exists = false;
+        }
+
+        if ($table === 'city_tiles') {
+            $this->hasCityTiles = $exists;
+        }
+        return $exists;
     }
 }

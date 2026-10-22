@@ -25,6 +25,26 @@ try {
     $pdo->exec($sql);
     $pdo->exec("USE `meijitown`;");
 
+    // Ensure foreign key fk_saved_cities_user exists on saved_cities
+    $fkCheck = $pdo->query("
+        SELECT CONSTRAINT_NAME 
+        FROM information_schema.TABLE_CONSTRAINTS 
+        WHERE TABLE_SCHEMA = 'meijitown' AND TABLE_NAME = 'saved_cities' AND CONSTRAINT_TYPE = 'FOREIGN KEY'
+    ")->fetchAll(PDO::FETCH_COLUMN);
+
+    if (!in_array('fk_saved_cities_user', $fkCheck, true)) {
+        try {
+            $pdo->exec("
+                ALTER TABLE `saved_cities`
+                ADD CONSTRAINT `fk_saved_cities_user`
+                FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE ON UPDATE CASCADE
+            ");
+            echo "[Migration] Added foreign key `fk_saved_cities_user` to `saved_cities`.\n";
+        } catch (Throwable $e) {
+            // If already constrained, continue
+        }
+    }
+
     echo "[Migration] Database `meijitown` and InnoDB tables verified successfully.\n";
 
     // Apply Migration v2 (meijitown_db & saved_cities)

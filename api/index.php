@@ -3,6 +3,9 @@ declare(strict_types=1);
 
 // ponytail: single front controller routing actions, clean JSON responses
 
+ini_set('display_errors', '0');
+error_reporting(E_ALL);
+
 require_once __DIR__ . '/../src/bootstrap.php';
 
 use Meiji\Application\UseCase\GetCityStateUseCase;
@@ -12,9 +15,11 @@ use Meiji\Application\UseCase\AuthUserUseCase;
 use Meiji\Application\UseCase\ManageSavedCitiesUseCase;
 
 if (session_status() === PHP_SESSION_NONE) {
+    $isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (isset($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443);
     session_start([
         'cookie_httponly' => true,
         'cookie_samesite' => 'Lax',
+        'cookie_secure' => $isSecure,
     ]);
 }
 
@@ -79,9 +84,10 @@ try {
         $tilesData = is_array($payload['tiles'] ?? null) ? $payload['tiles'] : [];
         $width = (int) ($payload['width'] ?? 32);
         $height = (int) ($payload['height'] ?? 32);
-        $treasury = isset($payload['treasury']) ? (int) $payload['treasury'] : null;
+        $treasury = (int) ($payload['treasury'] ?? 5000);
         $population = isset($payload['population']) ? (int) $payload['population'] : null;
         $metrics = is_array($payload['metrics'] ?? null) ? $payload['metrics'] : null;
+        $cityName = isset($payload['cityName']) ? htmlspecialchars(strip_tags(trim((string) $payload['cityName'])), ENT_QUOTES, 'UTF-8') : null;
 
         /** @var SaveCityGridUseCase $useCase */
         $useCase = $container->get(SaveCityGridUseCase::class);
@@ -92,7 +98,8 @@ try {
             height: $height,
             treasury: $treasury,
             population: $population,
-            metricsData: $metrics
+            metricsData: $metrics,
+            cityName: $cityName
         );
 
         echo json_encode(['success' => true, 'data' => $result], JSON_THROW_ON_ERROR);
@@ -118,7 +125,7 @@ try {
         if (!empty($rawBody)) {
             $parsedBody = json_decode($rawBody, true);
             if (is_array($parsedBody) && !empty($parsedBody['cityName'])) {
-                $cityName = (string) $parsedBody['cityName'];
+                $cityName = htmlspecialchars(strip_tags((string) $parsedBody['cityName']), ENT_QUOTES, 'UTF-8');
             }
         }
 
@@ -255,7 +262,7 @@ try {
             exit(0);
         }
 
-        $cityName = (string) ($payload['cityName'] ?? 'Edo-Tokyo Settlement');
+        $cityName = htmlspecialchars(strip_tags(trim((string) ($payload['cityName'] ?? 'Edo-Tokyo Settlement'))), ENT_QUOTES, 'UTF-8');
         $chronicleYear = (int) ($payload['chronicleYear'] ?? 1872);
         $chronicleMonth = (int) ($payload['chronicleMonth'] ?? 1);
         $population = (int) ($payload['population'] ?? 0);
