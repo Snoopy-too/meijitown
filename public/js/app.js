@@ -172,9 +172,10 @@ class GameStateManager {
             ? tile.rotation
             : Math.round(this.renderer.getFacingAngleForTile(x, y) / (Math.PI / 2));
         tile.rotation = ((currentRot + 1) % 4 + 4) % 4;
+        tile.manualRotation = true;
         this.grid.notifyChange(x, y);
         this.scope.update(x, y, this.grid, this.simulation);
-        const dirs = ['North (0°)', 'East (90°)', 'South (180°)', 'West (270°)'];
+        const dirs = ['South (180°)', 'East (90°)', 'North (0°)', 'West (270°)'];
         this.showToast(`Rotated structure to ${dirs[tile.rotation]}`);
         return true;
     }

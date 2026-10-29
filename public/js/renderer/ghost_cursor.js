@@ -37,9 +37,9 @@ export class GhostCursorManager {
         // Directional Facing Marker on front edge (+Z)
         const markerGeo = new THREE.BoxGeometry(CONFIG.TILE_SIZE * 0.65, 0.22, 0.14);
         this.markerMat = new THREE.MeshLambertMaterial({
-            color: 0xffdf59,
+            color: 0x39ff14,
             transparent: true,
-            opacity: 0.85,
+            opacity: 0.95,
             depthWrite: false
         });
         this.dirMarker = new THREE.Mesh(markerGeo, this.markerMat);
@@ -87,6 +87,10 @@ export class GhostCursorManager {
             this.ghostMat.color.setHex(activeColor);
             this.ghostMat.opacity = activeOpacity;
             this.ghostMesh.rotation.y = (rotation % 4) * (Math.PI / 2);
+            if (this.markerMat) {
+                this.markerMat.color.setHex(isValid ? 0x39ff14 : 0xe74c3c);
+                this.markerMat.opacity = 0.95;
+            }
 
             const isLinearOrFlat = toolType === CONFIG.TOOLS.ROAD || toolType === CONFIG.TOOLS.STONE_ROAD || toolType === CONFIG.TOOLS.CANAL || toolType === CONFIG.TOOLS.RAIL_TRACK || toolType === CONFIG.TOOLS.BULLDOZER || toolType === CONFIG.TOOLS.RICE_PADDY;
             if (this.dirMarker) this.dirMarker.visible = !isLinearOrFlat;

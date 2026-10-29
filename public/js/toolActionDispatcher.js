@@ -241,6 +241,7 @@ export class ToolActionDispatcher {
             const tile = this.grid.getTile(x, y);
             tile.serviceType = s.type;
             tile.rotation = this.ctrl.placementRotation;
+            tile.manualRotation = true;
             this.grid.notifyChange(x, y);
             SOUND.playBellChime();
             this.ctrl.lastPaintedTile = tileKey;
@@ -260,7 +261,13 @@ export class ToolActionDispatcher {
         const z = zoneMap[tool];
         if (z && (existing.type !== CONFIG.TYPES.ZONE || existing.zoneType !== z.zone)) {
             if (this.state.deductTreasury(z.cost)) {
-                this.grid.setTile(x, y, CONFIG.TYPES.ZONE, z.zone, 0, false, CONFIG.STAGES.NONE);
+                const rot = this.ctrl.getEffectiveRotation ? this.ctrl.getEffectiveRotation(x, y) : (this.ctrl.placementRotation || 0);
+                this.grid.setTile(x, y, CONFIG.TYPES.ZONE, z.zone, 0, false, CONFIG.STAGES.NONE, 1, false, null, rot);
+                const tile = this.grid.getTile(x, y);
+                if (tile) {
+                    tile.rotation = rot;
+                    tile.manualRotation = Boolean(this.ctrl.hasManuallyRotated || rot !== 0);
+                }
                 SOUND.playMalletClack();
                 if (isDrag && this.ctrl.dragBatch) this.ctrl.dragBatch.label = z.label;
                 this.ctrl.recordPlacement(tileKey, z.cost, `Platted ${z.label} [-¥${z.cost}]`, isDrag);

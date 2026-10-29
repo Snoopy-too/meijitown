@@ -18,6 +18,7 @@ export class ToolController {
 
         this.currentTool = CONFIG.TOOLS.INSPECT;
         this.placementRotation = 0;
+        this.hasManuallyRotated = false;
         this.lastHoverCoord = null;
         this.isPainting = false;
         this.lastPaintedTile = null;
@@ -29,7 +30,8 @@ export class ToolController {
 
     rotatePlacement() {
         this.placementRotation = (this.placementRotation + 1) % 4;
-        const dirKeys = ['dir.north', 'dir.east', 'dir.south', 'dir.west'];
+        this.hasManuallyRotated = true;
+        const dirKeys = ['dir.south', 'dir.east', 'dir.north', 'dir.west'];
         const dirStr = i18n.t(dirKeys[this.placementRotation]);
         this.state.showToast(i18n.getLanguage() === 'ja' ? `配置方角: ${dirStr}` : `Orientation: ${dirStr}`);
         if (this.drawer && typeof this.drawer.updateRotateBtn === 'function') {
@@ -38,6 +40,19 @@ export class ToolController {
         if (this.lastHoverCoord) {
             const isValid = this.checkPlacementValid(this.lastHoverCoord.x, this.lastHoverCoord.y);
             this.renderer.updateCursor(this.lastHoverCoord, this.currentTool, isValid, this.placementRotation);
+        }
+        return this.placementRotation;
+    }
+
+    getEffectiveRotation(x, y) {
+        if (this.hasManuallyRotated) return this.placementRotation;
+        const isZone = this.currentTool === CONFIG.TOOLS.RESIDENTIAL || this.currentTool === CONFIG.TOOLS.COMMERCIAL || this.currentTool === CONFIG.TOOLS.INDUSTRIAL;
+        if (isZone && this.grid) {
+            const dirs = [{ dx: 0, dy: 1, rot: 0 }, { dx: 1, dy: 0, rot: 1 }, { dx: 0, dy: -1, rot: 2 }, { dx: -1, dy: 0, rot: 3 }];
+            for (const d of dirs) {
+                const t = this.grid.getTile(x + d.dx, y + d.dy);
+                if (t && (t.type === CONFIG.TYPES.ROAD || (t.type === CONFIG.TYPES.CANAL && t.hasBridge))) return d.rot;
+            }
         }
         return this.placementRotation;
     }
@@ -55,6 +70,7 @@ export class ToolController {
 
         this.currentTool = toolName;
         this.placementRotation = 0;
+        this.hasManuallyRotated = false;
         if (this.drawer && typeof this.drawer.updateRotateBtn === 'function') {
             this.drawer.updateRotateBtn(this.placementRotation);
         }
@@ -107,7 +123,8 @@ export class ToolController {
             this.lastHoverCoord = tileCoord;
             if (tileCoord) {
                 const isValid = this.checkPlacementValid(tileCoord.x, tileCoord.y);
-                this.renderer.updateCursor(tileCoord, this.currentTool, isValid, this.placementRotation);
+                const rot = this.getEffectiveRotation(tileCoord.x, tileCoord.y);
+                this.renderer.updateCursor(tileCoord, this.currentTool, isValid, rot);
 
                 if (this.isPainting) {
                     this.applyTool(tileCoord.x, tileCoord.y, true);
@@ -210,31 +227,21 @@ export class ToolController {
 
         // Multi-tile ploppables check
         if (this.currentTool === CONFIG.TOOLS.SCHOOL) {
-            return this.state.schoolSystem
-                ? (this.state.schoolSystem.canPlaceSchool(x, y) && this.state.treasury >= (CONFIG.COSTS.SCHOOL || 280))
-                : (this.state.treasury >= (CONFIG.COSTS.SCHOOL || 280));
+            return (this.state.schoolSystem?.canPlaceSchool(x, y) ?? true) && this.state.treasury >= (CONFIG.COSTS.SCHOOL || 280);
         }
         if (this.currentTool === CONFIG.TOOLS.HARBOR_PIER) {
             const hasTech = !this.state.milestones || this.state.milestones.currentTier >= 3 || (this.state.population && this.state.population >= 300);
             if (!hasTech) return false;
-            return this.state.tradePierManager
-                ? (this.state.tradePierManager.canPlacePier(x, y) && this.state.treasury >= (CONFIG.COSTS.HARBOR_PIER || 450))
-                : (this.state.treasury >= (CONFIG.COSTS.HARBOR_PIER || 450));
+            return (this.state.tradePierManager?.canPlacePier(x, y) ?? true) && this.state.treasury >= (CONFIG.COSTS.HARBOR_PIER || 450);
         }
         if (this.currentTool === CONFIG.TOOLS.POWER_PLANT) {
-            return this.state.powerSystem
-                ? (this.state.powerSystem.canPlacePowerPlant(x, y) && this.state.treasury >= (CONFIG.COSTS.POWER_PLANT || 600))
-                : (this.state.treasury >= (CONFIG.COSTS.POWER_PLANT || 600));
+            return (this.state.powerSystem?.canPlacePowerPlant(x, y) ?? true) && this.state.treasury >= (CONFIG.COSTS.POWER_PLANT || 600);
         }
         if (this.currentTool === CONFIG.TOOLS.WATERWORKS) {
-            return this.state.sanitation
-                ? (this.state.sanitation.canPlaceWaterworks(x, y) && this.state.treasury >= (CONFIG.COSTS.WATERWORKS || 350))
-                : (this.state.treasury >= (CONFIG.COSTS.WATERWORKS || 350));
+            return (this.state.sanitation?.canPlaceWaterworks(x, y) ?? true) && this.state.treasury >= (CONFIG.COSTS.WATERWORKS || 350);
         }
         if (this.currentTool === CONFIG.TOOLS.PAVILION) {
-            return this.state.milestones
-                ? (this.state.milestones.canPlacePavilion(x, y) && this.state.treasury >= (CONFIG.COSTS.PAVILION || 2000))
-                : (this.state.treasury >= (CONFIG.COSTS.PAVILION || 2000));
+            return (this.state.milestones?.canPlacePavilion(x, y) ?? true) && this.state.treasury >= (CONFIG.COSTS.PAVILION || 2000);
         }
 
         if (this.currentTool === CONFIG.TOOLS.RICE_PADDY) {
@@ -256,27 +263,18 @@ export class ToolController {
         }
 
         const serviceCosts = {
-            [CONFIG.TOOLS.WATCHTOWER]: CONFIG.COSTS.WATCHTOWER,
-            [CONFIG.TOOLS.FIRE_DEPOT]: CONFIG.COSTS.FIRE_DEPOT,
-            [CONFIG.TOOLS.WELL]: CONFIG.COSTS.WELL,
-            [CONFIG.TOOLS.OCHAYA]: CONFIG.COSTS.OCHAYA,
-            [CONFIG.TOOLS.SENTO]: CONFIG.COSTS.SENTO,
-            [CONFIG.TOOLS.KOBAN]: CONFIG.COSTS.KOBAN || 110,
-            [CONFIG.TOOLS.SHRINE_PARK]: CONFIG.COSTS.SHRINE_PARK || 50,
-            [CONFIG.TOOLS.TRAIN_DEPOT]: CONFIG.COSTS.TRAIN_DEPOT || 350,
-            [CONFIG.TOOLS.TELEGRAPH]: CONFIG.COSTS.TELEGRAPH || 220,
-            [CONFIG.TOOLS.SUIMON]: CONFIG.COSTS.SUIMON || 180,
+            [CONFIG.TOOLS.WATCHTOWER]: CONFIG.COSTS.WATCHTOWER, [CONFIG.TOOLS.FIRE_DEPOT]: CONFIG.COSTS.FIRE_DEPOT,
+            [CONFIG.TOOLS.WELL]: CONFIG.COSTS.WELL, [CONFIG.TOOLS.OCHAYA]: CONFIG.COSTS.OCHAYA,
+            [CONFIG.TOOLS.SENTO]: CONFIG.COSTS.SENTO, [CONFIG.TOOLS.KOBAN]: CONFIG.COSTS.KOBAN || 110,
+            [CONFIG.TOOLS.SHRINE_PARK]: CONFIG.COSTS.SHRINE_PARK || 50, [CONFIG.TOOLS.TRAIN_DEPOT]: CONFIG.COSTS.TRAIN_DEPOT || 350,
+            [CONFIG.TOOLS.TELEGRAPH]: CONFIG.COSTS.TELEGRAPH || 220, [CONFIG.TOOLS.SUIMON]: CONFIG.COSTS.SUIMON || 180,
         };
         if (serviceCosts[this.currentTool] !== undefined) {
             if (existing.occupied || existing.type === CONFIG.TYPES.ROAD || existing.type === CONFIG.TYPES.SERVICE || existing.type === CONFIG.TYPES.CANAL || existing.type === CONFIG.TYPES.RAIL) return false;
             return this.state.treasury >= serviceCosts[this.currentTool];
         }
 
-        const zoneCosts = {
-            [CONFIG.TOOLS.RESIDENTIAL]: { zone: CONFIG.ZONES.RESIDENTIAL, cost: CONFIG.COSTS.RESIDENTIAL },
-            [CONFIG.TOOLS.COMMERCIAL]: { zone: CONFIG.ZONES.COMMERCIAL, cost: CONFIG.COSTS.COMMERCIAL },
-            [CONFIG.TOOLS.INDUSTRIAL]: { zone: CONFIG.ZONES.INDUSTRIAL, cost: CONFIG.COSTS.INDUSTRIAL },
-        };
+        const zoneCosts = { [CONFIG.TOOLS.RESIDENTIAL]: { zone: CONFIG.ZONES.RESIDENTIAL, cost: CONFIG.COSTS.RESIDENTIAL }, [CONFIG.TOOLS.COMMERCIAL]: { zone: CONFIG.ZONES.COMMERCIAL, cost: CONFIG.COSTS.COMMERCIAL }, [CONFIG.TOOLS.INDUSTRIAL]: { zone: CONFIG.ZONES.INDUSTRIAL, cost: CONFIG.COSTS.INDUSTRIAL } };
         if (zoneCosts[this.currentTool]) {
             const z = zoneCosts[this.currentTool];
             if (existing.type === CONFIG.TYPES.ROAD || existing.type === CONFIG.TYPES.SERVICE || existing.type === CONFIG.TYPES.CANAL) return false;

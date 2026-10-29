@@ -98,6 +98,7 @@ export class CityGridModel {
                         hasCrossing: Boolean(item.hasCrossing || false),
                         subType: item.subType || null,
                         rotation: parseInt(item.rotation || 0, 10),
+                        manualRotation: Boolean(item.manualRotation || false),
                     });
                 }
             }
@@ -123,6 +124,7 @@ export class CityGridModel {
                 hasCrossing: Boolean(tile.hasCrossing || false),
                 subType: tile.subType || null,
                 rotation: tile.rotation || 0,
+                manualRotation: Boolean(tile.manualRotation || false),
             });
         }
         return result;

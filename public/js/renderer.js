@@ -198,8 +198,10 @@ export class WorldRenderer {
 
     getFacingAngleForTile(x, y) {
         const tile = this.grid.getTile(x, y);
-        if (tile && typeof tile.rotation === 'number') return (tile.rotation % 4) * (Math.PI / 2);
-        const dirs = [{ dx: 0, dy: 1, a: 0 }, { dx: 0, dy: -1, a: Math.PI }, { dx: 1, dy: 0, a: Math.PI / 2 }, { dx: -1, dy: 0, a: -Math.PI / 2 }];
+        if (tile && (tile.manualRotation || (typeof tile.rotation === 'number' && tile.rotation !== 0))) {
+            return (tile.rotation % 4) * (Math.PI / 2);
+        }
+        const dirs = [{ dx: 0, dy: 1, a: 0 }, { dx: 1, dy: 0, a: Math.PI / 2 }, { dx: 0, dy: -1, a: Math.PI }, { dx: -1, dy: 0, a: -Math.PI / 2 }];
         for (const d of dirs) {
             const t = this.grid.getTile(x + d.dx, y + d.dy);
             if (t && (t.type === CONFIG.TYPES.ROAD || (t.type === CONFIG.TYPES.CANAL && t.hasBridge))) return d.a;
@@ -208,7 +210,7 @@ export class WorldRenderer {
             const t = this.grid.getTile(x + dx, y + dy);
             if (t && (t.type === CONFIG.TYPES.ROAD || (t.type === CONFIG.TYPES.CANAL && t.hasBridge))) return Math.atan2(dx, dy);
         }
-        return 0;
+        return (tile?.rotation ? (tile.rotation % 4) * (Math.PI / 2) : 0);
     }
 
     createServiceMesh(tile, facingAngle) {
