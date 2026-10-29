@@ -22,8 +22,16 @@ try {
         ]);
     }
 
-    $raw = file_get_contents('php://input');
-    $payload = !empty($raw) ? json_decode((string) $raw, true) : [];
+    $raw = file_get_contents('php://input') ?: '';
+    $payload = [];
+    if (trim($raw) !== '') {
+        if (!json_validate($raw)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Malformed JSON payload'], JSON_THROW_ON_ERROR);
+            exit(0);
+        }
+        $payload = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+    }
     $profile = strtolower((string) ($payload['profile'] ?? $_GET['profile'] ?? 'fidel'));
 
     if ($profile === 'guest') {
@@ -93,7 +101,7 @@ try {
                 ':username' => $selected['username'],
                 ':hash' => $selected['hash'],
             ]);
-        } catch (Throwable $e) {
+        } catch (\Throwable) {
             $fallback = $pdo->prepare('INSERT INTO users (username, password_hash) VALUES (:username, :hash)');
             $fallback->execute([
                 ':username' => $selected['username'],
@@ -113,8 +121,8 @@ try {
         'username' => $selected['username'],
     ], JSON_THROW_ON_ERROR);
     exit(0);
-} catch (Throwable $e) {
+} catch (\Throwable $e) {
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => $e->getMessage()], JSON_THROW_ON_ERROR);
+    echo json_encode(['success' => false, 'error' => htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8')], JSON_THROW_ON_ERROR);
     exit(0);
 }

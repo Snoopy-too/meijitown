@@ -7,8 +7,8 @@ use Meiji\Domain\Model\SavedCity;
 use Meiji\Domain\Model\User;
 use Meiji\Domain\Repository\SavedCityRepositoryInterface;
 use Meiji\Infrastructure\Database\DatabaseConnection;
+use Override;
 use PDO;
-use RuntimeException;
 
 final class PdoSavedCityRepository implements SavedCityRepositoryInterface
 {
@@ -47,6 +47,7 @@ final class PdoSavedCityRepository implements SavedCityRepositoryInterface
         return $this->userIdCol;
     }
 
+    #[Override]
     public function findUserByUsername(string $username): ?User
     {
         $idCol = $this->getUserIdCol();
@@ -65,6 +66,7 @@ final class PdoSavedCityRepository implements SavedCityRepositoryInterface
         );
     }
 
+    #[Override]
     public function findUserById(int $userId): ?User
     {
         $idCol = $this->getUserIdCol();
@@ -83,6 +85,7 @@ final class PdoSavedCityRepository implements SavedCityRepositoryInterface
         );
     }
 
+    #[Override]
     public function createUser(string $username, string $passwordHash): User
     {
         $stmt = $this->pdo->prepare("INSERT INTO users (username, password_hash) VALUES (?, ?)");
@@ -97,18 +100,8 @@ final class PdoSavedCityRepository implements SavedCityRepositoryInterface
         );
     }
 
-    /**
-     * @return SavedCity[]
-     */
+    #[Override]
     public function listCitiesByUser(int $userId): array
-    {
-        return $this->listCitiesForUser($userId);
-    }
-
-    /**
-     * @return SavedCity[]
-     */
-    public function listCitiesForUser(int $userId): array
     {
         $stmt = $this->pdo->prepare("
             SELECT id, user_id, city_name, chronicle_year, chronicle_month, population, treasury, city_data, updated_at
@@ -137,12 +130,13 @@ final class PdoSavedCityRepository implements SavedCityRepositoryInterface
         return $results;
     }
 
-    public function getSavedCity(int $cityId, int $userId): ?SavedCity
+    public function listCitiesForUser(int $userId): array
     {
-        return $this->getCityById($cityId, $userId);
+        return $this->listCitiesByUser($userId);
     }
 
-    public function getCityById(int $cityId, int $userId): ?SavedCity
+    #[Override]
+    public function getSavedCity(int $cityId, int $userId): ?SavedCity
     {
         $stmt = $this->pdo->prepare("
             SELECT id, user_id, city_name, chronicle_year, chronicle_month, population, treasury, city_data, updated_at
@@ -169,6 +163,12 @@ final class PdoSavedCityRepository implements SavedCityRepositoryInterface
         );
     }
 
+    public function getCityById(int $cityId, int $userId): ?SavedCity
+    {
+        return $this->getSavedCity($cityId, $userId);
+    }
+
+    #[Override]
     public function saveCityForUser(
         int $userId,
         string $cityName,
@@ -220,6 +220,7 @@ final class PdoSavedCityRepository implements SavedCityRepositoryInterface
         return (int) $this->pdo->lastInsertId();
     }
 
+    #[Override]
     public function deleteSavedCity(int $cityId, int $userId): bool
     {
         $stmt = $this->pdo->prepare("DELETE FROM saved_cities WHERE id = ? AND user_id = ?");

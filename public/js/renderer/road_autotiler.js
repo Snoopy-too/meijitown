@@ -237,6 +237,7 @@ export class RoadAutotiler {
 
         // Shoji paper lantern core with emissive night glow capability
         const paperMat = new THREE.MeshStandardMaterial({
+            name: 'M_GasLantern',
             color: 0xffeedd,
             roughness: 0.9,
             emissive: new THREE.Color(0x000000),
@@ -244,19 +245,21 @@ export class RoadAutotiler {
         });
         const paperGeo = new THREE.BoxGeometry(0.16, 0.20, 0.16);
         const paperCore = new THREE.Mesh(paperGeo, paperMat);
+        paperCore.name = 'Lantern_Body';
         paperCore.position.y = 1.25;
         lanternGroup.add(paperCore);
 
-        // Localized warm point light (activated at twilight/night)
-        const lanternLight = new THREE.PointLight(0xff9e4a, 0.0, 5.0);
-        lanternLight.position.set(0, 1.25, 0);
-        lanternGroup.add(lanternLight);
+        // Lightweight proxy object instead of per-intersection WebGL PointLight spam
+        const lanternLightProxy = {
+            color: new THREE.Color(0xff9e4a),
+            intensity: 0.0
+        };
 
         // Tag lantern for night/day ambience & electric power arc lighting updates
         lanternGroup.userData = {
             isLantern: true,
             material: paperMat,
-            light: lanternLight,
+            light: lanternLightProxy,
             tileX,
             tileY
         };

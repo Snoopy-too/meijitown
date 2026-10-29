@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-// ponytail: single load endpoint, session-scoped slot query, stdlib PDO
+// ponytail: single load endpoint, session-scoped slot query, native json_validate(), stdlib PDO
 
 ini_set('display_errors', '0');
 error_reporting(E_ALL);
@@ -71,8 +71,13 @@ try {
     }
 
     if ($selectedCity !== null && isset($selectedCity['city_data'])) {
-        $decoded = json_decode((string) $selectedCity['city_data'], true);
-        $selectedCity['parsed_data'] = is_array($decoded) ? $decoded : [];
+        $rawCityData = (string) $selectedCity['city_data'];
+        if (json_validate($rawCityData)) {
+            $decoded = json_decode($rawCityData, true, 512, JSON_THROW_ON_ERROR);
+            $selectedCity['parsed_data'] = is_array($decoded) ? $decoded : [];
+        } else {
+            $selectedCity['parsed_data'] = [];
+        }
     }
 
     echo json_encode([
@@ -81,7 +86,7 @@ try {
         'slots' => $slots,
     ], JSON_THROW_ON_ERROR);
     exit(0);
-} catch (Throwable $e) {
+} catch (\Throwable $e) {
     http_response_code(500);
     echo json_encode([
         'success' => false,

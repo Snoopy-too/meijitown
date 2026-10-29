@@ -3,13 +3,14 @@ declare(strict_types=1);
 
 namespace Meiji\Domain\Model;
 
+// ponytail: domain user model with PHP 8.5 asymmetric visibility
 final class User
 {
     public function __construct(
-        public readonly int $id,
-        public readonly string $username,
-        public readonly string $passwordHash,
-        public readonly string $createdAt = ''
+        public private(set) int $id,
+        public private(set) string $username,
+        public private(set) string $passwordHash,
+        public private(set) string $createdAt = ''
     ) {}
 
     public function toArray(bool $includeHash = false): array

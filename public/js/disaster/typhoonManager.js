@@ -217,6 +217,9 @@ export class TyphoonManager {
         this.rainSystem = new THREE.Points(geo, mat);
         this.scene.add(this.rainSystem);
 
+        if (this.scene.userData?.lighting?.setStormOverride) {
+            this.scene.userData.lighting.setStormOverride(true);
+        }
         if (this.scene.background && this.scene.background.getHex) {
             this.savedSkyColor = this.scene.background.getHex();
             this.scene.background.setHex(0x2c3e50); // Darkened storm sky
@@ -246,6 +249,9 @@ export class TyphoonManager {
             this.rainSystem.geometry.dispose();
             this.rainSystem.material.dispose();
             this.rainSystem = null;
+        }
+        if (this.scene?.userData?.lighting?.setStormOverride) {
+            this.scene.userData.lighting.setStormOverride(false);
         }
         if (this.savedSkyColor !== null && this.scene?.background?.setHex) {
             this.scene.background.setHex(this.savedSkyColor);

@@ -3,18 +3,19 @@ declare(strict_types=1);
 
 namespace Meiji\Domain\Model;
 
+// ponytail: domain model with PHP 8.5 asymmetric visibility
 final class SavedCity
 {
     public function __construct(
-        public readonly int $id,
-        public readonly int $userId,
-        public readonly string $cityName,
-        public readonly int $chronicleYear,
-        public readonly int $chronicleMonth,
-        public readonly int $population,
-        public readonly int $treasury,
-        public readonly string $cityData,
-        public readonly string $updatedAt = ''
+        public private(set) int $id,
+        public private(set) int $userId,
+        public private(set) string $cityName,
+        public private(set) int $chronicleYear,
+        public private(set) int $chronicleMonth,
+        public private(set) int $population,
+        public private(set) int $treasury,
+        public private(set) string $cityData,
+        public private(set) string $updatedAt = ''
     ) {}
 
     public function toArray(bool $includeCityData = false): array

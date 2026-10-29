@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-// ponytail: single front controller routing actions, clean JSON responses
+// ponytail: single front controller routing actions, clean JSON responses, PHP 8.5 json_validate()
 
 ini_set('display_errors', '0');
 error_reporting(E_ALL);
@@ -66,10 +66,16 @@ try {
             exit(0);
         }
 
-        $rawBody = file_get_contents('php://input');
-        if (empty($rawBody)) {
+        $rawBody = file_get_contents('php://input') ?: '';
+        if (trim($rawBody) === '') {
             http_response_code(400);
             echo json_encode(['success' => false, 'error' => 'Empty request payload.'], JSON_THROW_ON_ERROR);
+            exit(0);
+        }
+
+        if (!json_validate($rawBody)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Malformed JSON payload'], JSON_THROW_ON_ERROR);
             exit(0);
         }
 
@@ -120,10 +126,15 @@ try {
             exit(0);
         }
 
-        $rawBody = (string) file_get_contents('php://input');
+        $rawBody = file_get_contents('php://input') ?: '';
         $cityName = 'Edo-Tokyo';
-        if (!empty($rawBody)) {
-            $parsedBody = json_decode($rawBody, true);
+        if (trim($rawBody) !== '') {
+            if (!json_validate($rawBody)) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'Malformed JSON payload'], JSON_THROW_ON_ERROR);
+                exit(0);
+            }
+            $parsedBody = json_decode($rawBody, true, 512, JSON_THROW_ON_ERROR);
             if (is_array($parsedBody) && !empty($parsedBody['cityName'])) {
                 $cityName = htmlspecialchars(strip_tags((string) $parsedBody['cityName']), ENT_QUOTES, 'UTF-8');
             }
@@ -145,7 +156,14 @@ try {
             exit(0);
         }
 
-        $payload = json_decode((string) file_get_contents('php://input'), true, 512, JSON_THROW_ON_ERROR);
+        $rawBody = file_get_contents('php://input') ?: '';
+        if (trim($rawBody) === '' || !json_validate($rawBody)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Malformed JSON payload'], JSON_THROW_ON_ERROR);
+            exit(0);
+        }
+
+        $payload = json_decode($rawBody, true, 512, JSON_THROW_ON_ERROR);
         $username = (string) ($payload['username'] ?? '');
         $password = (string) ($payload['password'] ?? '');
 
@@ -167,7 +185,14 @@ try {
             exit(0);
         }
 
-        $payload = json_decode((string) file_get_contents('php://input'), true, 512, JSON_THROW_ON_ERROR);
+        $rawBody = file_get_contents('php://input') ?: '';
+        if (trim($rawBody) === '' || !json_validate($rawBody)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Malformed JSON payload'], JSON_THROW_ON_ERROR);
+            exit(0);
+        }
+
+        $payload = json_decode($rawBody, true, 512, JSON_THROW_ON_ERROR);
         $username = (string) ($payload['username'] ?? '');
         $password = (string) ($payload['password'] ?? '');
 
@@ -255,7 +280,14 @@ try {
             exit(0);
         }
 
-        $payload = json_decode((string) file_get_contents('php://input'), true, 512, JSON_THROW_ON_ERROR);
+        $rawBody = file_get_contents('php://input') ?: '';
+        if (trim($rawBody) === '' || !json_validate($rawBody)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Malformed JSON payload'], JSON_THROW_ON_ERROR);
+            exit(0);
+        }
+
+        $payload = json_decode($rawBody, true, 512, JSON_THROW_ON_ERROR);
         if (!is_array($payload)) {
             http_response_code(400);
             echo json_encode(['success' => false, 'error' => 'Invalid JSON payload.'], JSON_THROW_ON_ERROR);
@@ -333,7 +365,14 @@ try {
             exit(0);
         }
 
-        $payload = json_decode((string) file_get_contents('php://input'), true, 512, JSON_THROW_ON_ERROR);
+        $rawBody = file_get_contents('php://input') ?: '';
+        if (trim($rawBody) === '' || !json_validate($rawBody)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Malformed JSON payload'], JSON_THROW_ON_ERROR);
+            exit(0);
+        }
+
+        $payload = json_decode($rawBody, true, 512, JSON_THROW_ON_ERROR);
         $cityId = (int) ($payload['cityId'] ?? 0);
 
         /** @var ManageSavedCitiesUseCase $cityCase */
@@ -347,7 +386,7 @@ try {
     http_response_code(404);
     echo json_encode(['success' => false, 'error' => "Unknown action '{$action}'"], JSON_THROW_ON_ERROR);
     exit(0);
-} catch (Throwable $e) {
+} catch (\Throwable $e) {
     http_response_code(500);
     // Sanitize message to prevent XSS/injection leakage
     $safeMessage = htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8');

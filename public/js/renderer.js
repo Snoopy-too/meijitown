@@ -1,9 +1,8 @@
 // Project Meiji - Three.js Isometric 3D Diorama Renderer (renderer.js)
-// ponytail: modular renderer orchestrator, procedural architecture, asset cache & traffic loop (< 420 lines)
+// Phase 1 Architecture: Strictly-Three.js synchronous pipeline, ACESFilmic PBR, Clock delta & safe GPU disposal (< 420 lines)
 
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { CONFIG, assetUrl } from './config.js';
+import { CONFIG } from './config.js';
 import { ParticleManager } from './fx.js';
 import { CameraManager } from './renderer/camera_manager.js';
 import { SceneLighting } from './renderer/scene_lighting.js';
@@ -23,6 +22,7 @@ import { InstancingManager } from './renderer/instancingManager.js';
 import { AgricultureManager } from './agricultureManager.js';
 import { BackdropManager } from './renderer/backdropManager.js';
 import { CloudManager } from './renderer/cloudManager.js';
+import { MaterialLibrary } from './renderer/materialLibrary.js';
 
 export class WorldRenderer {
     constructor(containerElement, gridModel, rootElement = null) {
@@ -34,9 +34,11 @@ export class WorldRenderer {
         this.grid = gridModel;
         this.tileMeshes = new Map();
         this.modelCache = new Map();
-        this.modelsLoaded = false;
+        this.modelsLoaded = true;
         this.simulation = null;
+        this.clock = new THREE.Clock();
 
+        MaterialLibrary.init();
         this.initScene();
         this.cameraManager = new CameraManager(this.container, this.renderer.domElement);
         this.lighting = SceneLighting.initLights(this.scene);
@@ -48,7 +50,7 @@ export class WorldRenderer {
         this.initGround();
 
         const initialFoliageColor = (CONFIG.SIMULATION.SEASON_COLORS && CONFIG.SIMULATION.SEASON_COLORS.WINTER) || 0x8c857b;
-        this.seasonalFoliageMaterial = new THREE.MeshLambertMaterial({ color: initialFoliageColor });
+        this.seasonalFoliageMaterial = new THREE.MeshStandardMaterial({ color: initialFoliageColor, roughness: 0.8 });
 
         this.instancing = new InstancingManager(this.scene, this.modelCache);
         this.instancing.setSeasonalMaterial(this.seasonalFoliageMaterial);
@@ -56,6 +58,7 @@ export class WorldRenderer {
         this.fx = new ParticleManager(this.scene);
         this.traffic = new TrafficManager(this.scene, this.grid, this.getTileWorldPos.bind(this), this.fx);
         this.canalTraffic = new CanalTrafficManager(this.scene, this.grid, this.getTileWorldPos.bind(this), this.modelCache);
+        this.trainTraffic = new TrainTrafficManager(this.scene, this.grid, this.getTileWorldPos.bind(this), this.modelCache);
         this.overlay = new OverlaySystem(this.scene, this.grid, null, this.root);
 
         this.bindEvents();
@@ -66,7 +69,9 @@ export class WorldRenderer {
                 this.updateTileMesh(data.x, data.y, data.tile);
                 this.refreshAdjacentRoads(data.x, data.y);
                 this.refreshAdjacentBuildings(data.x, data.y);
-                this.rebuildInstancedBatches();
+                if (this.isFoliageTile(data.x, data.y)) {
+                    this.rebuildInstancedBatches();
+                }
                 if (this.overlay && this.overlay.currentMode !== 'none') this.overlay.refresh();
             } else if (event === 'grid_reset') {
                 this.rebuildAllMeshes();
@@ -91,6 +96,11 @@ export class WorldRenderer {
         this.renderer = new THREE.WebGLRenderer({ antialias: true });
         this.renderer.setSize(width, height);
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        this.renderer.toneMappingExposure = 1.05;
+        if (THREE.SRGBColorSpace) {
+            this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+        }
         this.renderer.shadowMap.enabled = true;
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         if (this.container && typeof this.container.appendChild === 'function') {
@@ -112,7 +122,10 @@ export class WorldRenderer {
     initGround() {
         const totalSizeX = CONFIG.GRID_WIDTH * CONFIG.TILE_SIZE;
         const totalSizeZ = CONFIG.GRID_HEIGHT * CONFIG.TILE_SIZE;
-        this.groundMesh = new THREE.Mesh(new THREE.BoxGeometry(totalSizeX, 1.0, totalSizeZ), new THREE.MeshLambertMaterial({ color: CONFIG.COLORS.GROUND }));
+        this.groundMesh = new THREE.Mesh(
+            new THREE.BoxGeometry(totalSizeX, 1.0, totalSizeZ),
+            new THREE.MeshStandardMaterial({ color: CONFIG.COLORS.GROUND, roughness: 0.92 })
+        );
         this.groundMesh.position.set(totalSizeX / 2, -0.5, totalSizeZ / 2);
         this.groundMesh.receiveShadow = true;
         this.scene.add(this.groundMesh);
@@ -174,41 +187,13 @@ export class WorldRenderer {
         this.ghostCursor.update(tileCoord, toolType, isValid, this.getTileWorldPos.bind(this), rotation);
     }
 
+    /**
+     * Strictly-Three.js synchronous asset initialization (no external .glb HTTP fetches).
+     */
     async loadAssets() {
-        const loader = new GLTFLoader();
-        const loadModel = (key, url) => {
-            if (!url) return Promise.resolve(false);
-            const resolvedUrl = assetUrl(url);
-            return new Promise((resolve) => {
-                loader.load(resolvedUrl, (gltf) => {
-                    gltf.scene.traverse((child) => {
-                        if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; }
-                    });
-                    this.modelCache.set(key, gltf.scene);
-                    resolve(true);
-                }, undefined, () => resolve(false));
-            });
-        };
-
-        const assetList = [
-            ['scaffold', CONFIG.MODELS.SCAFFOLD], ['residential_l1', CONFIG.MODELS.RESIDENTIAL_L1],
-            ['residential_l2', CONFIG.MODELS.RESIDENTIAL_L2], ['commercial_l1', CONFIG.MODELS.COMMERCIAL_L1],
-            ['commercial_l2', CONFIG.MODELS.COMMERCIAL_L2], ['commercial_l3', CONFIG.MODELS.COMMERCIAL_L3],
-            ['commercial_l4', CONFIG.MODELS.COMMERCIAL_L4], ['industrial_l1', CONFIG.MODELS.INDUSTRIAL_L1],
-            ['industrial_l2', CONFIG.MODELS.INDUSTRIAL_L2], ['watchtower', CONFIG.MODELS.WATCHTOWER],
-            ['fire_depot', CONFIG.MODELS.FIRE_DEPOT], ['well', CONFIG.MODELS.WELL],
-            ['ochaya', CONFIG.MODELS.OCHAYA], ['sento', CONFIG.MODELS.SENTO],
-            ['koban', CONFIG.MODELS.KOBAN], ['school', CONFIG.MODELS.SCHOOL],
-            ['telegraph', CONFIG.MODELS.TELEGRAPH], ['harbor_pier', CONFIG.MODELS.HARBOR_PIER],
-            ['power_plant', CONFIG.MODELS.POWER_PLANT], ['pavilion', CONFIG.MODELS.PAVILION],
-            ['barge', CONFIG.MODELS.BARGE], ['crossing', CONFIG.MODELS.CROSSING],
-            ['train', CONFIG.MODELS.TRAIN]
-        ];
-
-        await Promise.all(assetList.map(([k, u]) => loadModel(k, u)));
         this.modelsLoaded = true;
-        this.trainTraffic = new TrainTrafficManager(this.scene, this.grid, this.getTileWorldPos.bind(this), this.modelCache);
         this.rebuildAllMeshes();
+        return true;
     }
 
     getFacingAngleForTile(x, y) {
@@ -235,33 +220,9 @@ export class WorldRenderer {
         const group = new THREE.Group();
 
         if (tile.stage === CONFIG.STAGES.SCAFFOLDING) {
-            if (this.modelCache.has('scaffold')) {
-                const sc = this.modelCache.get('scaffold').clone();
-                sc.rotation.y = facingAngle;
-                group.add(sc);
-            } else {
-                const fm = new THREE.Mesh(new THREE.BoxGeometry(s * 0.7, 0.7, s * 0.7), new THREE.MeshLambertMaterial({ color: 0x8a7752, wireframe: true }));
-                fm.position.y = 0.35;
-                fm.rotation.y = facingAngle;
-                group.add(fm);
-            }
+            group.add(ProceduralMeshes.createScaffoldMesh(tile, facingAngle));
         } else if (tile.stage === CONFIG.STAGES.BUILT) {
-            let mk = 'residential_l1';
-            if (tile.zoneType === CONFIG.ZONES.RESIDENTIAL) mk = tile.level >= 3 ? 'residential_l3' : (tile.level >= 2 ? 'residential_l2' : 'residential_l1');
-            else if (tile.zoneType === CONFIG.ZONES.COMMERCIAL) mk = tile.level >= 4 ? 'commercial_l4' : (tile.level >= 3 ? 'commercial_l3' : (tile.level >= 2 ? 'commercial_l2' : 'commercial_l1'));
-            else if (tile.zoneType === CONFIG.ZONES.INDUSTRIAL) mk = tile.level >= 2 ? 'industrial_l2' : 'industrial_l1';
-
-            if (this.modelCache.has(mk)) {
-                const bldg = this.modelCache.get(mk).clone();
-                bldg.rotation.y = facingAngle;
-                group.add(bldg);
-            } else if (tile.zoneType === CONFIG.ZONES.RESIDENTIAL && tile.level >= 3) {
-                group.add(CivicMeshes.createGinzaBrickMesh(tile, facingAngle));
-            } else if (tile.zoneType === CONFIG.ZONES.COMMERCIAL && tile.level >= 4) {
-                group.add(CivicMeshes.createGinzaBrickMesh(tile, facingAngle));
-            } else if (tile.zoneType === CONFIG.ZONES.COMMERCIAL && tile.level >= 3) {
-                group.add(ProceduralMeshes.createCommercialL3Mesh(tile, facingAngle));
-            }
+            group.add(ProceduralMeshes.createZoneBuildingMesh(tile, facingAngle));
         } else if (tile.stage === CONFIG.STAGES.ON_FIRE) {
             const ch = new THREE.Mesh(new THREE.BoxGeometry(s * 0.8, 0.35, s * 0.8), new THREE.MeshLambertMaterial({ color: 0x241e1a }));
             ch.position.y = 0.18;
@@ -360,14 +321,12 @@ export class WorldRenderer {
         for (let x = 0; x < this.grid.width; x++) {
             for (let y = 0; y < this.grid.height; y++) {
                 const tile = this.grid.getTile(x, y);
-                const pos = this.getTileWorldPos(x, y);
                 if (!tile || tile.type === CONFIG.TYPES.EMPTY) {
                     if (this.isFoliageTile(x, y)) {
+                        const pos = this.getTileWorldPos(x, y);
                         if ((x + y) % 3 === 0) this.instancing.addSakuraTree(pos.x, pos.z);
                         else this.instancing.addPineTree(pos.x, pos.z);
                     }
-                } else if (tile.type === CONFIG.TYPES.PARK && (tile.subType === 'willow' || tile.subType === 'tree_willow')) {
-                    this.instancing.addWillowTree(pos.x, pos.z);
                 }
             }
         }
@@ -377,7 +336,9 @@ export class WorldRenderer {
     updateTileMesh(x, y, tile) {
         const key = this.grid.getKey(x, y);
         if (this.tileMeshes.has(key)) {
-            this.scene.remove(this.tileMeshes.get(key));
+            const oldMesh = this.tileMeshes.get(key);
+            this.scene.remove(oldMesh);
+            MaterialLibrary.disposeGroup(oldMesh);
             this.tileMeshes.delete(key);
         }
         if (tile && tile.stage !== CONFIG.STAGES.ON_FIRE && this.fx?.fireEmitters?.has(key)) {
@@ -396,7 +357,10 @@ export class WorldRenderer {
         if (this.fx?.fireEmitters) {
             for (const key of Array.from(this.fx.fireEmitters.keys())) this.fx.detachFire(key);
         }
-        for (const [_, mesh] of this.tileMeshes.entries()) this.scene.remove(mesh);
+        for (const [_, mesh] of this.tileMeshes.entries()) {
+            this.scene.remove(mesh);
+            MaterialLibrary.disposeGroup(mesh);
+        }
         this.tileMeshes.clear();
         for (let x = 0; x < this.grid.width; x++) {
             for (let y = 0; y < this.grid.height; y++) {
@@ -415,17 +379,19 @@ export class WorldRenderer {
     animate() {
         if (this.isDestroyed) return;
         this.animFrameId = requestAnimationFrame(this.animate);
+        const delta = Math.min(this.clock ? this.clock.getDelta() : 0.016, 0.1) || 0.016;
+
         this.cameraManager.update();
         const isSimRunning = !this.simulation || this.simulation.isRunning;
         const speedMult = isSimRunning ? (this.simulation ? (this.simulation.speedMultiplier || 1) : 1) : 0;
 
-        this.traffic.update(speedMult, 0.016);
-        if (this.canalTraffic) this.canalTraffic.update(speedMult, 0.016);
-        if (this.trainTraffic) this.trainTraffic.update(0.016, speedMult);
-        if (this.simulation?.typhoon) this.simulation.typhoon.updateRain(0.016);
-        if (this.fx) this.fx.update(0.016);
-        if (this.lighting && typeof this.lighting.update === 'function') this.lighting.update(0.016);
-        if (this.clouds) this.clouds.update(0.016, isSimRunning ? speedMult : 1, !!this.simulation?.typhoon?.isStormActive);
+        this.traffic.update(speedMult, delta);
+        if (this.canalTraffic) this.canalTraffic.update(speedMult, delta);
+        if (this.trainTraffic) this.trainTraffic.update(delta, speedMult);
+        if (this.simulation?.typhoon) this.simulation.typhoon.updateRain(delta);
+        if (this.fx) this.fx.update(delta);
+        if (this.lighting && typeof this.lighting.update === 'function') this.lighting.update(delta);
+        if (this.clouds) this.clouds.update(delta, isSimRunning ? speedMult : 1, !!this.simulation?.typhoon?.isStormActive);
         this.renderer.render(this.scene, this.camera);
     }
 

@@ -109,7 +109,7 @@ try {
                     ]
                 ]
             ];
-            file_put_contents($configFile, json_encode($configData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+            file_put_contents($configFile, json_encode($configData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
         }
 
         echo "[Seed] Created default city 'Edo-Tokyo' (City ID: {$cityId}) with initial 32x32 grid in config.\n";

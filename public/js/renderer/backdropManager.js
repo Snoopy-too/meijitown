@@ -1,5 +1,5 @@
 // Project Meiji - Landscape Backdrop & Mountain Perimeter (backdropManager.js)
-// ponytail: procedural terrain skirt, faceted low-poly peaks & winding river (< 280 lines)
+// Phase 2 /artisan: Snow-Capped Mount Fuji, Faceted Ridge Peaks & River Ribbon (<= 280 lines, < 4,000 polys)
 
 import * as THREE from 'three';
 import { CONFIG } from '../config.js';
@@ -18,6 +18,11 @@ export class BackdropManager {
 
         this.mountainMaterial = new THREE.MeshLambertMaterial({
             color: 0x4f6354, // Misty moss green / slate ridge
+            flatShading: true
+        });
+
+        this.snowMaterial = new THREE.MeshLambertMaterial({
+            color: 0xf4f6f9, // Crisp snow-white cap
             flatShading: true
         });
 
@@ -65,7 +70,7 @@ export class BackdropManager {
             if (distFromPlayable <= 0.1) {
                 pos.setY(i, -0.55); // Flush beneath board
             } else {
-                // Smooth sinusoidal elevation upward toward basin rim
+                // Smooth elevation upward toward basin rim
                 const normalized = Math.min(1.0, distFromPlayable / 95);
                 const elevation = Math.pow(normalized, 1.6) * 14.0;
                 const undulation = Math.sin((vx + cx) * 0.08) * Math.cos((vz + cz) * 0.08) * 1.5;
@@ -81,7 +86,7 @@ export class BackdropManager {
         this.group.add(skirtMesh);
     }
 
-    // 2. Low-poly mountain ridgeline enclosing valley perimeter
+    // 2. Low-poly mountain ridgeline enclosing valley perimeter + Mount Fuji
     buildMountainRidges() {
         const peaks = [
             // Northern Ridge
@@ -93,7 +98,7 @@ export class BackdropManager {
 
             // Eastern Foothills & Mount Fuji silhouette in far East
             { x: 130, z: -15, r: 30, h: 40, segs: 7 },
-            { x: 135, z: 25, r: 34, h: 46, segs: 6 },
+            { x: 135, z: 25, r: 34, h: 48, segs: 8, isFuji: true },
             { x: 128, z: 65, r: 28, h: 38, segs: 7 },
             { x: 122, z: 105, r: 30, h: 42, segs: 6 },
 
@@ -108,7 +113,7 @@ export class BackdropManager {
 
         for (const p of peaks) {
             const geo = new THREE.ConeGeometry(p.r, p.h, p.segs, 1);
-            // Slight jitter for organic faceted mountain slopes
+            // Facet jitter for organic ridgeline contours
             const pos = geo.attributes.position;
             for (let i = 0; i < pos.count; i++) {
                 if (pos.getY(i) < p.h * 0.4) {
@@ -124,6 +129,19 @@ export class BackdropManager {
             peakMesh.receiveShadow = true;
             peakMesh.userData = { isBackdrop: true, ignoreRaycast: true };
             this.group.add(peakMesh);
+
+            // Mount Fuji snow cap
+            if (p.isFuji) {
+                const snowH = p.h * 0.36;
+                const snowR = p.r * 0.36;
+                const snowGeo = new THREE.ConeGeometry(snowR, snowH, p.segs, 1);
+                snowGeo.computeVertexNormals();
+                const snowMesh = new THREE.Mesh(snowGeo, this.snowMaterial);
+                snowMesh.position.set(p.x, (p.h / 2) - 1.0 + (p.h * 0.32), p.z);
+                snowMesh.castShadow = true;
+                snowMesh.userData = { isBackdrop: true, ignoreRaycast: true };
+                this.group.add(snowMesh);
+            }
         }
     }
 

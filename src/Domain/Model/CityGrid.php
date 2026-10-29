@@ -5,20 +5,25 @@ namespace Meiji\Domain\Model;
 
 use InvalidArgumentException;
 
-// ponytail: grid as coordinate map "x_y" => Tile, sparse storage for non-empty tiles
+// ponytail: grid as coordinate map "x_y" => Tile, sparse storage with PHP 8.5 asymmetric visibility & property hooks
 final class CityGrid
 {
     /** @var array<string, Tile> */
     private array $tiles = [];
 
     public function __construct(
-        public readonly int $cityId,
-        public readonly int $width = 32,
-        public readonly int $height = 32
+        public private(set) int $cityId,
+        public private(set) int $width = 32,
+        public private(set) int $height = 32
     ) {
         if ($this->width < 8 || $this->height < 8) {
             throw new InvalidArgumentException("Grid dimensions must be at least 8x8");
         }
+    }
+
+    // Property hook for active tile count
+    public int $tileCount {
+        get => count($this->tiles);
     }
 
     public function getTile(int $x, int $y): ?Tile

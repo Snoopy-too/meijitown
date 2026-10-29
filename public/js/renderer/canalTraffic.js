@@ -1,5 +1,5 @@
 // Project Meiji - Canal Waterway Traffic & Takasebune Cargo Barges (canalTraffic.js)
-// ponytail: waterway graph pathfinding, smooth barge lerp under taiko-bashi bridges, reverse route
+// Phase 2 /artisan: Takasebune Cargo Barges, Woven Bamboo Awning, Rice Sacks & Poled Boatman (<= 400 lines)
 
 import * as THREE from 'three';
 import { CONFIG } from '../config.js';
@@ -14,60 +14,92 @@ export class CanalTrafficManager {
         this.barges = [];
         this.maxBarges = 2;
         this.spawnCheckTimer = 0;
+        this.animTime = 0;
     }
 
-    // Procedural fallback Takasebune barge mesh if GLB model is not cached
+    // Authentic Meiji Takasebune (高瀬舟) river cargo barge
     createProceduralBargeMesh() {
         const group = new THREE.Group();
+        const hullMat = new THREE.MeshLambertMaterial({ color: 0x4a3422 });
+        const gunwaleMat = new THREE.MeshLambertMaterial({ color: 0x382618 });
+        const bambooMat = new THREE.MeshLambertMaterial({ color: 0xc8aa64 });
+        const strawMat = new THREE.MeshLambertMaterial({ color: 0xbfa366 });
+        const wakeMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.40 });
 
-        // Hull
-        const hullGeo = new THREE.BoxGeometry(0.38, 0.05, 0.90);
-        const hullMat = new THREE.MeshLambertMaterial({ color: 0x4a3525 });
-        const hull = new THREE.Mesh(hullGeo, hullMat);
+        // 1. Flat-bottomed Swept Timber Hull
+        const hull = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.05, 0.92), hullMat);
         hull.position.y = 0.025;
         hull.castShadow = true;
         group.add(hull);
 
-        // Raised Prow (Bow)
-        const bowGeo = new THREE.BoxGeometry(0.34, 0.05, 0.20);
-        const bow = new THREE.Mesh(bowGeo, hullMat);
-        bow.position.set(0, 0.045, 0.50);
-        bow.rotation.x = -0.15;
-        group.add(bow);
+        // Raised sweeping Prow (Bow)
+        const prow = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.05, 0.22), hullMat);
+        prow.position.set(0, 0.055, 0.52);
+        prow.rotation.x = -0.22;
+        prow.castShadow = true;
+        group.add(prow);
 
-        // Cargo Barrels & Sacks (Midship)
-        const barrelMat = new THREE.MeshLambertMaterial({ color: 0x5c4028 });
-        const b1 = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.065, 0.08, 6), barrelMat);
-        b1.position.set(-0.08, 0.08, -0.05);
-        group.add(b1);
+        // Left and Right timber gunwale sideboards
+        for (const gx of [-0.18, 0.18]) {
+            const side = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.07, 0.94), gunwaleMat);
+            side.position.set(gx, 0.065, 0.02);
+            group.add(side);
+        }
 
-        const b2 = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.065, 0.08, 6), barrelMat);
-        b2.position.set(0.08, 0.08, -0.05);
-        group.add(b2);
+        // 2. Woven Bamboo / Reed Cargo Canopy Awning (Tomabune / 苫舟)
+        const awning = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.45, 8, 1, false, 0, Math.PI), bambooMat);
+        awning.rotation.set(0, 0, -Math.PI / 2);
+        awning.scale.set(0.65, 1.0, 1.0);
+        awning.position.set(0, 0.12, -0.04);
+        awning.castShadow = true;
+        group.add(awning);
 
-        const sackMat = new THREE.MeshLambertMaterial({ color: 0x9c855a });
-        const sack = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.22, 6), sackMat);
-        sack.rotation.z = Math.PI / 2;
-        sack.position.set(0, 0.07, 0.16);
-        group.add(sack);
+        // 3. Cargo under & behind awning: Straw Rice Bales (Tawara) & Sake Casks
+        const tawaraGeo = new THREE.CylinderGeometry(0.055, 0.055, 0.22, 6);
+        tawaraGeo.rotateZ(Math.PI / 2);
+        const t1 = new THREE.Mesh(tawaraGeo, strawMat);
+        t1.position.set(0, 0.07, 0.18);
+        t1.castShadow = true;
+        group.add(t1);
 
-        // Boatman (Sendō) with straw hat at stern
-        const coatMat = new THREE.MeshLambertMaterial({ color: 0x243754 });
-        const hatMat = new THREE.MeshLambertMaterial({ color: 0xc2a66b });
-        const body = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.08, 0.07), coatMat);
-        body.position.set(0, 0.08, -0.32);
+        const caskGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.09, 8);
+        const c1 = new THREE.Mesh(caskGeo, gunwaleMat);
+        c1.position.set(-0.08, 0.08, -0.04);
+        group.add(c1);
+        const c2 = new THREE.Mesh(caskGeo, gunwaleMat);
+        c2.position.set(0.08, 0.08, -0.04);
+        group.add(c2);
+
+        // 4. Articulated Boatman (Sendō 船頭) at Stern
+        const coatMat = new THREE.MeshLambertMaterial({ color: 0x1f3652 });
+        const body = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.14, 0.08), coatMat);
+        body.position.set(0, 0.11, -0.32);
         group.add(body);
 
-        const hat = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.03, 6), hatMat);
-        hat.position.set(0, 0.13, -0.32);
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.045, 5, 5), new THREE.MeshLambertMaterial({ color: 0xf2cbb0 }));
+        head.position.set(0, 0.20, -0.32);
+        group.add(head);
+
+        // Conical straw hat (Sugegasa)
+        const hat = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.045, 8), bambooMat);
+        hat.position.set(0, 0.23, -0.32);
         group.add(hat);
 
-        // Push-Pole (Sao)
-        const poleMat = new THREE.MeshLambertMaterial({ color: 0xa89058 });
-        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.40, 4), poleMat);
-        pole.rotation.x = Math.PI / 5;
-        pole.position.set(0.12, 0.07, -0.36);
+        // Long Bamboo Push-Pole (Sao 竿) angled into the water
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.55, 4), bambooMat);
+        pole.rotation.set(Math.PI / 4, 0, -0.25);
+        pole.position.set(0.12, 0.06, -0.38);
         group.add(pole);
+
+        // 5. White trailing water wake ribbons
+        const wakeL = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.005, 0.35), wakeMat);
+        wakeL.position.set(-0.16, 0.035, -0.58);
+        wakeL.rotation.y = -0.22;
+        group.add(wakeL);
+        const wakeR = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.005, 0.35), wakeMat);
+        wakeR.position.set(0.16, 0.035, -0.58);
+        wakeR.rotation.y = 0.22;
+        group.add(wakeR);
 
         return group;
     }
@@ -155,61 +187,56 @@ export class CanalTrafficManager {
         }
 
         const startTile = endpoints.length > 0 ? endpoints[0] : network[0];
-        const visited = new Set();
-        const path = [];
+        const endTile = endpoints.length > 1 ? endpoints[endpoints.length - 1] : network[network.length - 1];
 
-        // DFS to find longest simple waterway path
-        const dfs = (tile) => {
-            const key = `${tile.x}_${tile.y}`;
-            visited.add(key);
-            path.push(tile);
+        // BFS path between endpoints
+        const queue = [[startTile]];
+        const visited = new Set([`${startTile.x}_${startTile.y}`]);
+
+        while (queue.length > 0) {
+            const path = queue.shift();
+            const curr = path[path.length - 1];
+
+            if (curr.x === endTile.x && curr.y === endTile.y && path.length >= 2) {
+                return path;
+            }
 
             const neighbors = [
-                { x: tile.x + 1, y: tile.y },
-                { x: tile.x - 1, y: tile.y },
-                { x: tile.x, y: tile.y + 1 },
-                { x: tile.x, y: tile.y - 1 }
+                { x: curr.x + 1, y: curr.y },
+                { x: curr.x - 1, y: curr.y },
+                { x: curr.x, y: curr.y + 1 },
+                { x: curr.x, y: curr.y - 1 }
             ];
 
             for (const n of neighbors) {
-                const nKey = `${n.x}_${n.y}`;
-                if (netSet.has(nKey) && !visited.has(nKey)) {
-                    const nextTile = this.grid.getTile(n.x, n.y);
-                    if (nextTile) {
-                        dfs(nextTile);
-                        break;
-                    }
+                const key = `${n.x}_${n.y}`;
+                if (netSet.has(key) && !visited.has(key)) {
+                    visited.add(key);
+                    const tileObj = network.find(t => t.x === n.x && t.y === n.y);
+                    if (tileObj) queue.push([...path, tileObj]);
                 }
             }
-        };
+        }
 
-        dfs(startTile);
-
-        if (path.length < 2) return null;
-
-        // Convert tiles to Three.js Vector3 world coordinates at water surface level (y = 0.040)
-        return path.map(t => {
-            const pos = this.getTileWorldPos(t.x, t.y);
-            return new THREE.Vector3(pos.x, 0.040, pos.z);
-        });
+        return network.slice(0, Math.min(network.length, 12));
     }
 
+    // Spawn Takasebune cargo barge on active canal
     spawnBarge() {
         const networks = this.findCanalNetworks();
-        if (networks.length === 0) return false;
+        if (networks.length === 0) return;
 
         const chosenNet = networks[Math.floor(Math.random() * networks.length)];
-        const waypoints = this.buildWaterwayRoute(chosenNet);
-        if (!waypoints || waypoints.length < 2) return false;
+        const tilePath = this.buildWaterwayRoute(chosenNet);
+        if (!tilePath || tilePath.length < 2) return;
+
+        const waypoints = tilePath.map(t => {
+            const p = this.getTileWorldPos(t.x, t.y);
+            return new THREE.Vector3(p.x, 0.038, p.z);
+        });
 
         const mesh = this.createBargeInstance();
         mesh.position.copy(waypoints[0]);
-
-        // Orient initial heading towards next waypoint
-        const dirX = waypoints[1].x - waypoints[0].x;
-        const dirZ = waypoints[1].z - waypoints[0].z;
-        mesh.rotation.y = Math.atan2(dirX, dirZ);
-
         this.scene.add(mesh);
 
         this.barges.push({
@@ -217,16 +244,16 @@ export class CanalTrafficManager {
             waypoints,
             waypointIndex: 0,
             progress: 0,
-            speed: 0.55 + Math.random() * 0.25, // Calm waterway speed
+            speed: 1.15
         });
-
-        return true;
     }
 
-    update(speedMult, delta) {
-        if (speedMult <= 0) return;
+    // Advance canal barge positions with gentle aquatic rocking motion
+    update(speedMult = 1.0, delta = 0.016) {
+        if (speedMult <= 0 || !delta || delta <= 0) return;
+        this.animTime += delta * speedMult;
 
-        this.spawnCheckTimer += speedMult * delta;
+        this.spawnCheckTimer += delta * (speedMult > 0 ? speedMult : 1);
         if (this.spawnCheckTimer > 3.0) {
             this.spawnCheckTimer = 0;
             if (this.barges.length < this.maxBarges) {
@@ -256,15 +283,19 @@ export class CanalTrafficManager {
                 barge.progress = 0;
             } else {
                 barge.mesh.position.lerpVectors(from, to, barge.progress);
+                // Gentle floating water rocking bob
+                barge.mesh.position.y = 0.038 + Math.sin(this.animTime * 2.8 + i) * 0.008;
+
                 const dirX = to.x - from.x;
                 const dirZ = to.z - from.z;
                 if (Math.hypot(dirX, dirZ) > 0.01) {
                     const targetAngle = Math.atan2(dirX, dirZ);
-                    // Gentle angular interpolation for realistic barge steering
                     let diff = targetAngle - barge.mesh.rotation.y;
                     while (diff < -Math.PI) diff += Math.PI * 2;
                     while (diff > Math.PI) diff -= Math.PI * 2;
                     barge.mesh.rotation.y += diff * 0.12;
+                    // Subtle bank roll when turning
+                    barge.mesh.rotation.z = Math.sin(this.animTime * 2.2 + i) * 0.03;
                 }
             }
         }

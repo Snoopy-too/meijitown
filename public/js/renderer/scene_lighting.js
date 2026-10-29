@@ -1,12 +1,17 @@
-// Project Meiji - Scene Lighting & 4-Phase Day/Night Cycle
-// ponytail: smooth directional sun pitch/color lerp, atmospheric indigo night fog & warm emissive glow
+// Project Meiji - Scene Lighting & 4-Phase Day/Night Cycle (scene_lighting.js)
+// Phase 1 Architecture: Smooth sun/hemisphere/fog lerp, O(1) MaterialLibrary emissives & Typhoon sky lock (< 200 lines)
 
 import * as THREE from 'three';
 import { CONFIG } from '../config.js';
+import { MaterialLibrary } from './materialLibrary.js';
 
 export class SceneLighting {
     constructor(scene) {
         this.scene = scene;
+        if (this.scene) {
+            this.scene.userData = this.scene.userData || {};
+            this.scene.userData.lighting = this;
+        }
 
         this.hemiLight = new THREE.HemisphereLight(
             CONFIG.ATMOSPHERE.HEMI_SKY,
@@ -34,7 +39,6 @@ export class SceneLighting {
         this.sunLight.shadow.bias = -0.0003;
         this.scene.add(this.sunLight);
 
-        // Target state for smooth frame-by-frame lerping
         this.currentPhaseKey = 'DAY';
         const initialPreset = CONFIG.ATMOSPHERE.PHASES.DAY;
 
@@ -50,30 +54,25 @@ export class SceneLighting {
         this.targetFogColor = new THREE.Color(initialPreset.FOG);
         this.targetFogDensity = initialPreset.FOG_DENSITY;
 
+        this.stormBgColor = new THREE.Color(0x2c3e50);
+        this.isStormOverride = false;
+
         this.targetEmissiveIntensity = 0.0;
         this.currentEmissiveIntensity = 0.0;
-
-        this.emissiveColor = new THREE.Color(0xffa040);
-        this.offColor = new THREE.Color(0x000000);
     }
 
-    // Static factory for backward compatibility
     static initLights(scene) {
-        const lighting = new SceneLighting(scene);
-        return lighting;
+        return new SceneLighting(scene);
     }
 
     setPowerSystem(powerSystem) {
         this._powerSystem = powerSystem;
     }
 
-    /**
-     * Map simulation calendar month (1..12) into 4 distinct historical day/night phases.
-     * M1, M5, M9: Dawn / Morning
-     * M2, M6, M10: Daytime (Bright warm white)
-     * M3, M7, M11: Twilight / Golden Hour (Warm amber)
-     * M4, M8, M12: Night (Deep indigo moonlit)
-     */
+    setStormOverride(isActive) {
+        this.isStormOverride = Boolean(isActive);
+    }
+
     updateMonth(month) {
         const phaseIndex = (month - 1) % 4;
         let phaseKey = 'DAY';
@@ -106,87 +105,76 @@ export class SceneLighting {
         this.targetEmissiveIntensity = p.EMISSIVE_INTENSITY;
     }
 
-    /**
-     * Smooth per-frame interpolation of lighting, fog, and lantern/shoji emissives.
-     */
     update(delta = 0.016) {
         const lerpSpeed = Math.min(1.0, delta * 2.2);
 
-        // 1. Directional Sun/Moon Lerp
         this.sunLight.color.lerp(this.targetSunColor, lerpSpeed);
         this.sunLight.intensity += (this.targetSunIntensity - this.sunLight.intensity) * lerpSpeed;
         this.sunLight.position.lerp(this.targetSunPos, lerpSpeed);
 
-        // 2. Ambient Hemisphere Lerp
         this.hemiLight.color.lerp(this.targetHemiSky, lerpSpeed);
         this.hemiLight.groundColor.lerp(this.targetHemiGround, lerpSpeed);
         this.hemiLight.intensity += (this.targetHemiIntensity - this.hemiLight.intensity) * lerpSpeed;
 
-        // 3. Scene Background & Fog Lerp
-        if (this.scene.background) {
-            this.scene.background.lerp(this.targetBgColor, lerpSpeed);
+        const activeBgTarget = this.isStormOverride ? this.stormBgColor : this.targetBgColor;
+        if (this.scene.background && typeof this.scene.background.lerp === 'function') {
+            this.scene.background.lerp(activeBgTarget, lerpSpeed);
         }
         if (this.scene.fog) {
-            this.scene.fog.color.lerp(this.targetFogColor, lerpSpeed);
+            this.scene.fog.color.lerp(this.isStormOverride ? this.stormBgColor : this.targetFogColor, lerpSpeed);
             this.scene.fog.density += (this.targetFogDensity - this.scene.fog.density) * lerpSpeed;
         }
 
-        // 4. Lantern & Window Emissive Intensity Lerp
         const prevEmissive = this.currentEmissiveIntensity;
         this.currentEmissiveIntensity += (this.targetEmissiveIntensity - this.currentEmissiveIntensity) * Math.min(1.0, delta * 3.5);
 
-        // Update emissives on tiles when value changes noticeably
         if (Math.abs(prevEmissive - this.currentEmissiveIntensity) > 0.005) {
             this.applyEmissivesToScene(this.currentEmissiveIntensity);
         }
     }
 
     /**
-     * Toggles emissive properties on teahouse red lanterns, shoji windows, and street lamps.
+     * Updates shared MaterialLibrary emissives in O(1) time and updates powered street lanterns.
      */
     applyEmissivesToScene(intensity) {
+        MaterialLibrary.updateEmissives(intensity);
+
         const isGlowing = intensity > 0.05;
         const emissiveHex = isGlowing ? 0xffa040 : 0x000000;
 
         this.scene.traverse((child) => {
-            // A. Traditional Teahouse Red Lanterns
-            if (child.isMesh && child.material) {
+            if (child.isMesh && child.material && !child.material.userData?.isSharedLibraryMaterial) {
                 const matName = child.material.name || '';
                 const nodeName = child.name || '';
-
                 if (matName === 'M_RedLantern' || nodeName.includes('Lantern_Body')) {
-                    if (!child.material.emissive) return;
-                    child.material.emissive.setHex(emissiveHex);
-                    child.material.emissiveIntensity = intensity;
-                }
-
-                // B. Residential Shoji Windows & Machiya Facade Glow
-                if (nodeName === 'Upper_Window' || nodeName === 'Front_Koushi') {
-                    if (child.material && child.material.emissive) {
+                    if (child.material.emissive) {
+                        child.material.emissive.setHex(emissiveHex);
+                        child.material.emissiveIntensity = intensity;
+                    }
+                } else if (nodeName === 'Upper_Window' || nodeName === 'Front_Koushi') {
+                    if (child.material.emissive) {
                         child.material.emissive.setHex(emissiveHex);
                         child.material.emissiveIntensity = intensity * 0.75;
                     }
                 }
             }
 
-            // C. Stone Road Intersection Street Lanterns (userData.isLantern)
             if (child.userData && child.userData.isLantern) {
                 const pSys = this._powerSystem || (this.state && this.state.powerSystem);
                 const isPowered = (pSys && typeof pSys.hasPower === 'function')
                     ? pSys.hasPower(child.userData.tileX, child.userData.tileY)
                     : false;
 
-                // Electric Arc Lamp: Cool-white high intensity (0xd8eeff) vs Amber gas lantern (0xffa040)
                 const arcEmissive = isGlowing ? (isPowered ? 0xd8eeff : 0xffa040) : 0x000000;
                 const arcLightColor = isPowered ? 0xd8eeff : 0xff9e4a;
                 const arcLightIntensity = isPowered ? intensity * 2.8 : intensity * 1.8;
 
-                if (child.userData.material) {
+                if (child.userData.material && child.userData.material.emissive) {
                     child.userData.material.emissive.setHex(arcEmissive);
                     child.userData.material.emissiveIntensity = isPowered ? intensity * 1.5 : intensity;
                 }
                 if (child.userData.light) {
-                    child.userData.light.color.setHex(arcLightColor);
+                    if (child.userData.light.color?.setHex) child.userData.light.color.setHex(arcLightColor);
                     child.userData.light.intensity = isGlowing ? arcLightIntensity : 0.0;
                 }
             }

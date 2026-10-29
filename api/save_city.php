@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-// ponytail: single save endpoint, strict session auth, INSERT ... ON DUPLICATE KEY UPDATE
+// ponytail: single save endpoint, native json_validate(), strict session auth, atomic InnoDB transaction
 
 ini_set('display_errors', '0');
 error_reporting(E_ALL);
@@ -38,21 +38,28 @@ if ($userId <= 0) {
 }
 
 try {
-    $raw = file_get_contents('php://input');
-    if (empty($raw)) {
+    $rawPayload = file_get_contents('php://input') ?: '';
+    if (trim($rawPayload) === '') {
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Empty request payload.'], JSON_THROW_ON_ERROR);
         exit(0);
     }
 
-    $payload = json_decode((string) $raw, true, 512, JSON_THROW_ON_ERROR);
+    // 2. Native Payload Validation with PHP 8.5 json_validate()
+    if (!json_validate($rawPayload)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Malformed JSON payload'], JSON_THROW_ON_ERROR);
+        exit(0);
+    }
+
+    $payload = json_decode($rawPayload, true, 512, JSON_THROW_ON_ERROR);
     if (!is_array($payload)) {
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Invalid JSON payload.'], JSON_THROW_ON_ERROR);
         exit(0);
     }
 
-    // 2. Validate JSON payload (grid arrays, treasury, population, chronicle date, active edicts)
+    // 3. Validate JSON payload structure (grid arrays, treasury, population, chronicle date, active edicts)
     $grid = $payload['grid'] ?? $payload['tiles'] ?? null;
     if (!is_array($grid)) {
         http_response_code(422);
@@ -96,56 +103,60 @@ try {
     $container = createContainer();
     $pdo = $container->get(DatabaseConnection::class)->getPdo();
 
-    // 3. Determine Slot ID for INSERT ... ON DUPLICATE KEY UPDATE
-    $targetSlotId = isset($payload['slotId']) && (int) $payload['slotId'] > 0 ? (int) $payload['slotId'] : null;
+    // 4. Atomic Transaction on InnoDB
+    $pdo->beginTransaction();
+    try {
+        $targetSlotId = isset($payload['slotId']) && (int) $payload['slotId'] > 0 ? (int) $payload['slotId'] : null;
 
-    if ($targetSlotId !== null) {
-        // Verify user owns this slot
-        $checkStmt = $pdo->prepare("SELECT id FROM saved_cities WHERE id = ? AND user_id = ?");
-        $checkStmt->execute([$targetSlotId, $userId]);
-        if (!$checkStmt->fetch()) {
-            $targetSlotId = null; // Unowned slot: insert new
+        if ($targetSlotId !== null) {
+            $checkStmt = $pdo->prepare("SELECT id FROM saved_cities WHERE id = ? AND user_id = ?");
+            $checkStmt->execute([$targetSlotId, $userId]);
+            if (!$checkStmt->fetch()) {
+                $targetSlotId = null; // Unowned slot: insert new
+            }
         }
-    }
 
-    // If slotId wasn't passed, check if the user has an existing default slot
-    if ($targetSlotId === null && empty($payload['createNewSlot'])) {
-        $existingStmt = $pdo->prepare("SELECT id FROM saved_cities WHERE user_id = ? ORDER BY updated_at DESC LIMIT 1");
-        $existingStmt->execute([$userId]);
-        $existingRow = $existingStmt->fetch();
-        if ($existingRow) {
-            $targetSlotId = (int) $existingRow['id'];
+        if ($targetSlotId === null && empty($payload['createNewSlot'])) {
+            $existingStmt = $pdo->prepare("SELECT id FROM saved_cities WHERE user_id = ? ORDER BY updated_at DESC LIMIT 1");
+            $existingStmt->execute([$userId]);
+            $existingRow = $existingStmt->fetch();
+            if ($existingRow) {
+                $targetSlotId = (int) $existingRow['id'];
+            }
         }
+
+        $stmt = $pdo->prepare("
+            INSERT INTO saved_cities 
+                (id, user_id, city_name, chronicle_year, chronicle_month, population, treasury, city_data)
+            VALUES 
+                (:id, :user_id, :city_name, :chronicle_year, :chronicle_month, :population, :treasury, :city_data)
+            ON DUPLICATE KEY UPDATE
+                city_name = VALUES(city_name),
+                chronicle_year = VALUES(chronicle_year),
+                chronicle_month = VALUES(chronicle_month),
+                population = VALUES(population),
+                treasury = VALUES(treasury),
+                city_data = VALUES(city_data),
+                updated_at = CURRENT_TIMESTAMP
+        ");
+
+        $stmt->execute([
+            ':id' => $targetSlotId,
+            ':user_id' => $userId,
+            ':city_name' => $cityName,
+            ':chronicle_year' => $chronicleYear,
+            ':chronicle_month' => $chronicleMonth,
+            ':population' => $population,
+            ':treasury' => $treasury,
+            ':city_data' => $cityDataJson,
+        ]);
+
+        $savedSlotId = $targetSlotId ?: (int) $pdo->lastInsertId();
+        $pdo->commit();
+    } catch (\Throwable $transEx) {
+        $pdo->rollBack();
+        throw $transEx;
     }
-
-    // 4. Execute INSERT ... ON DUPLICATE KEY UPDATE
-    $stmt = $pdo->prepare("
-        INSERT INTO saved_cities 
-            (id, user_id, city_name, chronicle_year, chronicle_month, population, treasury, city_data)
-        VALUES 
-            (:id, :user_id, :city_name, :chronicle_year, :chronicle_month, :population, :treasury, :city_data)
-        ON DUPLICATE KEY UPDATE
-            city_name = VALUES(city_name),
-            chronicle_year = VALUES(chronicle_year),
-            chronicle_month = VALUES(chronicle_month),
-            population = VALUES(population),
-            treasury = VALUES(treasury),
-            city_data = VALUES(city_data),
-            updated_at = CURRENT_TIMESTAMP
-    ");
-
-    $stmt->execute([
-        ':id' => $targetSlotId,
-        ':user_id' => $userId,
-        ':city_name' => $cityName,
-        ':chronicle_year' => $chronicleYear,
-        ':chronicle_month' => $chronicleMonth,
-        ':population' => $population,
-        ':treasury' => $treasury,
-        ':city_data' => $cityDataJson,
-    ]);
-
-    $savedSlotId = $targetSlotId ?: (int) $pdo->lastInsertId();
 
     echo json_encode([
         'success' => true,
@@ -155,7 +166,7 @@ try {
         'message' => "Settlement '{$cityName}' saved successfully to MySQL (Slot #{$savedSlotId}).",
     ], JSON_THROW_ON_ERROR);
     exit(0);
-} catch (Throwable $e) {
+} catch (\Throwable $e) {
     http_response_code(500);
     echo json_encode([
         'success' => false,

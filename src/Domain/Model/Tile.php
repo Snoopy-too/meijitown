@@ -5,7 +5,7 @@ namespace Meiji\Domain\Model;
 
 use InvalidArgumentException;
 
-// ponytail: compact value object, self-validating
+// ponytail: compact value object, self-validating with PHP 8.5 asymmetric visibility and property hooks
 final class Tile
 {
     public const TYPE_EMPTY = 'empty';
@@ -46,18 +46,18 @@ final class Tile
     ];
 
     public function __construct(
-        public readonly int $x,
-        public readonly int $y,
-        public readonly string $type = self::TYPE_EMPTY,
-        public readonly ?string $zoneType = null,
-        public readonly int $level = 0,
-        public readonly bool $occupied = false,
-        public readonly string $stage = self::STAGE_NONE,
-        public readonly ?string $serviceType = null,
-        public readonly int $roadTier = 1,
-        public readonly bool $hasBridge = false,
-        public readonly ?string $subType = null,
-        public readonly int $rotation = 0
+        public private(set) int $x,
+        public private(set) int $y,
+        public private(set) string $type = self::TYPE_EMPTY,
+        public private(set) ?string $zoneType = null,
+        public private(set) int $level = 0,
+        public private(set) bool $occupied = false,
+        public private(set) string $stage = self::STAGE_NONE,
+        public private(set) ?string $serviceType = null,
+        public private(set) int $roadTier = 1,
+        public private(set) bool $hasBridge = false,
+        public private(set) ?string $subType = null,
+        public private(set) int $rotation = 0
     ) {
         if ($this->x < 0 || $this->y < 0) {
             throw new InvalidArgumentException("Tile coordinates must be non-negative: ({$this->x}, {$this->y})");
@@ -95,6 +95,16 @@ final class Tile
         if ($this->rotation < 0 || $this->rotation > 3) {
             throw new InvalidArgumentException("Tile rotation must be an orthogonal step 0..3: {$this->rotation}");
         }
+    }
+
+    // Property hook for coordinate key (e.g. "5_5")
+    public string $coordinateKey {
+        get => "{$this->x}_{$this->y}";
+    }
+
+    // Property hook to check if tile is flammable
+    public bool $isFlammable {
+        get => $this->type === self::TYPE_ZONE || $this->type === self::TYPE_PARK;
     }
 
     public function toArray(): array

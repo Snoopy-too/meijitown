@@ -18,57 +18,93 @@ export class TrainTrafficManager {
         this.puffTimer = 0;
     }
 
-    // Procedural fallback 2-4-0 tank engine + passenger car if GLB asset is not cached
+    // Procedural authentic 1872 Shimbashi-Yokohama 2-4-0 steam locomotive & Meiji coach
     createProceduralTrainMesh() {
         const group = new THREE.Group();
-
         const ironMat = new THREE.MeshLambertMaterial({ color: 0x222426 });
-        const brassMat = new THREE.MeshStandardMaterial({ color: 0xb89230, metalness: 0.8, roughness: 0.3 });
-        const coachMat = new THREE.MeshLambertMaterial({ color: 0x1f3825 });
+        const darkIron = new THREE.MeshLambertMaterial({ color: 0x141618 });
+        const brassMat = new THREE.MeshStandardMaterial({ color: 0xb89230, metalness: 0.85, roughness: 0.28 });
+        const coachMat = new THREE.MeshLambertMaterial({ color: 0x1d3822 });
+        const creamMat = new THREE.MeshLambertMaterial({ color: 0xede0c8 });
         const roofMat = new THREE.MeshLambertMaterial({ color: 0x3d2b1f });
+        const lampMat = new THREE.MeshStandardMaterial({ color: 0xfff0aa, emissive: new THREE.Color(0xffbb44), emissiveIntensity: 0.9 });
 
-        // Locomotive (facing -Z as forward)
+        // 1. Locomotive (facing -Z as forward)
         const locoGroup = new THREE.Group();
         locoGroup.position.z = -0.45;
 
-        // Chassis & Boiler
-        const chassis = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.06, 0.85), ironMat);
+        // Chassis & Front Cowcatcher Pilot
+        const chassis = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.06, 0.88), ironMat);
         chassis.position.y = 0.08;
         locoGroup.add(chassis);
 
-        const boiler = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.54, 8), ironMat);
-        boiler.rotation.x = Math.PI / 2;
-        boiler.position.set(0, 0.22, -0.12);
+        const pilot = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.14, 4), darkIron);
+        pilot.rotation.set(-Math.PI / 2, 0, Math.PI / 4);
+        pilot.position.set(0, 0.08, -0.48);
+        locoGroup.add(pilot);
+
+        // Boiler & Brass Bands
+        const boiler = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.54, 8), darkIron);
+        boiler.rotation.x = Math.PI / 2; boiler.position.set(0, 0.22, -0.12);
         locoGroup.add(boiler);
 
-        // Tall Smokestack & Dome
-        const stack = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.22, 8), ironMat);
-        stack.position.set(0, 0.42, -0.30);
-        locoGroup.add(stack);
+        const band = new THREE.Mesh(new THREE.CylinderGeometry(0.145, 0.145, 0.02, 8), brassMat);
+        band.rotation.x = Math.PI / 2; band.position.set(0, 0.22, -0.12);
+        locoGroup.add(band);
 
-        const dome = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.10, 8), brassMat);
-        dome.position.set(0, 0.38, -0.10);
-        locoGroup.add(dome);
+        // Flared Smokestack & Brass Dome
+        const stack = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.04, 0.22, 8), ironMat);
+        stack.position.set(0, 0.42, -0.30); locoGroup.add(stack);
+        const stackRim = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.045, 0.04, 8), brassMat);
+        stackRim.position.set(0, 0.52, -0.30); locoGroup.add(stackRim);
 
-        // Cab
+        const dome = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.10, 8), brassMat);
+        dome.position.set(0, 0.38, -0.10); locoGroup.add(dome);
+
+        // Headlamp on Front Smokebox
+        const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.10, 0.08), brassMat);
+        lamp.position.set(0, 0.30, -0.42); locoGroup.add(lamp);
+        const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.02, 6), lampMat);
+        lens.rotation.x = Math.PI / 2; lens.position.set(0, 0.30, -0.465);
+        locoGroup.add(lens);
+
+        // Driver Cab
         const cab = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.26, 0.26), ironMat);
         cab.position.set(0, 0.24, 0.22);
         locoGroup.add(cab);
 
+        // 4 Spoked Driving Wheels
+        const wheelGeo = new THREE.CylinderGeometry(0.10, 0.10, 0.03, 8);
+        wheelGeo.rotateZ(Math.PI / 2);
+        for (const [wx, wz] of [[-0.20, -0.14], [0.20, -0.14], [-0.20, 0.08], [0.20, 0.08]]) {
+            const w = new THREE.Mesh(wheelGeo, darkIron);
+            w.position.set(wx, 0.09, wz);
+            locoGroup.add(w);
+        }
         group.add(locoGroup);
 
-        // Passenger Coach (trailing at +Z)
+        // 2. Passenger Coach with Clerestory Monitor Roof
         const coachGroup = new THREE.Group();
         coachGroup.position.z = 0.45;
-
         const cBody = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.24, 0.65), coachMat);
         cBody.position.y = 0.22;
         coachGroup.add(cBody);
-
+        const cStripe = new THREE.Mesh(new THREE.BoxGeometry(0.365, 0.08, 0.655), creamMat);
+        cStripe.position.y = 0.24;
+        coachGroup.add(cStripe);
         const cRoof = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.04, 0.68), roofMat);
         cRoof.position.y = 0.35;
         coachGroup.add(cRoof);
+        const clere = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.05, 0.54), roofMat);
+        clere.position.y = 0.39;
+        coachGroup.add(clere);
 
+        for (const [cx, cz] of [[-0.19, -0.20], [0.19, -0.20], [-0.19, 0.20], [0.19, 0.20]]) {
+            const cw = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.03, 8), darkIron);
+            cw.rotation.z = Math.PI / 2;
+            cw.position.set(cx, 0.075, cz);
+            coachGroup.add(cw);
+        }
         group.add(coachGroup);
         return group;
     }

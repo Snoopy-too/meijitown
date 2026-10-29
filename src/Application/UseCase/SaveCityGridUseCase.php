@@ -5,11 +5,11 @@ namespace Meiji\Application\UseCase;
 
 use InvalidArgumentException;
 use Meiji\Domain\Model\CityGrid;
-use Meiji\Domain\Model\CityMetrics;
 use Meiji\Domain\Model\Tile;
 use Meiji\Domain\Repository\CityRepositoryInterface;
 use RuntimeException;
 
+// ponytail: streamlined city grid persistence use case with native json_validate() payload handling
 final class SaveCityGridUseCase
 {
     public function __construct(
@@ -18,7 +18,7 @@ final class SaveCityGridUseCase
 
     public function execute(
         int $cityId,
-        array $tilesData,
+        array|string $tilesData,
         int $width = 32,
         int $height = 32,
         ?int $treasury = null,
@@ -32,6 +32,17 @@ final class SaveCityGridUseCase
 
         if ($width < 8 || $width > 128 || $height < 8 || $height > 128) {
             throw new InvalidArgumentException("Grid dimensions out of bounds: {$width}x{$height}");
+        }
+
+        if (is_string($tilesData)) {
+            if (!json_validate($tilesData)) {
+                throw new InvalidArgumentException("Malformed JSON payload for city grid");
+            }
+            $tilesData = json_decode($tilesData, true, 512, JSON_THROW_ON_ERROR);
+        }
+
+        if (!is_array($tilesData)) {
+            throw new InvalidArgumentException("Tiles data must be an array or valid JSON string");
         }
 
         $city = $this->cityRepository->getCity($cityId);

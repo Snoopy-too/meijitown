@@ -9,6 +9,7 @@ use Meiji\Domain\Model\CityMetrics;
 use Meiji\Domain\Model\Tile;
 use Meiji\Domain\Repository\CityRepositoryInterface;
 use Meiji\Infrastructure\Database\DatabaseConnection;
+use Override;
 use PDO;
 use RuntimeException;
 
@@ -24,6 +25,7 @@ final class PdoCityRepository implements CityRepositoryInterface
         $this->configFilePath = $configFilePath ?? dirname(__DIR__, 3) . '/data/city_config.json';
     }
 
+    #[Override]
     public function getCity(int $cityId): ?City
     {
         $stmt = $this->pdo->prepare("SELECT * FROM cities WHERE city_id = ?");
@@ -53,6 +55,7 @@ final class PdoCityRepository implements CityRepositoryInterface
         );
     }
 
+    #[Override]
     public function getGrid(int $cityId): ?CityGrid
     {
         $width = 32;
@@ -104,6 +107,7 @@ final class PdoCityRepository implements CityRepositoryInterface
         );
     }
 
+    #[Override]
     public function saveCityAndGrid(City $city, CityGrid $grid): void
     {
         $this->pdo->beginTransaction();
@@ -188,6 +192,7 @@ final class PdoCityRepository implements CityRepositoryInterface
         }
     }
 
+    #[Override]
     public function resetCity(int $cityId, string $cityName = 'Edo-Tokyo'): void
     {
         $this->pdo->beginTransaction();
@@ -273,12 +278,15 @@ final class PdoCityRepository implements CityRepositoryInterface
                 'defaults' => $this->getDefaultConfig(),
                 'cities' => [],
             ];
-            file_put_contents($this->configFilePath, json_encode($initial, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+            file_put_contents($this->configFilePath, json_encode($initial, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
             return $initial;
         }
 
         $raw = (string) file_get_contents($this->configFilePath);
-        $data = json_decode($raw, true);
+        if ($raw === '' || !json_validate($raw)) {
+            return [];
+        }
+        $data = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
         return is_array($data) ? $data : [];
     }
 
