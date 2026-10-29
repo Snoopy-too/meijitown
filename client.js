@@ -96,6 +96,20 @@ function getTemplateHtml(mode = 'standard', playerName = 'Mayor', gameName = 'me
             <div class="time-audio-divider" aria-hidden="true"></div>
             <button id="btn-layers-toggle" class="time-btn hud-btn-civic" title="Map Data Overlays / 地図レイヤー" data-i18n-title="hud.layers_title">🗺️ <span data-i18n="hud.layers">${isJa ? '階層地図' : 'Layers'}</span></button>
             <button id="btn-policy-ledger" class="time-btn hud-btn-civic" title="Civic Policies & Imperial Edicts / 政策録" data-i18n-title="hud.edicts_title">📜 <span data-i18n="hud.edicts">${isJa ? '政策録' : 'Edicts'}</span></button>
+            <!-- Washi Map Layers Dropdown Popover -->
+            <div id="layer-menu-popover" class="layer-menu-popover washi-card" style="display: none;">
+              <div class="layer-menu-header"><h4 data-i18n="hud.layers_menu_title">${isJa ? '地図レイヤー表示' : 'Map Data Overlays'}</h4></div>
+              <div class="layer-menu-options">
+                <label class="layer-radio-item"><input type="radio" name="layer-mode" value="none" checked><span data-i18n="layer.normal">${isJa ? '通常表示' : 'Normal View'}</span></label>
+                <label class="layer-radio-item"><input type="radio" name="layer-mode" value="fire"><span data-i18n="layer.fire">${isJa ? '🔥 火災危険度' : '🔥 Fire Hazard'}</span></label>
+                <label class="layer-radio-item"><input type="radio" name="layer-mode" value="sanitation"><span data-i18n="layer.sanitation">${isJa ? '💧 衛生・井戸水道' : '💧 Sanitation & Water'}</span></label>
+                <label class="layer-radio-item"><input type="radio" name="layer-mode" value="electric"><span data-i18n="layer.electric">${isJa ? '⚡ 送電網・電灯' : '⚡ Electric Grid'}</span></label>
+                <label class="layer-radio-item"><input type="radio" name="layer-mode" value="pollution"><span data-i18n="layer.pollution">${isJa ? '🏭 石炭煤煙公害' : '🏭 Coal Soot Pollution'}</span></label>
+                <label class="layer-radio-item"><input type="radio" name="layer-mode" value="flood"><span data-i18n="layer.flood">${isJa ? '🌊 水害危険度' : '🌊 Flood Risk'}</span></label>
+                <div style="margin: 4px 0; border-top: 1px dashed #8c7355; opacity: 0.4;"></div>
+                <label class="layer-radio-item" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;"><span>🧑‍💼 <span data-i18n="hud.advisor_guidance">${isJa ? '助言役の手引き' : 'Advisor Guidance'}</span></span><input type="checkbox" id="toggle-advisor-guidance" checked style="cursor: pointer;"></label>
+              </div>
+            </div>
           </div>
         </div>
       </header>
@@ -213,6 +227,160 @@ function getTemplateHtml(mode = 'standard', playerName = 'Mayor', gameName = 'me
       <!-- Feedback Toasts & Inline Drag Badge -->
       <div id="toast-container"></div>
       <div id="drag-badge" style="display: none;"></div>
+
+      <!-- Civic Policy Ledger Slide-out Drawer (Hidden by default) -->
+      <div id="policy-drawer-scrim" class="policy-drawer-scrim">
+        <div id="policy-drawer" class="policy-drawer">
+          <div class="policy-header">
+            <div class="policy-header-title">
+              <span class="policy-seal-icon">政</span>
+              <span data-i18n="policy.title">${isJa ? '政策録・布告' : 'Civic Edicts & Policies'}</span>
+            </div>
+            <button id="policy-close-btn" class="policy-close-btn" title="Close Policy Ledger">✕</button>
+          </div>
+          <div class="policy-body">
+            <!-- Edict 1: Night Fire Watch -->
+            <div class="policy-card" id="card-policy-night-watch">
+              <div class="policy-card-top">
+                <span class="policy-name" data-i18n="policy.night_watch_name">${isJa ? '夜警火の番 (夜番)' : 'Night Fire Watch (Yakin)'}</span>
+                <label class="policy-switch">
+                  <input type="checkbox" id="toggle-policy-night-watch" data-policy="night_watch">
+                  <span class="policy-slider"></span>
+                </label>
+              </div>
+              <div class="policy-desc" data-i18n="policy.night_watch_desc">
+                ${isJa ? '町民夜警が拍子木を鳴らし夜間巡回を行い、火の粉の早期発見・初期消火を徹底します。' : 'Vigilant citizen watchmen patrol wooden alleys with hyōshigi clappers throughout the night to detect embers early.'}
+              </div>
+              <div class="policy-effects">
+                <span class="policy-tag pos" data-i18n="policy.night_watch_eff1">${isJa ? '-40% 出火率低減' : '-40% Fire Outbreak Risk'}</span>
+                <span class="policy-tag neg" data-i18n="policy.night_watch_eff2">${isJa ? '-¥15/月 維持費' : '-¥15/mo Upkeep'}</span>
+                <span class="policy-tag neg" data-i18n="policy.night_watch_eff3">${isJa ? '-5% 夜間商業' : '-5% Night Commerce'}</span>
+              </div>
+              <div class="policy-hint" data-i18n="policy.night_watch_hint">${isJa ? '乾燥する冬期 (11月〜2月) や木造密集区での施行を推奨。' : 'Recommended during dry winter months (Nov–Feb) or in dense wooden quarters.'}</div>
+            </div>
+
+            <!-- Edict 2: Clean Water Mandate -->
+            <div class="policy-card" id="card-policy-clean-water">
+              <div class="policy-card-top">
+                <span class="policy-name" data-i18n="policy.clean_water_name">${isJa ? '清水平癒令 (清潔法)' : 'Clean Water Mandate (Seisui-rei)'}</span>
+                <label class="policy-switch">
+                  <input type="checkbox" id="toggle-policy-clean-water" data-policy="clean_water">
+                  <span class="policy-slider"></span>
+                </label>
+              </div>
+              <div class="policy-desc" data-i18n="policy.clean_water_desc">
+                ${isJa ? '共同井戸の煮沸消毒と水路衛生を義務づけ、疫病の蔓延を防止します。' : 'Enforces strict well boiling and communal aqua-sanitation regulations across all serviced residential blocks.'}
+              </div>
+              <div class="policy-effects">
+                <span class="policy-tag pos" data-i18n="policy.clean_water_eff1">${isJa ? '+10% 人口増加率' : '+10% Population Growth'}</span>
+                <span class="policy-tag neg" data-i18n="policy.clean_water_eff2">${isJa ? '-¥10/月 公衆衛生費' : '-¥10/mo Public Health Cost'}</span>
+              </div>
+              <div class="policy-hint" data-i18n="policy.clean_water_hint">${isJa ? '人口停滞時やコレラ発生時に有効。' : 'Recommended when population growth stagnates or disease outbreak occurs.'}</div>
+            </div>
+
+            <!-- Edict 3: Modernization Subsidy -->
+            <div class="policy-card" id="card-policy-modernization-subsidy">
+              <div class="policy-card-top">
+                <span class="policy-name" data-i18n="policy.modernization_name">${isJa ? '文明開化助成 (煉瓦・蔵造)' : 'Modernization Subsidy (Bunmei Kaika)'}</span>
+                <label class="policy-switch">
+                  <input type="checkbox" id="toggle-policy-modernization-subsidy" data-policy="modernization_subsidy">
+                  <span class="policy-slider"></span>
+                </label>
+              </div>
+              <div class="policy-desc" data-i18n="policy.modernization_desc">
+                ${isJa ? '木造長屋から耐火蔵造り・擬洋風煉瓦建築への改築に公費助成金を支給します。' : 'Municipal co-financing to accelerate the conversion of wooden machiya into fireproof Kura-zukuri and Giyōfū brick structures.'}
+              </div>
+              <div class="policy-effects">
+                <span class="policy-tag pos" data-i18n="policy.modernization_eff1">${isJa ? '+50% 耐火改築速度' : '+50% Renovation Speed'}</span>
+                <span class="policy-tag neg" data-i18n="policy.modernization_eff2">${isJa ? '-¥50 改築毎助成' : '-¥50 per Building Conversion'}</span>
+              </div>
+              <div class="policy-hint" data-i18n="policy.modernization_hint">${isJa ? '国庫が¥500以上あり近代化を急ぐ場合に推奨。' : 'Recommended only when treasury exceeds ¥500 and brickworks are available.'}</div>
+            </div>
+          </div>
+          <div class="policy-footer">
+            <span id="policy-active-count">${isJa ? '施行中勅令: 0件' : '0 Edicts Enacted'}</span>
+            <span id="policy-monthly-cost">${isJa ? '月間財政影響: -¥0/月' : '¥0/mo Fiscal Impact'}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Settlement Milestone Celebration Modal (Hidden by default) -->
+      <div id="milestone-modal-scrim" class="meiji-modal-scrim">
+        <div class="meiji-parchment-card">
+          <div class="milestone-seal">勅</div>
+          <div class="milestone-header">
+            <div class="milestone-subtitle" data-i18n="milestone.imperial_decree">${isJa ? '明治天皇勅令・勅諚' : 'Imperial Settlement Charter'}</div>
+            <div id="milestone-title" class="milestone-title">${isJa ? '開拓宿場町' : 'Bustling Post Town'}</div>
+          </div>
+          <div id="milestone-body" class="milestone-body">
+            ${isJa ? '町並みは賑わいを増し、多くの商人や民が集い栄えています！' : 'The settlement has flourished with industrious townsfolk and thriving commerce!'}
+          </div>
+          <div class="milestone-features">
+            <div class="milestone-features-title" data-i18n="milestone.unlocked_title">${isJa ? '解禁された都市機能' : 'Civic Capabilities Unlocked'}</div>
+            <ul id="milestone-features-list"></ul>
+          </div>
+          <div class="milestone-reward-banner">
+            <span class="reward-label" data-i18n="milestone.charter_grant">${isJa ? '勅旨開拓助成金:' : 'Treasury Charter Grant:'}</span>
+            <span id="milestone-reward-val" class="reward-amount">+¥1,000</span>
+          </div>
+          <div class="milestone-actions"><button id="btn-milestone-claim" class="btn-milestone-claim" data-i18n="milestone.accept">${isJa ? '勅許を受諾する' : 'Accept Imperial Charter'}</button></div>
+        </div>
+      </div>
+
+      <!-- Imperial Meiji Restoration Triumph Capstone Modal (Hidden by default) -->
+      <div id="triumph-modal-scrim" class="meiji-modal-scrim">
+        <div class="meiji-parchment-card triumph-modal-card" style="border: 2px solid #b8860b; max-width: 520px;">
+          <div class="milestone-seal" style="background: #b8860b;">栄</div>
+          <div class="milestone-header">
+            <div class="milestone-subtitle" style="color: #b8860b; font-weight: bold;">${isJa ? '明治維新・大業結実' : 'Imperial Meiji Restoration Triumph'}</div>
+            <div class="milestone-title" style="color: #8b0000; font-size: 1.4rem;">${isJa ? '内国勧業博覧会・偉業顕彰' : 'National Industrial Exposition'}</div>
+          </div>
+          <div class="milestone-body" style="font-size: 0.95rem; line-height: 1.6; margin: 12px 0;">
+            ${isJa ? '内国勧業博覧会館が堂々完成し、欧米列強の使節や全国の使者が集います。町長の偉業は永久に顕彰されます。' : 'The National Industrial Exhibition Pavilion stands triumphant! Delegations from across the empire and foreign envoys marvel at the flourishing manufactures, railways, telegraphs, and electrified modern avenues.'}
+          </div>
+          <div class="milestone-actions"><button id="btn-triumph-close" class="btn-milestone-claim" style="background: #8b0000; color: #fff;">${isJa ? '歴史に刻み都市を継続' : 'Inscribe in Municipal History'}</button></div>
+        </div>
+      </div>
+
+      <!-- Historical Chronicle & Municipal Ledger Modal (Hidden by default) -->
+      <div id="chronicle-ledger-modal" class="meiji-modal-scrim" style="display: none;">
+        <div class="meiji-parchment-card chronicle-modal-card" style="max-width: 540px; width: 90%; max-height: 85vh; overflow-y: auto;">
+          <button id="chronicle-close-btn" class="scope-close-btn" title="Close">✕</button>
+          <div class="milestone-seal">史</div>
+          <div class="milestone-header">
+            <div class="milestone-subtitle" data-i18n="chronicle.subtitle">${isJa ? '明治都市年代記・公文書' : 'Meiji Town Chronicle & Municipal Archives'}</div>
+            <div class="milestone-title" data-i18n="chronicle.title">${isJa ? '歴史統計原簿' : 'Historical Ledger'}</div>
+          </div>
+          <div class="chronicle-section" style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.82rem; background: rgba(0,0,0,0.04); padding: 8px; border-radius: 4px;">
+            <div><strong>${isJa ? '開拓草創:' : 'Founding:'}</strong> <span id="ledger-founding-date">Meiji 5 (1872)</span></div>
+            <div><strong>${isJa ? '現行時代:' : 'Current:'}</strong> <span id="ledger-current-date">Meiji 5 (1872)</span></div>
+            <div><strong>${isJa ? '累計税収:' : 'Total Taxes:'}</strong> <span id="ledger-stat-taxes" style="color: #3a6332; font-weight: bold;">¥0</span></div>
+            <div><strong>${isJa ? '消火実績:' : 'Fires Extinguished:'}</strong> <span id="ledger-stat-fires" style="color: #2c4765; font-weight: bold;">0</span></div>
+            <div style="grid-column: span 2;"><strong>${isJa ? '最高人口:' : 'Peak Population:'}</strong> <span id="ledger-stat-peak-pop" style="font-weight: bold;">0</span></div>
+          </div>
+          <div class="milestone-features" style="margin-top: 14px;">
+            <div class="milestone-features-title" data-i18n="chronicle.charters">${isJa ? '授与された勅定定書' : 'Imperial Charters Earned'}</div>
+            <ul id="ledger-charters-list" style="list-style: none; padding: 0; margin: 6px 0; display: flex; flex-direction: column; gap: 4px;"></ul>
+          </div>
+          <div class="milestone-features" style="margin-top: 14px;">
+            <div class="milestone-features-title" data-i18n="chronicle.events">${isJa ? '歴史的記録・大事件' : 'Historical Events & Milestones'}</div>
+            <ul id="ledger-events-list" style="list-style: none; padding: 0; margin: 6px 0; max-height: 160px; overflow-y: auto; font-size: 0.8rem; display: flex; flex-direction: column; gap: 4px;"></ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Reusable Washi Confirmation Modal -->
+      <div id="confirmation-modal" class="modal-overlay hidden" style="display: none;">
+        <div class="modal-card washi-card confirmation-card">
+          <div id="confirm-modal-icon" class="modal-seal" style="font-size: 2.2rem; margin-bottom: 8px;">⛩️</div>
+          <h3 id="confirm-modal-title" style="margin-top: 0;"></h3>
+          <p id="confirm-modal-message" class="confirm-modal-message" style="margin: 14px 0 12px; font-size: 0.92rem; line-height: 1.5; color: #3c2a1d; white-space: pre-line;"></p>
+          <div id="confirm-modal-input-container" style="display: none; margin-bottom: 18px;">
+            <input type="text" id="confirm-modal-input" maxlength="40" style="width: 85%; padding: 8px 12px; font-family: inherit; font-size: 1rem; border: 1.5px solid #8c7355; border-radius: 4px; background: #fffdf9; color: #2b1f14; text-align: center;" />
+          </div>
+          <div class="modal-actions" style="display: flex; gap: 12px; justify-content: center;"><button id="confirm-modal-cancel" class="btn-wood-cancel">${isJa ? '取消' : 'Cancel'}</button><button id="confirm-modal-ok" class="btn-wood-confirm">${isJa ? '確認' : 'Confirm'}</button></div>
+        </div>
+      </div>
     </div>
   `;
 }

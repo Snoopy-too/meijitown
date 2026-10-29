@@ -232,6 +232,7 @@
 
 /* --- Tier 2: Utility Toggles (Right) --- */
 .header-utility-group {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 4px;
@@ -502,8 +503,8 @@
 /* Washi Map Data Layers Popover Menu */
 .layer-menu-popover {
     position: absolute;
-    top: 54px;
-    right: 80px;
+    top: calc(100% + 6px);
+    right: 0;
     z-index: 1200;
     min-width: 210px;
     background: #fbf5e6;

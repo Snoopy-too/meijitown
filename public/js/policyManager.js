@@ -127,12 +127,14 @@ export class PolicyManager {
             }
         }
 
-        // [P] Hotkey to toggle policy ledger
+        // [P] Hotkey to toggle policy ledger, [Escape] to dismiss
         window.addEventListener('keydown', (e) => {
             if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
             if (e.key === 'p' || e.key === 'P') {
                 e.preventDefault();
                 this.toggle();
+            } else if (e.key === 'Escape' && this.isOpen) {
+                this.close();
             }
         });
     }

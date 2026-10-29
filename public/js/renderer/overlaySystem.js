@@ -78,18 +78,22 @@ export class OverlaySystem {
         if (this.dom.btnToggle && this.dom.popover) {
             this.dom.btnToggle.addEventListener('click', (e) => {
                 e.stopPropagation();
-                const isHidden = this.dom.popover.style.display === 'none';
+                const isHidden = this.dom.popover.style.display === 'none' || !this.dom.popover.style.display;
                 this.dom.popover.style.display = isHidden ? 'flex' : 'none';
                 this.dom.btnToggle.classList.toggle('active', isHidden);
             });
 
             // Close popover when clicking outside
-            window.addEventListener('click', (e) => {
-                if (this.dom.popover && !this.dom.popover.contains(e.target) && e.target !== this.dom.btnToggle) {
+            const closePopover = (e) => {
+                if (this.dom.popover && !this.dom.popover.contains(e.target) && !this.dom.btnToggle.contains(e.target)) {
                     this.dom.popover.style.display = 'none';
                     if (this.dom.btnToggle) this.dom.btnToggle.classList.toggle('active', this.currentMode !== 'none');
                 }
-            });
+            };
+            window.addEventListener('click', closePopover);
+            if (this.root && this.root !== document && typeof this.root.addEventListener === 'function') {
+                this.root.addEventListener('click', closePopover);
+            }
         }
 
         if (this.dom.optionBtns) {
