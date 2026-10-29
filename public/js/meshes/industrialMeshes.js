@@ -20,25 +20,32 @@ export class IndustrialMeshes {
         // 1. Cut-stone foundation plinth
         Kit.addStoneFoundation(sub, 1.54, 1.54, 0.12);
 
-        // 2. Open timber-framed work shed (left wing)
-        Kit.addPart(sub, new THREE.BoxGeometry(0.88, 0.72, 1.25), woodMat, [-0.26, 0.48, 0], true, null, true);
-        Kit.addCornerPillars(sub, 0.90, 1.27, 0.72, 0.48, 0, 0.08);
+        // 2. Timber-framed work shed (left wing) with recessed back wall & open front artisan bay
+        const wallMat = MaterialLibrary.get('woodWall') || woodMat;
+        Kit.addPart(sub, new THREE.BoxGeometry(0.86, 0.72, 0.74), MaterialLibrary.get('plasterWarm'), [-0.26, 0.48, -0.24], true, null, true);
+        Kit.addPart(sub, new THREE.BoxGeometry(0.88, 0.36, 0.76), wallMat, [-0.26, 0.30, -0.24], true);
+        Kit.addCornerPillars(sub, 0.88, 1.24, 0.72, 0.48, 0, 0.08);
+        // Glowing workshop shoji window & hanging lantern inside open bay
+        Kit.addKoushiLattice(sub, 0.48, 0.36, [-0.26, 0.56, 0.15]);
+        Kit.addChochinLantern(sub, [0.16, 0.68, 0.58], true);
 
-        // Open bay workbench & pottery wheels
-        Kit.addPart(sub, new THREE.BoxGeometry(0.70, 0.28, 0.35), lightWood, [-0.26, 0.26, 0.38], true);
-        Kit.addPart(sub, new THREE.CylinderGeometry(0.12, 0.12, 0.08, 8), lightWood, [-0.42, 0.44, 0.38]);
-        Kit.addPart(sub, new THREE.CylinderGeometry(0.08, 0.10, 0.14, 8), MaterialLibrary.get('plasterWarm'), [-0.15, 0.47, 0.38]); // Ceramic pot
+        // Open bay workbench & pottery wheels (visible in front bay z = 0.25..0.56)
+        Kit.addPart(sub, new THREE.BoxGeometry(0.72, 0.26, 0.32), lightWood, [-0.26, 0.25, 0.40], true);
+        Kit.addPart(sub, new THREE.CylinderGeometry(0.12, 0.12, 0.08, 10), lightWood, [-0.44, 0.42, 0.40]);
+        Kit.addPart(sub, new THREE.CylinderGeometry(0.08, 0.10, 0.15, 10), MaterialLibrary.get('plasterWarm'), [-0.14, 0.45, 0.40]);
 
         // Workshop shed gabled roof (offset over left wing shed at x = -0.26)
         Kit.addGabledRoof(sub, 1.08, 1.45, 0.38, 0.84, 0, null, -0.26);
 
-        // 3. Stepped climbing kiln (Noborigama / 登り窯) in right yard
-        // Chamber 1 (lower firebox)
-        Kit.addPart(sub, new THREE.BoxGeometry(0.44, 0.38, 0.42), brickMat, [0.46, 0.31, 0.32], true);
-        // Chamber 2 (middle firing chamber)
-        Kit.addPart(sub, new THREE.BoxGeometry(0.44, 0.44, 0.42), brickMat, [0.46, 0.34, -0.08], true);
-        // Chamber 3 (upper firing chamber)
-        Kit.addPart(sub, new THREE.BoxGeometry(0.44, 0.50, 0.42), brickMat, [0.46, 0.37, -0.46], true);
+        // 3. Stepped vaulted climbing kiln (Noborigama / 登り窯) in right yard
+        for (const [ky, kz, kh] of [[0.29, 0.32, 0.34], [0.33, -0.06, 0.42], [0.37, -0.44, 0.48]]) {
+            Kit.addPart(sub, new THREE.BoxGeometry(0.44, kh, 0.38), brickMat, [0.46, ky, kz], true);
+            const vault = new THREE.CylinderGeometry(0.22, 0.22, 0.38, 10, 1, false, 0, Math.PI);
+            vault.rotateX(Math.PI / 2);
+            Kit.addPart(sub, vault, brickMat, [0.46, ky + kh * 0.5, kz], true);
+        }
+        // Glowing kiln firebox mouth at front of Chamber 1
+        Kit.addPart(sub, new THREE.BoxGeometry(0.18, 0.18, 0.04), MaterialLibrary.get('hearthFire'), [0.46, 0.22, 0.51], false, null, false, 'Lantern_Glow');
 
         // Tapered brick smokestack with banded iron collar
         Kit.addPart(sub, new THREE.CylinderGeometry(0.09, 0.13, 1.35, 8), brickMat, [0.46, 1.04, -0.52], true);

@@ -124,14 +124,20 @@ export class WorldRenderer {
         const totalSizeZ = CONFIG.GRID_HEIGHT * CONFIG.TILE_SIZE;
         this.groundMesh = new THREE.Mesh(
             new THREE.BoxGeometry(totalSizeX, 1.0, totalSizeZ),
-            new THREE.MeshStandardMaterial({ color: CONFIG.COLORS.GROUND, roughness: 0.92 })
+            MaterialLibrary.get('meadowGround').clone()
         );
         this.groundMesh.position.set(totalSizeX / 2, -0.5, totalSizeZ / 2);
         this.groundMesh.receiveShadow = true;
         this.scene.add(this.groundMesh);
 
-        const gridHelper = new THREE.GridHelper(totalSizeX, CONFIG.GRID_WIDTH, 0x3d5c31, 0x4a6b3c);
-        gridHelper.position.set(totalSizeX / 2, 0.01, totalSizeZ / 2);
+        const gridHelper = new THREE.GridHelper(totalSizeX, CONFIG.GRID_WIDTH, 0x3b4d30, 0x455939);
+        gridHelper.position.set(totalSizeX / 2, 0.012, totalSizeZ / 2);
+        if (gridHelper.material) {
+            gridHelper.material.transparent = true;
+            gridHelper.material.opacity = 0.14;
+            gridHelper.material.depthWrite = false;
+        }
+        this.gridHelper = gridHelper;
         this.scene.add(gridHelper);
     }
 
@@ -150,7 +156,10 @@ export class WorldRenderer {
         if (this.overlay) this.overlay.state = state;
     }
 
-    setBuildMode(isBuilding) { this.cameraManager.setBuildMode(isBuilding); }
+    setBuildMode(isBuilding) {
+        this.cameraManager.setBuildMode(isBuilding);
+        if (this.gridHelper?.material) this.gridHelper.material.opacity = isBuilding ? 0.36 : 0.14;
+    }
     rotateCameraBy(angleDelta, durationMs = 200) { this.cameraManager.rotateCameraBy(angleDelta, durationMs); }
 
     updateSeason(month) {
@@ -165,6 +174,10 @@ export class WorldRenderer {
         if (this.seasonalFoliageMaterial) this.seasonalFoliageMaterial.color.setHex(color);
         if (this.instancing) this.instancing.setSeasonalMaterial(this.seasonalFoliageMaterial);
         if (this.backdrop) this.backdrop.updateSeason(month);
+        if (this.groundMesh?.material) {
+            const gCol = (month >= 3 && month <= 5) ? 0xddebd4 : (month >= 6 && month <= 8) ? 0xffffff : (month >= 9 && month <= 11) ? 0xdec49b : 0xd2d6cf;
+            this.groundMesh.material.color.setHex(gCol);
+        }
         for (const [_, tile] of this.grid.tiles.entries()) {
             if (tile.type === CONFIG.TYPES.AGRICULTURE) this.updateTileMesh(tile.x, tile.y, tile);
         }
@@ -226,15 +239,20 @@ export class WorldRenderer {
         } else if (tile.stage === CONFIG.STAGES.BUILT) {
             group.add(ProceduralMeshes.createZoneBuildingMesh(tile, facingAngle));
         } else if (tile.stage === CONFIG.STAGES.ON_FIRE) {
-            const ch = new THREE.Mesh(new THREE.BoxGeometry(s * 0.8, 0.35, s * 0.8), new THREE.MeshLambertMaterial({ color: 0x241e1a }));
-            ch.position.y = 0.18;
-            group.add(ch);
+            group.add(ProceduralMeshes.createZoneBuildingMesh(tile, facingAngle));
             this.fx.attachFire(key, pos.x, pos.z);
         } else if (tile.stage === CONFIG.STAGES.BURNED) {
             this.fx.detachFire(key);
-            const rn = new THREE.Mesh(new THREE.BoxGeometry(s * 0.75, 0.16, s * 0.75), new THREE.MeshLambertMaterial({ color: 0x1c1917 }));
-            rn.position.y = 0.08;
+            const charMat = MaterialLibrary.get('plasterBlack');
+            const rn = new THREE.Mesh(new THREE.BoxGeometry(s * 0.78, 0.14, s * 0.78), MaterialLibrary.get('stoneGranite'));
+            rn.position.y = 0.07;
             group.add(rn);
+            for (const [bx, by, bz, rz] of [[-0.25, 0.20, 0.12, 0.25], [0.22, 0.18, -0.15, -0.32], [0, 0.22, 0, 0.15]]) {
+                const beam = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.07, 0.09), charMat);
+                beam.position.set(bx, by, bz);
+                beam.rotation.set(0.1, bx, rz);
+                group.add(beam);
+            }
         }
 
         if (tile.threatTimer && tile.threatTimer > 0 && tile.stage !== CONFIG.STAGES.ON_FIRE && tile.stage !== CONFIG.STAGES.BURNED) {

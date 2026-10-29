@@ -83,39 +83,40 @@ export class TrafficManager {
         // 5. Articulated Hikeshi Firefighter leading cart
         const runnerGroup = new THREE.Group();
         runnerGroup.position.set(0, 0, -0.44);
+        const runnerBodyMat = new THREE.MeshStandardMaterial({ color: 0x1c2b38, roughness: 0.85 });
+        const skinMat = new THREE.MeshStandardMaterial({ color: 0xe5c29f, roughness: 0.75 });
+        const hairMat = new THREE.MeshStandardMaterial({ color: 0x181615, roughness: 0.8 });
 
-        // Indigo Hanten Coat Torso
-        const runnerBodyMat = new THREE.MeshLambertMaterial({ color: 0x1c2b38 });
-        const runnerBody = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.24, 0.12), runnerBodyMat);
+        const runnerBody = new THREE.Mesh(new THREE.CylinderGeometry(0.048, 0.062, 0.24, 8), runnerBodyMat);
         runnerBody.position.y = 0.24;
         runnerGroup.add(runnerBody);
 
-        const skinMat = new THREE.MeshLambertMaterial({ color: 0xf2cbb0 });
-        const head = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 6), skinMat);
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.046, 10, 10), skinMat);
         head.position.y = 0.41;
         runnerGroup.add(head);
+        const hairCap = new THREE.Mesh(new THREE.SphereGeometry(0.049, 10, 8), hairMat);
+        hairCap.position.set(0, 0.425, -0.008);
+        runnerGroup.add(hairCap);
 
         // White brigade headband (Hachimaki)
-        const hachi = new THREE.Mesh(new THREE.CylinderGeometry(0.062, 0.062, 0.02, 6), new THREE.MeshLambertMaterial({ color: 0xffffff }));
+        const hachi = new THREE.Mesh(new THREE.CylinderGeometry(0.050, 0.050, 0.018, 10), new THREE.MeshLambertMaterial({ color: 0xf5f5f0 }));
         hachi.position.y = 0.42;
         runnerGroup.add(hachi);
 
         // Articulated legs
-        const legMat = new THREE.MeshLambertMaterial({ color: 0x1c2b38 });
-        const legL = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.14, 0.06), legMat);
-        legL.position.set(-0.04, 0.07, 0);
+        const legL = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.020, 0.14, 6), runnerBodyMat);
+        legL.position.set(-0.032, 0.07, 0);
         runnerGroup.add(legL);
-        const legR = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.14, 0.06), legMat);
-        legR.position.set(0.04, 0.07, 0);
+        const legR = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.020, 0.14, 6), runnerBodyMat);
+        legR.position.set(0.032, 0.07, 0);
         runnerGroup.add(legR);
 
         // Matoi Standard Pole & Gilded Crest
-        const matoiPole = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.65, 5), bedMat);
-        matoiPole.position.set(0.10, 0.42, -0.05);
+        const matoiPole = new THREE.Mesh(new THREE.CylinderGeometry(0.010, 0.010, 0.62, 5), bedMat);
+        matoiPole.position.set(0.09, 0.40, -0.04);
         runnerGroup.add(matoiPole);
-
-        const matoiHead = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.12, 6), new THREE.MeshLambertMaterial({ color: 0xc89d32 }));
-        matoiHead.position.set(0.10, 0.76, -0.05);
+        const matoiHead = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.11, 6), new THREE.MeshLambertMaterial({ color: 0xd4af37 }));
+        matoiHead.position.set(0.09, 0.72, -0.04);
         runnerGroup.add(matoiHead);
 
         runnerGroup.userData = { legL, legR };
@@ -189,17 +190,22 @@ export class TrafficManager {
         hood.position.set(0, 0.40, -0.16);
         group.add(hood);
 
-        // Seated Passenger in Kimono
-        const passBody = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.20, 0.16), new THREE.MeshLambertMaterial({ color: 0x2d5a3d }));
+        // Seated Passenger in Kimono with Hair Crown
+        const skinMat = new THREE.MeshStandardMaterial({ color: 0xe5c29f, roughness: 0.75 });
+        const hairMat = new THREE.MeshStandardMaterial({ color: 0x181615, roughness: 0.8 });
+        const passBody = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.068, 0.22, 8), new THREE.MeshStandardMaterial({ color: 0x2d5a3d, roughness: 0.82 }));
         passBody.position.set(0, 0.38, -0.06);
         group.add(passBody);
-        const passHead = new THREE.Mesh(new THREE.SphereGeometry(0.055, 6, 6), new THREE.MeshLambertMaterial({ color: 0xf2cbb0 }));
+        const passHead = new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 10), skinMat);
         passHead.position.set(0, 0.52, -0.06);
         group.add(passHead);
+        const passHair = new THREE.Mesh(new THREE.SphereGeometry(0.048, 10, 8), hairMat);
+        passHair.position.set(0, 0.535, -0.07);
+        group.add(passHair);
 
         // 3. Wooden shafts
         const shaftMat = new THREE.MeshLambertMaterial({ color: 0x5a4632 });
-        const shaftGeo = new THREE.BoxGeometry(0.025, 0.025, 0.56);
+        const shaftGeo = new THREE.BoxGeometry(0.022, 0.022, 0.56);
         const shaftL = new THREE.Mesh(shaftGeo, shaftMat);
         shaftL.position.set(-0.12, 0.20, 0.24);
         group.add(shaftL);
@@ -210,29 +216,29 @@ export class TrafficManager {
         // 4. Articulated Rickshaw Runner (Shafu 車夫)
         const runnerGroup = new THREE.Group();
         runnerGroup.position.set(0, 0, 0.38);
+        const runnerMat = new THREE.MeshStandardMaterial({ color: 0x1e3a5f, roughness: 0.85 });
 
-        const runnerBody = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.26, 0.13), new THREE.MeshLambertMaterial({ color: 0x1e3a5f }));
+        const runnerBody = new THREE.Mesh(new THREE.CylinderGeometry(0.050, 0.065, 0.26, 8), runnerMat);
         runnerBody.position.y = 0.28;
         runnerBody.castShadow = true;
         runnerGroup.add(runnerBody);
 
-        const head = new THREE.Mesh(new THREE.SphereGeometry(0.065, 6, 6), new THREE.MeshLambertMaterial({ color: 0xf2cbb0 }));
-        head.position.y = 0.48;
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.046, 10, 10), skinMat);
+        head.position.y = 0.46;
         runnerGroup.add(head);
 
         // Conical Straw Hat (Sugegasa 菅笠)
-        const hat = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.08, 8), new THREE.MeshLambertMaterial({ color: 0xd9b36c }));
-        hat.position.y = 0.56;
+        const hat = new THREE.Mesh(new THREE.ConeGeometry(0.17, 0.075, 12), new THREE.MeshStandardMaterial({ color: 0xd9b36c, roughness: 0.85 }));
+        hat.position.y = 0.51;
         hat.castShadow = true;
         runnerGroup.add(hat);
 
         // Articulated runner legs
-        const legMat = new THREE.MeshLambertMaterial({ color: 0x1e3a5f });
-        const legL = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.16, 0.06), legMat);
-        legL.position.set(-0.05, 0.08, 0);
+        const legL = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.020, 0.16, 6), runnerMat);
+        legL.position.set(-0.035, 0.08, 0);
         runnerGroup.add(legL);
-        const legR = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.16, 0.06), legMat);
-        legR.position.set(0.05, 0.08, 0);
+        const legR = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.020, 0.16, 6), runnerMat);
+        legR.position.set(0.035, 0.08, 0);
         runnerGroup.add(legR);
 
         runnerGroup.userData = { legL, legR };
@@ -241,98 +247,102 @@ export class TrafficManager {
         return group;
     }
 
-    // Procedural Articulated Meiji Walking Citizen (町人 / Chōnin)
+    // Procedural Articulated Meiji Walking Citizen (町人 / Chōnin — Tapered Kimono & Full Hair/Headgear)
     createPedestrianMesh() {
         const group = new THREE.Group();
-
-        const kimonoColors = [0x2c3e50, 0x822419, 0x2d5a3d, 0x5a4269, 0x6e5238, 0x1f4e5b];
+        const kimonoColors = [0x243b55, 0x7a261c, 0x2b543a, 0x4e385c, 0x5c432c, 0x1f4754];
+        const obiColors = [0xc89d32, 0x8c2d19, 0x1c252c, 0xd8d0c2];
         const color = kimonoColors[Math.floor(Math.random() * kimonoColors.length)];
-        const kimonoMat = new THREE.MeshLambertMaterial({ color });
-        const skinMat = new THREE.MeshLambertMaterial({ color: 0xf2cbb0 });
+        const obiColor = obiColors[Math.floor(Math.random() * obiColors.length)];
 
-        // 1. Kimono Torso
-        const torso = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.22, 0.12), kimonoMat);
-        torso.position.y = 0.32;
+        const kimonoMat = new THREE.MeshStandardMaterial({ color, roughness: 0.82 });
+        const obiMat = new THREE.MeshStandardMaterial({ color: obiColor, roughness: 0.70 });
+        const skinMat = new THREE.MeshStandardMaterial({ color: 0xe5c29f, roughness: 0.75 });
+        const hairMat = new THREE.MeshStandardMaterial({ color: 0x181615, roughness: 0.80 });
+
+        // 1. Draped Tapered Kimono Upper Torso & Lower Skirt (NO boxy blocks!)
+        const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.044, 0.064, 0.24, 8), kimonoMat);
+        torso.position.y = 0.31;
         torso.castShadow = true;
         group.add(torso);
 
-        // Obi Sash
-        const obi = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.05, 0.13), new THREE.MeshLambertMaterial({ color: 0x1a1a1a }));
+        // Contrasting Silk Obi Sash & Back Musubi Knot
+        const obi = new THREE.Mesh(new THREE.CylinderGeometry(0.058, 0.061, 0.055, 8), obiMat);
         obi.position.y = 0.26;
         group.add(obi);
 
-        // 2. Head & Neck
-        const head = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 6), skinMat);
-        head.position.y = 0.48;
+        // 2. Smooth Proportioned Neck, Head & Full Dark Hair Crown (NO bald pink spheres!)
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 10), skinMat);
+        head.position.y = 0.475;
         group.add(head);
 
-        // Meiji Hair / Headgear variation (Topknot Chonmage vs Bowler Hat vs Sugegasa)
+        const hairCrown = new THREE.Mesh(new THREE.SphereGeometry(0.048, 10, 8), hairMat);
+        hairCrown.position.set(0, 0.49, -0.008);
+        group.add(hairCrown);
+
+        // Meiji Hair / Headgear variation (Shimada/Chonmage Chignon vs Meiji Bowler vs Woven Sugegasa)
         const hatStyle = Math.floor(Math.random() * 3);
         if (hatStyle === 0) {
-            // Traditional Chonmage Topknot
-            const hair = new THREE.Mesh(new THREE.SphereGeometry(0.035, 5, 5), new THREE.MeshLambertMaterial({ color: 0x111111 }));
-            hair.position.set(0, 0.54, -0.02);
-            group.add(hair);
+            const chignon = new THREE.Mesh(new THREE.SphereGeometry(0.032, 8, 8), hairMat);
+            chignon.scale.set(0.85, 0.75, 1.35);
+            chignon.position.set(0, 0.525, -0.025);
+            group.add(chignon);
         } else if (hatStyle === 1) {
-            // Meiji Western Bowler Hat (Bankara style)
-            const hatBrim = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.10, 0.015, 8), new THREE.MeshLambertMaterial({ color: 0x1a1a1a }));
-            hatBrim.position.y = 0.53;
+            const hatBrim = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, 0.012, 10), hairMat);
+            hatBrim.position.y = 0.515;
             group.add(hatBrim);
-            const hatCrown = new THREE.Mesh(new THREE.CylinderGeometry(0.065, 0.065, 0.06, 8), new THREE.MeshLambertMaterial({ color: 0x1a1a1a }));
-            hatCrown.position.y = 0.56;
+            const hatCrown = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.055, 0.055, 10), hairMat);
+            hatCrown.position.y = 0.545;
             group.add(hatCrown);
         } else {
-            // Conical Straw Hat (Sugegasa)
-            const sugegasa = new THREE.Mesh(new THREE.ConeGeometry(0.15, 0.06, 8), new THREE.MeshLambertMaterial({ color: 0xd4b068 }));
-            sugegasa.position.y = 0.55;
+            const sugegasa = new THREE.Mesh(new THREE.ConeGeometry(0.145, 0.06, 12), new THREE.MeshStandardMaterial({ color: 0xd4b068, roughness: 0.85 }));
+            sugegasa.position.y = 0.525;
+            sugegasa.castShadow = true;
             group.add(sugegasa);
         }
 
-        // 3. Articulated Sleeves & Arms
-        const armGeo = new THREE.BoxGeometry(0.045, 0.18, 0.055);
+        // 3. Draped Kimono Sleeves (Tamoto)
+        const armGeo = new THREE.BoxGeometry(0.035, 0.16, 0.065);
         const armL = new THREE.Mesh(armGeo, kimonoMat);
-        armL.position.set(-0.11, 0.30, 0);
+        armL.position.set(-0.068, 0.30, 0);
         group.add(armL);
         const armR = new THREE.Mesh(armGeo, kimonoMat);
-        armR.position.set(0.11, 0.30, 0);
+        armR.position.set(0.068, 0.30, 0);
         group.add(armR);
 
-        // 4. Articulated Lower Kimono Legs & Geta Sandals
-        const legGeo = new THREE.BoxGeometry(0.05, 0.16, 0.07);
+        // 4. Articulated Lower Legs & Wooden Geta Sandals
+        const legGeo = new THREE.CylinderGeometry(0.024, 0.020, 0.16, 6);
         const legL = new THREE.Mesh(legGeo, kimonoMat);
-        legL.position.set(-0.045, 0.09, 0);
+        legL.position.set(-0.028, 0.09, 0);
         group.add(legL);
         const legR = new THREE.Mesh(legGeo, kimonoMat);
-        legR.position.set(0.045, 0.09, 0);
+        legR.position.set(0.028, 0.09, 0);
         group.add(legR);
 
-        // Wooden Geta Sandals
-        const getaMat = new THREE.MeshLambertMaterial({ color: 0x4a321e });
-        const getaGeo = new THREE.BoxGeometry(0.045, 0.02, 0.08);
+        const getaMat = new THREE.MeshStandardMaterial({ color: 0x4a321e, roughness: 0.85 });
+        const getaGeo = new THREE.BoxGeometry(0.036, 0.018, 0.068);
         const getaL = new THREE.Mesh(getaGeo, getaMat);
-        getaL.position.set(-0.045, 0.01, 0.01);
+        getaL.position.set(-0.028, 0.01, 0.01);
         group.add(getaL);
         const getaR = new THREE.Mesh(getaGeo, getaMat);
-        getaR.position.set(0.045, 0.01, 0.01);
+        getaR.position.set(0.028, 0.01, 0.01);
         group.add(getaR);
 
         // 5. Traditional Japanese Oil-Paper Umbrella (Janome-gasa)
-        if (Math.random() < 0.55) {
+        if (Math.random() < 0.50) {
             const umbrellaGroup = new THREE.Group();
-            umbrellaGroup.position.set(0.12, 0.32, 0.05);
-
-            const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.45, 4), new THREE.MeshLambertMaterial({ color: 0x8a7042 }));
-            shaft.position.y = 0.22;
+            umbrellaGroup.position.set(0.085, 0.32, 0.04);
+            const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.42, 4), new THREE.MeshLambertMaterial({ color: 0x8a7042 }));
+            shaft.position.y = 0.21;
             umbrellaGroup.add(shaft);
 
-            const uColors = [0xb33927, 0x243b55, 0xd4a017, 0x556b2f];
+            const uColors = [0xa83222, 0x243b55, 0xc8961e, 0x3b5932];
             const uColor = uColors[Math.floor(Math.random() * uColors.length)];
-            const canopy = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.10, 8), new THREE.MeshLambertMaterial({ color: uColor }));
-            canopy.position.y = 0.44;
-            canopy.rotation.x = 0.15;
+            const canopy = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.085, 12), new THREE.MeshStandardMaterial({ color: uColor, roughness: 0.75 }));
+            canopy.position.y = 0.41;
+            canopy.rotation.x = 0.14;
             canopy.castShadow = true;
             umbrellaGroup.add(canopy);
-
             group.add(umbrellaGroup);
         }
 

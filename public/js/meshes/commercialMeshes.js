@@ -21,29 +21,34 @@ export class CommercialMeshes {
         // 1. Granite plinth foundation
         Kit.addStoneFoundation(sub, 1.54, 1.48, 0.12);
 
-        // 2. Enclosed rear & side storehouse walls
+        // 2. Enclosed rear & side storehouse walls with cedar wainscoting & recessed warm shopfront
+        const wallWood = MaterialLibrary.get('woodWall') || woodMat;
         Kit.addPart(sub, new THREE.BoxGeometry(1.36, 0.84, 1.05), plasterMat, [0, 0.54, -0.16], true, null, true);
+        Kit.addPart(sub, new THREE.BoxGeometry(1.38, 0.42, 1.07), wallWood, [0, 0.33, -0.16], true);
         Kit.addCornerPillars(sub, 1.38, 1.07, 0.84, 0.54, -0.16);
+        Kit.addKoushiLattice(sub, 0.96, 0.52, [0, 0.58, 0.38]);
 
         // 3. Open street-front shop stall
         // Raised wooden merchandise counter & display risers
-        Kit.addPart(sub, new THREE.BoxGeometry(1.10, 0.32, 0.40), lightWood, [0, 0.28, 0.42], true);
-        Kit.addPart(sub, new THREE.BoxGeometry(1.02, 0.12, 0.22), lightWood, [0, 0.44, 0.34], true);
+        Kit.addPart(sub, new THREE.BoxGeometry(1.10, 0.32, 0.40), lightWood, [0, 0.28, 0.44], true);
+        Kit.addPart(sub, new THREE.BoxGeometry(1.02, 0.12, 0.22), lightWood, [0, 0.44, 0.38], true);
 
         // Merchant goods: Ceramic sake casks, woven bamboo produce baskets
-        Kit.addPart(sub, new THREE.CylinderGeometry(0.08, 0.09, 0.18, 8), MaterialLibrary.get('stoneTrim'), [-0.36, 0.53, 0.34], true);
-        Kit.addPart(sub, new THREE.CylinderGeometry(0.08, 0.09, 0.18, 8), MaterialLibrary.get('stoneTrim'), [-0.18, 0.53, 0.34], true);
-        Kit.addPart(sub, new THREE.BoxGeometry(0.24, 0.10, 0.16), bambooMat, [0.18, 0.49, 0.34], true);
-        Kit.addPart(sub, new THREE.BoxGeometry(0.22, 0.08, 0.16), MaterialLibrary.get('hempMat'), [0.38, 0.36, 0.44], true);
+        Kit.addPart(sub, new THREE.CylinderGeometry(0.08, 0.09, 0.18, 8), MaterialLibrary.get('stoneTrim'), [-0.36, 0.53, 0.38], true);
+        Kit.addPart(sub, new THREE.CylinderGeometry(0.08, 0.09, 0.18, 8), MaterialLibrary.get('stoneTrim'), [-0.18, 0.53, 0.38], true);
+        Kit.addPart(sub, new THREE.BoxGeometry(0.24, 0.10, 0.16), bambooMat, [0.18, 0.49, 0.38], true);
+        Kit.addPart(sub, new THREE.BoxGeometry(0.22, 0.08, 0.16), MaterialLibrary.get('hempMat'), [0.38, 0.36, 0.46], true);
 
         // Front timber support pillars
         Kit.addPart(sub, new THREE.BoxGeometry(0.08, 0.88, 0.08), woodMat, [-0.60, 0.56, 0.58], true);
         Kit.addPart(sub, new THREE.BoxGeometry(0.08, 0.88, 0.08), woodMat, [0.60, 0.56, 0.58], true);
 
-        // Split indigo Noren shop curtains hanging from a bamboo pole
+        // Split indigo Noren shop curtains hanging from a bamboo pole with white kamon crests
         Kit.addPart(sub, new THREE.CylinderGeometry(0.015, 0.015, 1.24, 4), bambooMat, [0, 0.88, 0.58]);
-        Kit.addPart(sub, new THREE.BoxGeometry(0.52, 0.28, 0.02), norenMat, [-0.28, 0.74, 0.58], true);
-        Kit.addPart(sub, new THREE.BoxGeometry(0.52, 0.28, 0.02), norenMat, [0.28, 0.74, 0.58], true);
+        for (const nx of [-0.28, 0.28]) {
+            Kit.addPart(sub, new THREE.BoxGeometry(0.50, 0.28, 0.02), norenMat, [nx, 0.74, 0.58], true);
+            Kit.addPart(sub, new THREE.CylinderGeometry(0.07, 0.07, 0.026, 10), MaterialLibrary.get('plasterWhite'), [nx, 0.74, 0.58], false, [Math.PI / 2, 0, 0]);
+        }
 
         // Hanging wooden signboard (Kanban)
         Kit.addPart(sub, new THREE.BoxGeometry(0.18, 0.36, 0.03), lightWood, [-0.62, 0.72, 0.38], true);
@@ -76,8 +81,11 @@ export class CommercialMeshes {
         Kit.addStoneFoundation(sub, 1.64, 1.64, 0.14);
 
         // 2. Ground floor: Spacious merchant shopfront & accounting chōba
+        const wallWood = MaterialLibrary.get('woodWall') || woodMat;
         Kit.addPart(sub, new THREE.BoxGeometry(1.42, 0.92, 1.28), plasterMat, [0, 0.60, -0.10], true, null, true);
+        Kit.addPart(sub, new THREE.BoxGeometry(1.44, 0.46, 1.30), wallWood, [0, 0.37, -0.10], true);
         Kit.addCornerPillars(sub, 1.44, 1.30, 0.92, 0.60, -0.10);
+        Kit.addKoushiLattice(sub, 1.06, 0.56, [0, 0.58, 0.56]);
 
         // Raised tatami accounting platform (chōba)
         Kit.addPart(sub, new THREE.BoxGeometry(1.18, 0.16, 0.44), hempMat, [0, 0.22, 0.44], true);
