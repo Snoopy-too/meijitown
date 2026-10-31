@@ -419,6 +419,23 @@ function mountMeijiClient(container, config) {
   function applySyncState(state) {
     if (!state || !window.game || !state.G) return;
     const G = state.G;
+
+    // Check if the server match actually has tiles populated
+    const hasGridData = G.gridSnapshot && (
+      Array.isArray(G.gridSnapshot) ? G.gridSnapshot.length > 0 : Object.keys(G.gridSnapshot).length > 0
+    );
+
+    // If this is a fresh/unpopulated server match and the player has a local save,
+    // restore their local save rather than wiping them with empty defaults!
+    if (!hasGridData && window.game.saveManager && window.game.saveManager.hasLocalSave() && !window.game.isLoggedIn()) {
+      console.log('[Meiji] Unpopulated lounge match: restoring local save from player device.');
+      window.game.saveManager.loadLocalCity(true);
+      if (typeof window.game.saveMatch === 'function') {
+        window.game.saveMatch(true);
+      }
+      return;
+    }
+
     if (G.vitals && G.vitals.treasury !== undefined) {
       window.game.treasury = G.vitals.treasury;
     }
@@ -473,6 +490,12 @@ function mountMeijiClient(container, config) {
           if (now - lastSaveTime < 800) return;
           lastSaveTime = now;
 
+          // 1. ALWAYS persist locally on the player's device for guest / unauthenticated players
+          if (window.game && window.game.saveManager && !window.game.isLoggedIn()) {
+            window.game.saveManager.saveLocalCity(isAuto);
+          }
+
+          // 2. Also emit live move to boardgame.io socket for match synchrony if connected
           if (socket && socket.connected && window.game) {
             const snapshot = {
               vitals: {
@@ -489,12 +512,6 @@ function mountMeijiClient(container, config) {
             };
 
             socket.emit('makeMove', 'syncCityState', [snapshot], matchID, String(playerID), credentials);
-            if (window.game.showToast) {
-              window.game.showToast(isAuto ? '💾 Auto-saved settlement to database.' : '💾 Settlement saved to database!');
-            }
-          } else if (window.game && window.game.saveManager) {
-            // Local fallback for guest / unauthenticated players
-            window.game.saveManager.saveLocalCity(isAuto);
           }
         };
 

@@ -94,7 +94,7 @@ class GameStateManager {
         i18n.updateDOM(this.root);
 
         // Periodic local auto-save and tab exit persistence for guests
-        if (typeof window !== 'undefined' && !this.isLoungeMode) {
+        if (typeof window !== 'undefined') {
             this.autoSaveInterval = setInterval(() => {
                 if (!this.isLoggedIn() && this.saveManager) {
                     this.saveManager.saveLocalCity(true);
@@ -213,7 +213,14 @@ class GameStateManager {
 
     async loadCityFromApi() {
         if (this.isLoungeMode) {
-            console.log('[Meiji] Lounge mode active: match state synchronized via boardgame.io socket.');
+            console.log('[Meiji] Lounge mode active: checking local persistence.');
+            if (!this.isLoggedIn() && this.saveManager && this.saveManager.hasLocalSave()) {
+                try {
+                    this.saveManager.loadLocalCity(true);
+                } catch (e) {
+                    console.warn('[Meiji] Failed to restore local save in lounge mode:', e);
+                }
+            }
             this.updateHUD();
             return;
         }
