@@ -42,9 +42,9 @@ export const TRANSLATIONS = {
 
         // Action Toolbar
         'action.save': 'Save',
-        'action.save_title': 'Commit current settlement state to MySQL database',
+        'action.save_title': 'Save settlement state to your device (or database when signed in)',
         'action.reload': 'Reload',
-        'action.reload_title': 'Reload state from MySQL database',
+        'action.reload_title': 'Reload saved settlement state from this device',
         'action.new': 'New',
         'action.new_title': 'Start a completely new settlement (Meiji 1872)',
         'confirm.reset_city_title': 'Start a New Settlement?',
@@ -220,9 +220,9 @@ export const TRANSLATIONS = {
 
         // Action Toolbar
         'action.save': '保存',
-        'action.save_title': '現在の街の状態を保存する',
+        'action.save_title': '街の状態をお使いの端末に保存します（ログイン時はデータベース）',
         'action.reload': '再読込',
-        'action.reload_title': '保存された街の状態を読み直す',
+        'action.reload_title': 'お使いの端末から保存された街を読み直します',
         'action.new': '新規開始',
         'action.new_title': '明治五年の新たな集落造りを開始する',
         'confirm.reset_city_title': '新たな集落を開拓しますか？',

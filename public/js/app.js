@@ -92,9 +92,29 @@ class GameStateManager {
 
         this.initButtons();
         i18n.updateDOM(this.root);
+
+        // Periodic local auto-save and tab exit persistence for guests
+        if (typeof window !== 'undefined' && !this.isLoungeMode) {
+            this.autoSaveInterval = setInterval(() => {
+                if (!this.isLoggedIn() && this.saveManager) {
+                    this.saveManager.saveLocalCity(true);
+                }
+            }, 60000);
+
+            window.addEventListener('beforeunload', () => {
+                if (!this.isLoggedIn() && this.saveManager) {
+                    this.saveManager.saveLocalCity(true);
+                }
+            });
+        }
+
         this.loadCityFromApi().then(() => {
             this.simulation.start();
         });
+    }
+
+    isLoggedIn() {
+        return Boolean(this.authModal?.currentUser && this.authModal.currentUser.id);
     }
 
     initButtons() {
@@ -208,7 +228,8 @@ class GameStateManager {
             } catch (_) {}
         }
 
-        if (this.authModal?.currentUser) {
+        // 1. Logged-in Community Member: Load from server database slot
+        if (this.isLoggedIn()) {
             try {
                 const loaded = await this.saveManager.loadCity();
                 if (loaded) return;
@@ -221,32 +242,21 @@ class GameStateManager {
             }
         }
 
-        this.showToast('Connecting to XAMPP MariaDB...');
-        try {
-            const data = await this.api.getCity(this.cityId);
-            const city = data.city;
-            const gridData = data.grid;
-
-            this.cityName = city.cityName;
-            this.treasury = city.treasury;
-            this.population = city.population;
-            this.currentYear = city.currentYear;
-            this.currentMonth = city.currentMonth;
-
-            if (city.metrics) this.metrics = city.metrics;
-            if (gridData) {
-                if (gridData.width) this.grid.width = gridData.width;
-                if (gridData.height) this.grid.height = gridData.height;
-                if (gridData.tiles) this.grid.loadFromMap(gridData.tiles);
+        // 2. Non-logged-in guest player: prioritize local device storage!
+        if (this.saveManager && this.saveManager.hasLocalSave()) {
+            try {
+                const loaded = this.saveManager.loadLocalCity(false);
+                if (loaded) return;
+            } catch (err) {
+                console.warn('[Meiji] Failed to restore local save, starting fresh:', err);
             }
-
-            this.updateHUD();
-            if (this.milestones) this.milestones.checkPopulation(this.population);
-            this.showToast(`Loaded "${this.cityName}" from database.`);
-        } catch (err) {
-            console.error('Failed to load city:', err);
-            this.showToast(`Failed to load city state: ${err.message}`, true);
         }
+
+        // 3. New guest player on this machine: start clean Edo settlement without database network errors
+        this.showToast(i18n.getLanguage() === 'ja'
+            ? '⛩️ 明治の町へようこそ！進行状況はお使いの端末に自動保存されます。'
+            : '⛩️ Welcome to Meiji Town! Game progress saves locally to your device.');
+        this.updateHUD();
     }
 
     async saveCityToApi() {
@@ -263,13 +273,11 @@ class GameStateManager {
                 if (sess && sess.authenticated) {
                     this.authModal.currentUser = { id: sess.user_id, username: sess.username };
                     this.authModal.updateBadge();
-                } else {
-                    this.authModal.currentUser = { id: 1, username: 'Mayor' };
                 }
-            } catch (e) {
-                this.authModal.currentUser = { id: 1, username: 'Mayor' };
-            }
+            } catch (_) {}
         }
+
+        // SaveManager handles delegating to local device storage for guests or API for logged-in users
         await this.saveManager.saveCurrentCity();
     }
 
@@ -278,7 +286,7 @@ class GameStateManager {
             this.saveManager.currentSlotId = null;
         }
 
-        if (this.authModal?.currentUser) {
+        if (this.isLoggedIn()) {
             try {
                 const loaded = await this.saveManager.loadCity(null, true);
                 if (loaded) {
@@ -315,6 +323,43 @@ class GameStateManager {
                 this.renderer.updateDayNight(this.currentMonth);
             }
             this.showToast(`✨ Fresh settlement ready for Mayor ${userName}!`);
+        } else {
+            // Switched to Guest: restore saved game from this machine if available
+            if (this.saveManager && this.saveManager.hasLocalSave()) {
+                try {
+                    const loaded = this.saveManager.loadLocalCity(false);
+                    if (loaded) return;
+                } catch (e) {
+                    console.warn('Could not load local save for guest:', e);
+                }
+            }
+
+            // Clean guest settlement
+            this.cityName = 'Edo-Tokyo';
+            this.treasury = CONFIG.SIMULATION.INITIAL_TREASURY || 5000;
+            this.population = 0;
+            this.currentYear = 1872;
+            this.currentMonth = 1;
+            this.lastCashflow = 0;
+            this.metrics = {
+                traditionModernityBalance: 50,
+                fireRisk: 0,
+                choleraRisk: 0,
+                townHappiness: 65,
+                industrialDemand: 30,
+                commercialDemand: 40,
+                residentialDemand: 60,
+            };
+            this.grid.loadFromMap({});
+            if (this.milestones) this.milestones.reset();
+            if (this.policies) this.policies.resetDefaults();
+            if (this.advisor) this.advisor.hide();
+            this.updateHUD();
+            if (this.renderer) {
+                this.renderer.updateSeason(this.currentMonth);
+                this.renderer.updateDayNight(this.currentMonth);
+            }
+            this.showToast('👤 Mayor (Guest) mode active. Progress saves locally on this device.');
         }
     }
 
@@ -336,7 +381,11 @@ class GameStateManager {
         this.showToast(i18n.getLanguage() === 'ja' ? `明治五年 (1872年) 「${newCityName}」を開拓中...` : `Founding "${newCityName}" in Meiji Year 5 (1872)...`);
 
         try {
-            await this.api.resetCity(this.cityId, newCityName);
+            if (this.isLoggedIn()) {
+                await this.api.resetCity(this.cityId, newCityName);
+            } else if (this.saveManager) {
+                this.saveManager.clearLocalSave();
+            }
 
             this.cityName = newCityName;
             this.treasury = CONFIG.SIMULATION.INITIAL_TREASURY || 5000;
@@ -377,6 +426,12 @@ class GameStateManager {
             this.renderer.updateSeason(this.currentMonth);
             this.renderer.updateDayNight(this.currentMonth);
             SOUND.playNewYearBell();
+
+            // Persist the fresh settlement state locally for guest
+            if (!this.isLoggedIn() && this.saveManager) {
+                this.saveManager.saveLocalCity(true);
+            }
+
             this.showToast('⛩️ A new settlement begins! Meiji Year 5 (1872).');
             this.simulation.start();
         } catch (err) {

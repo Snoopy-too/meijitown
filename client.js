@@ -219,8 +219,8 @@ function getTemplateHtml(mode = 'standard', playerName = 'Mayor', gameName = 'me
 
       <!-- Save & Match Status Actions (Bottom Right) -->
       <div id="hud-actions" class="hud-actions">
-        <button id="btn-save" class="action-btn btn-primary" title="Save city progress to MySQL database" data-i18n-title="action.save_title">
-          <span>💾</span><span class="btn-label" data-i18n="action.save">${isJa ? ' 保存' : ' Save Match'}</span>
+        <button id="btn-save" class="action-btn btn-primary" title="Save city progress to local device or database" data-i18n-title="action.save_title">
+          <span>💾</span><span class="btn-label" data-i18n="action.save">${isJa ? ' 保存' : ' Save'}</span>
         </button>
       </div>
 
@@ -463,6 +463,8 @@ function mountMeijiClient(container, config) {
         console.log('[Meiji] GameStateManager mounted inside lounge container.');
         if (latestSyncState) {
           applySyncState(latestSyncState);
+        } else if (window.game?.saveManager?.hasLocalSave()) {
+          window.game.saveManager.loadLocalCity(true);
         }
 
         let lastSaveTime = 0;
@@ -471,7 +473,7 @@ function mountMeijiClient(container, config) {
           if (now - lastSaveTime < 800) return;
           lastSaveTime = now;
 
-          if (socket && window.game) {
+          if (socket && socket.connected && window.game) {
             const snapshot = {
               vitals: {
                 cityName: window.game.cityName,
@@ -490,6 +492,9 @@ function mountMeijiClient(container, config) {
             if (window.game.showToast) {
               window.game.showToast(isAuto ? '💾 Auto-saved settlement to database.' : '💾 Settlement saved to database!');
             }
+          } else if (window.game && window.game.saveManager) {
+            // Local fallback for guest / unauthenticated players
+            window.game.saveManager.saveLocalCity(isAuto);
           }
         };
 
