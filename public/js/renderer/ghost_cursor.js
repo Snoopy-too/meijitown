@@ -1,18 +1,18 @@
-// Project Meiji - 3D Ghost Placement Indicator & Cursor Manager
-// ponytail: translucent preview mesh (y + 0.05) with #2ECC71 green / #E74C3C red tint & service radius rings
+// Project Meiji - 3D Architectural Ghost Placement Indicator & Survey Cartouche (ghost_cursor.js)
+// Phase 3 /artisan: Blueprint Wireframe Gable Silhouette, Corner Survey Brackets & Entrance Chevron (< 200 lines)
 
 import * as THREE from 'three';
 import { CONFIG } from '../config.js';
 import { getFootprint } from '../footprintPreview.js';
-
 import { ServiceRadiusPreview } from './serviceRadiusPreview.js';
 
 export class GhostCursorManager {
     constructor(scene) {
         this.scene = scene;
+        const s = CONFIG.TILE_SIZE;
 
-        // Base tile cursor outline/box
-        const cursorGeo = new THREE.BoxGeometry(CONFIG.TILE_SIZE, 0.08, CONFIG.TILE_SIZE);
+        // 1. Base tile cursor footprint pad + 4 brass/emerald survey corner brackets
+        const cursorGeo = new THREE.BoxGeometry(s, 0.08, s);
         const cursorMat = new THREE.MeshBasicMaterial({
             color: 0x2ecc71,
             transparent: true,
@@ -21,10 +21,22 @@ export class GhostCursorManager {
         });
         this.cursorBox = new THREE.Mesh(cursorGeo, cursorMat);
         this.cursorBox.visible = false;
+
+        this.wireMat = new THREE.LineBasicMaterial({ color: 0xa8ffdb, transparent: true, opacity: 0.85 });
+        const baseEdges = new THREE.LineSegments(new THREE.EdgesGeometry(cursorGeo), this.wireMat);
+        this.cursorBox.add(baseEdges);
+
+        const bracketMat = new THREE.MeshBasicMaterial({ color: 0xf5d76e, transparent: true, opacity: 0.90, depthWrite: false });
+        const cornerOff = s * 0.46;
+        for (const [cx, cz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+            const post = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.14, 0.10), bracketMat);
+            post.position.set(cx * cornerOff, 0.04, cz * cornerOff);
+            this.cursorBox.add(post);
+        }
         this.scene.add(this.cursorBox);
 
-        // 3D Translucent Ghost Placement Preview Mesh (y + 0.05)
-        const ghostGeo = new THREE.BoxGeometry(CONFIG.TILE_SIZE * 0.85, 0.8, CONFIG.TILE_SIZE * 0.85);
+        // 2. 3D Translucent Architectural Ghost Preview (Wall Core + Pitched Gable Roof + Wireframe)
+        const ghostGeo = new THREE.BoxGeometry(s * 0.85, 0.8, s * 0.85);
         this.ghostMat = new THREE.MeshLambertMaterial({
             color: 0x2ecc71,
             transparent: true,
@@ -34,8 +46,29 @@ export class GhostCursorManager {
         this.ghostMesh = new THREE.Mesh(ghostGeo, this.ghostMat);
         this.ghostMesh.visible = false;
 
-        // Directional Facing Marker on front edge (+Z)
-        const markerGeo = new THREE.BoxGeometry(CONFIG.TILE_SIZE * 0.65, 0.22, 0.14);
+        const bodyWire = new THREE.LineSegments(new THREE.EdgesGeometry(ghostGeo), this.wireMat);
+        this.ghostMesh.add(bodyWire);
+
+        // Architectural eave skirt & pitched gable roof prism (hidden for flat road/canal/paddy tools)
+        this.archCrownGroup = new THREE.Group();
+        const eaveGeo = new THREE.BoxGeometry(s * 0.96, 0.06, s * 0.96);
+        const eaveMesh = new THREE.Mesh(eaveGeo, this.ghostMat);
+        eaveMesh.position.set(0, 0.42, 0);
+        this.archCrownGroup.add(eaveMesh);
+
+        const roofPrismGeo = new THREE.CylinderGeometry(0.02, s * 0.62, s * 0.88, 4, 1);
+        roofPrismGeo.rotateY(Math.PI / 4);
+        roofPrismGeo.rotateZ(Math.PI / 2);
+        roofPrismGeo.scale(1.0, 0.42, 1.0);
+        const roofMesh = new THREE.Mesh(roofPrismGeo, this.ghostMat);
+        roofMesh.position.set(0, 0.56, 0);
+        const roofWire = new THREE.LineSegments(new THREE.EdgesGeometry(roofPrismGeo), this.wireMat);
+        roofMesh.add(roofWire);
+        this.archCrownGroup.add(roofMesh);
+        this.ghostMesh.add(this.archCrownGroup);
+
+        // 3. Directional Entrance Threshold & Forward Chevron Cartouche on front edge (+Z)
+        const markerGeo = new THREE.BoxGeometry(s * 0.65, 0.22, 0.14);
         this.markerMat = new THREE.MeshLambertMaterial({
             color: 0x39ff14,
             transparent: true,
@@ -43,14 +76,20 @@ export class GhostCursorManager {
             depthWrite: false
         });
         this.dirMarker = new THREE.Mesh(markerGeo, this.markerMat);
-        this.dirMarker.position.set(0, 0.32, (CONFIG.TILE_SIZE * 0.85) / 2 - 0.04);
-        this.ghostMesh.add(this.dirMarker);
+        this.dirMarker.position.set(0, 0.32, (s * 0.85) / 2 - 0.04);
 
+        // Forward-pointing entrance arrow chevron attached to dirMarker
+        const chevronGeo = new THREE.ConeGeometry(0.24, 0.28, 3);
+        chevronGeo.rotateX(Math.PI / 2);
+        const chevronMesh = new THREE.Mesh(chevronGeo, this.markerMat);
+        chevronMesh.position.set(0, -0.18, 0.20);
+        this.dirMarker.add(chevronMesh);
+
+        this.ghostMesh.add(this.dirMarker);
         this.scene.add(this.ghostMesh);
 
-        // Dynamic Civic Service Reach Radius Preview
+        // 4. Dynamic Civic Service Reach Radius Preview
         this.serviceRadiusPreview = new ServiceRadiusPreview(this.scene);
-
         this.currentTool = CONFIG.TOOLS.INSPECT;
     }
 
@@ -70,18 +109,23 @@ export class GhostCursorManager {
             z: (tileCoord.y + h / 2) * CONFIG.TILE_SIZE
         };
 
-        // Position & scale base cursor footprint box
         this.cursorBox.scale.set(w, 1, h);
         this.cursorBox.position.set(centerPos.x, 0.04, centerPos.z);
         this.cursorBox.visible = true;
 
-        // Validity color & opacity: #2ECC71 (0.45) green or #E74C3C (0.55) red
         const activeColor = isValid ? 0x2ecc71 : 0xe74c3c;
         const activeOpacity = isValid ? 0.45 : 0.55;
         this.cursorBox.material.color.setHex(activeColor);
         this.cursorBox.material.opacity = activeOpacity;
+        if (this.wireMat && this.wireMat.color) {
+            const wireCol = isValid ? 0xa8ffdb : 0xff948a;
+            if (typeof this.wireMat.color.setHex === 'function') {
+                this.wireMat.color.setHex(wireCol);
+            } else {
+                this.wireMat.color = wireCol;
+            }
+        }
 
-        // 3D Ghost Placement Indicator (Active when tool is not Survey/Inspect)
         if (toolType && toolType !== CONFIG.TOOLS.INSPECT) {
             this.ghostMesh.visible = true;
             this.ghostMat.color.setHex(activeColor);
@@ -94,6 +138,7 @@ export class GhostCursorManager {
 
             const isLinearOrFlat = toolType === CONFIG.TOOLS.ROAD || toolType === CONFIG.TOOLS.STONE_ROAD || toolType === CONFIG.TOOLS.CANAL || toolType === CONFIG.TOOLS.RAIL_TRACK || toolType === CONFIG.TOOLS.BULLDOZER || toolType === CONFIG.TOOLS.RICE_PADDY;
             if (this.dirMarker) this.dirMarker.visible = !isLinearOrFlat;
+            if (this.archCrownGroup) this.archCrownGroup.visible = !isLinearOrFlat;
 
             if (toolType === CONFIG.TOOLS.ROAD || toolType === CONFIG.TOOLS.STONE_ROAD) {
                 this.ghostMesh.scale.set(1.0, 0.12, 1.0);
@@ -124,7 +169,6 @@ export class GhostCursorManager {
             this.ghostMesh.visible = false;
         }
 
-        // Dynamic Civic Service Radius Preview Hook
         this.serviceRadiusPreview.update(tileCoord, toolType, { w, h });
     }
 }

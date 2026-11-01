@@ -1,43 +1,37 @@
 // Project Meiji - Build Drawer & Active Tool Floating Action Button (FAB)
-// ponytail: slide-up drawer with 4 thumb-friendly category tabs & persistent FAB
+// ponytail: slide-up drawer with 4 thumb-friendly category tabs & persistent FAB (< 350 lines)
 
 import { CONFIG } from '../config.js';
 import { i18n } from '../i18n.js';
 import { getToolCatalogEntry } from '../config/toolCatalogData.js';
 
 export const TOOL_TIER_REQUIREMENTS = {
-    [CONFIG.TOOLS.INSPECT]: { tier: 1, pop: 0 },
-    [CONFIG.TOOLS.ROAD]: { tier: 1, pop: 0 },
-    [CONFIG.TOOLS.RESIDENTIAL]: { tier: 1, pop: 0 },
-    [CONFIG.TOOLS.COMMERCIAL]: { tier: 1, pop: 0 },
-    [CONFIG.TOOLS.INDUSTRIAL]: { tier: 1, pop: 0 },
-    [CONFIG.TOOLS.RICE_PADDY]: { tier: 1, pop: 0 },
-    [CONFIG.TOOLS.WELL]: { tier: 1, pop: 0 },
-    [CONFIG.TOOLS.BULLDOZER]: { tier: 1, pop: 0 },
+    [CONFIG.TOOLS.INSPECT]: { tier: 1, pop: 0 }, [CONFIG.TOOLS.ROAD]: { tier: 1, pop: 0 },
+    [CONFIG.TOOLS.RESIDENTIAL]: { tier: 1, pop: 0 }, [CONFIG.TOOLS.COMMERCIAL]: { tier: 1, pop: 0 },
+    [CONFIG.TOOLS.INDUSTRIAL]: { tier: 1, pop: 0 }, [CONFIG.TOOLS.RICE_PADDY]: { tier: 1, pop: 0 },
+    [CONFIG.TOOLS.WELL]: { tier: 1, pop: 0 }, [CONFIG.TOOLS.BULLDOZER]: { tier: 1, pop: 0 },
 
-    [CONFIG.TOOLS.CANAL]: { tier: 2, pop: 100 },
-    [CONFIG.TOOLS.STONE_ROAD]: { tier: 2, pop: 100 },
-    [CONFIG.TOOLS.WATCHTOWER]: { tier: 2, pop: 100 },
-    [CONFIG.TOOLS.FIRE_DEPOT]: { tier: 2, pop: 100 },
-    [CONFIG.TOOLS.OCHAYA]: { tier: 2, pop: 100 },
-    [CONFIG.TOOLS.SHRINE_PARK]: { tier: 2, pop: 100 },
-    [CONFIG.TOOLS.TREE_WILLOW]: { tier: 2, pop: 100 },
-    [CONFIG.TOOLS.SUIMON]: { tier: 2, pop: 100 },
+    [CONFIG.TOOLS.CANAL]: { tier: 2, pop: 100 }, [CONFIG.TOOLS.STONE_ROAD]: { tier: 2, pop: 100 },
+    [CONFIG.TOOLS.WATCHTOWER]: { tier: 2, pop: 100 }, [CONFIG.TOOLS.FIRE_DEPOT]: { tier: 2, pop: 100 },
+    [CONFIG.TOOLS.OCHAYA]: { tier: 2, pop: 100 }, [CONFIG.TOOLS.SHRINE_PARK]: { tier: 2, pop: 100 },
+    [CONFIG.TOOLS.TREE_WILLOW]: { tier: 2, pop: 100 }, [CONFIG.TOOLS.SUIMON]: { tier: 2, pop: 100 },
 
-    [CONFIG.TOOLS.RAIL_TRACK]: { tier: 3, pop: 300 },
-    [CONFIG.TOOLS.TRAIN_DEPOT]: { tier: 3, pop: 300 },
-    [CONFIG.TOOLS.KOBAN]: { tier: 3, pop: 300 },
-    [CONFIG.TOOLS.SCHOOL]: { tier: 3, pop: 300 },
-    [CONFIG.TOOLS.TELEGRAPH]: { tier: 3, pop: 300 },
-    [CONFIG.TOOLS.HARBOR_PIER]: { tier: 3, pop: 300 },
+    [CONFIG.TOOLS.RAIL_TRACK]: { tier: 3, pop: 300 }, [CONFIG.TOOLS.TRAIN_DEPOT]: { tier: 3, pop: 300 },
+    [CONFIG.TOOLS.KOBAN]: { tier: 3, pop: 300 }, [CONFIG.TOOLS.SCHOOL]: { tier: 3, pop: 300 },
+    [CONFIG.TOOLS.TELEGRAPH]: { tier: 3, pop: 300 }, [CONFIG.TOOLS.HARBOR_PIER]: { tier: 3, pop: 300 },
     [CONFIG.TOOLS.SENTO]: { tier: 3, pop: 300 },
 
-    [CONFIG.TOOLS.POWER_PLANT]: { tier: 4, pop: 600 },
-    [CONFIG.TOOLS.WATERWORKS]: { tier: 4, pop: 600 },
-    [CONFIG.TOOLS.PAVILION]: { tier: 4, pop: 600 },
-    monument_pavilion: { tier: 4, pop: 600 },
-    pavilion: { tier: 4, pop: 600 }
+    [CONFIG.TOOLS.POWER_PLANT]: { tier: 4, pop: 600 }, [CONFIG.TOOLS.WATERWORKS]: { tier: 4, pop: 600 },
+    [CONFIG.TOOLS.PAVILION]: { tier: 4, pop: 600 }, monument_pavilion: { tier: 4, pop: 600 }, pavilion: { tier: 4, pop: 600 }
 };
+
+const ROTATABLE_TOOLS = new Set([
+    CONFIG.TOOLS.TRAIN_DEPOT, CONFIG.TOOLS.KOBAN, CONFIG.TOOLS.WATCHTOWER, CONFIG.TOOLS.FIRE_DEPOT,
+    CONFIG.TOOLS.WELL, CONFIG.TOOLS.OCHAYA, CONFIG.TOOLS.SENTO, CONFIG.TOOLS.SHRINE_PARK,
+    CONFIG.TOOLS.RESIDENTIAL, CONFIG.TOOLS.COMMERCIAL, CONFIG.TOOLS.INDUSTRIAL, CONFIG.TOOLS.SCHOOL,
+    CONFIG.TOOLS.TELEGRAPH, CONFIG.TOOLS.HARBOR_PIER, CONFIG.TOOLS.POWER_PLANT, CONFIG.TOOLS.WATERWORKS,
+    CONFIG.TOOLS.PAVILION, CONFIG.TOOLS.SUIMON
+]);
 
 export class BuildDrawer {
     constructor(onToolSelectCallback, onRotateCallback = null, rootContainer = null) {
@@ -83,25 +77,18 @@ export class BuildDrawer {
     }
 
     bindEvents() {
-        // FAB Click -> Toggle Drawer (unless cancel or rotate clicked)
         if (this.dom.fab) {
             this.dom.fab.addEventListener('click', (e) => {
                 if (e.target.closest('#fab-cancel-btn') || e.target.closest('#fab-rotate-btn')) return;
                 this.toggle();
             });
         }
-
-        // Rotate Button -> Rotate Placement
         if (this.dom.fabRotate) {
             this.dom.fabRotate.addEventListener('click', (e) => {
                 e.stopPropagation();
-                if (typeof this.onRotate === 'function') {
-                    this.onRotate();
-                }
+                if (typeof this.onRotate === 'function') this.onRotate();
             });
         }
-
-        // Cancel Button -> Revert to Survey Mode
         if (this.dom.fabCancel) {
             this.dom.fabCancel.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -109,49 +96,30 @@ export class BuildDrawer {
                 this.close();
             });
         }
-
-        // Drawer Close Button
-        if (this.dom.closeBtn) {
-            this.dom.closeBtn.addEventListener('click', () => this.close());
-        }
-
-        // Click outside (scrim / overlay) -> Close
-        if (this.dom.drawerOverlay) {
-            this.dom.drawerOverlay.addEventListener('click', () => this.close());
-        }
-
-        // Tab Switching
+        if (this.dom.closeBtn) this.dom.closeBtn.addEventListener('click', () => this.close());
+        if (this.dom.drawerOverlay) this.dom.drawerOverlay.addEventListener('click', () => this.close());
         if (this.dom.tabButtons) {
             this.dom.tabButtons.forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const targetTab = btn.dataset.tab;
-                    this.switchTab(targetTab);
-                });
+                btn.addEventListener('click', () => this.switchTab(btn.dataset.tab));
             });
         }
-
-        // Drawer Item Buttons -> Hover, Focus & Selection Handling
         if (this.dom.itemButtons) {
             this.dom.itemButtons.forEach(btn => {
                 const tool = btn.dataset.tool;
                 if (!tool) return;
-
                 btn.addEventListener('mouseenter', () => {
                     if (this._inspectorDebounce) clearTimeout(this._inspectorDebounce);
                     this.updateInspector(tool);
                 });
                 btn.addEventListener('mouseleave', () => {
                     if (this._inspectorDebounce) clearTimeout(this._inspectorDebounce);
-                    this._inspectorDebounce = setTimeout(() => {
-                        this.updateInspector(null);
-                    }, 80);
+                    this._inspectorDebounce = setTimeout(() => this.updateInspector(null), 80);
                 });
                 btn.addEventListener('focus', () => {
                     if (this._inspectorDebounce) clearTimeout(this._inspectorDebounce);
                     this.updateInspector(tool);
                 });
                 btn.addEventListener('blur', () => this.updateInspector(null));
-
                 btn.addEventListener('click', (e) => {
                     const req = TOOL_TIER_REQUIREMENTS[tool];
                     if (req && this.currentTownTier < req.tier) {
@@ -164,8 +132,6 @@ export class BuildDrawer {
                 });
             });
         }
-
-        // Reset inspector immediately when mouse leaves drawer entirely
         if (this.dom.drawer) {
             this.dom.drawer.addEventListener('mouseleave', () => {
                 if (this._inspectorDebounce) clearTimeout(this._inspectorDebounce);
@@ -174,18 +140,13 @@ export class BuildDrawer {
         }
     }
 
-    toggle() {
-        if (this.isOpen) this.close();
-        else this.open();
-    }
-
+    toggle() { if (this.isOpen) this.close(); else this.open(); }
     open() {
         this.isOpen = true;
         if (this.dom.drawer) this.dom.drawer.classList.add('drawer-open');
         if (this.dom.drawerOverlay) this.dom.drawerOverlay.classList.add('overlay-active');
         this.updateInspector();
     }
-
     close() {
         this.isOpen = false;
         if (this.dom.drawer) this.dom.drawer.classList.remove('drawer-open');
@@ -194,17 +155,10 @@ export class BuildDrawer {
 
     switchTab(tabName) {
         if (this.dom.tabButtons) {
-            this.dom.tabButtons.forEach(btn => {
-                if (btn.dataset.tab === tabName) btn.classList.add('active');
-                else btn.classList.remove('active');
-            });
+            this.dom.tabButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tabName));
         }
-
         if (this.dom.tabPanels) {
-            this.dom.tabPanels.forEach(panel => {
-                if (panel.id === `tab-panel-${tabName}`) panel.classList.add('active');
-                else panel.classList.remove('active');
-            });
+            this.dom.tabPanels.forEach(panel => panel.classList.toggle('active', panel.id === `tab-panel-${tabName}`));
         }
     }
 
@@ -220,91 +174,52 @@ export class BuildDrawer {
             this.updateInspector(toolName);
             return;
         }
-
         this.currentTool = toolName;
-
-        // Update active class on drawer items
         if (this.dom.itemButtons) {
-            this.dom.itemButtons.forEach(btn => {
-                if (btn.dataset.tool === toolName) btn.classList.add('active');
-                else btn.classList.remove('active');
-            });
+            this.dom.itemButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.tool === toolName));
         }
-
-        // Update FAB icon, label, and cancel button visibility
         this.updateFAB(toolName);
         this.updateInspector(toolName);
-
-        // Notify ToolController
-        if (typeof this.onToolSelect === 'function') {
-            this.onToolSelect(toolName);
-        }
+        if (typeof this.onToolSelect === 'function') this.onToolSelect(toolName);
     }
 
     updateInspector(toolName = null) {
-        if (this._inspectorDebounce) {
-            clearTimeout(this._inspectorDebounce);
-            this._inspectorDebounce = null;
-        }
+        if (this._inspectorDebounce) { clearTimeout(this._inspectorDebounce); this._inspectorDebounce = null; }
         if (!this.dom.inspector) return;
         const targetTool = toolName || (this.currentTool !== CONFIG.TOOLS.INSPECT ? this.currentTool : null);
         const isJa = i18n.getLanguage() === 'ja';
         const lang = isJa ? 'ja' : 'en';
 
         if (!targetTool) {
-            if (this.dom.inspectorName) {
-                this.dom.inspectorName.textContent = isJa ? '項目を選択またはカーソルを合わせる' : 'Select or hover over an item';
-            }
-            if (this.dom.inspectorCost) {
-                this.dom.inspectorCost.textContent = '';
-            }
-            if (this.dom.inspectorEffect) {
-                this.dom.inspectorEffect.textContent = isJa
-                    ? '建物や道具にカーソルを合わせると、効果や費用を確認できます。'
-                    : 'Hover over any building or tool (including locked items) to view its purpose and municipal benefits.';
-            }
-            if (this.dom.inspectorLock) {
-                this.dom.inspectorLock.textContent = '';
-                this.dom.inspectorLock.style.display = 'none';
-            }
+            if (this.dom.inspectorName) this.dom.inspectorName.textContent = isJa ? '項目を選択またはカーソルを合わせる' : 'Select or hover over an item';
+            if (this.dom.inspectorCost) this.dom.inspectorCost.textContent = '';
+            if (this.dom.inspectorEffect) this.dom.inspectorEffect.textContent = isJa ? '建物や道具にカーソルを合わせると、効果や費用を確認できます。' : 'Hover over any building or tool (including locked items) to view its purpose and municipal benefits.';
+            if (this.dom.inspectorLock) { this.dom.inspectorLock.textContent = ''; this.dom.inspectorLock.style.display = 'none'; }
             return;
         }
 
         const entry = getToolCatalogEntry(targetTool);
-
         if (this.dom.inspectorName) {
             const meta = this.getToolMetadata(targetTool);
             this.dom.inspectorName.textContent = entry?.name?.[lang] || meta?.name || targetTool;
         }
-
         if (this.dom.inspectorCost) {
-            if (entry && (entry.cost !== undefined || entry.upkeep !== undefined)) {
-                this.dom.inspectorCost.textContent = isJa
-                    ? `費用: ¥${entry.cost} | 維持費: ¥${entry.upkeep}/月`
-                    : `Cost: ¥${entry.cost} | Upkeep: ¥${entry.upkeep}/mo`;
-            } else {
-                this.dom.inspectorCost.textContent = '';
-            }
+            this.dom.inspectorCost.textContent = (entry && (entry.cost !== undefined || entry.upkeep !== undefined))
+                ? (isJa ? `費用: ¥${entry.cost} | 維持費: ¥${entry.upkeep}/月` : `Cost: ¥${entry.cost} | Upkeep: ¥${entry.upkeep}/mo`)
+                : '';
         }
-
         if (this.dom.inspectorEffect) {
             this.dom.inspectorEffect.textContent = entry?.effect?.[lang] || entry?.effect?.en || '';
         }
-
         if (this.dom.inspectorLock) {
             const req = TOOL_TIER_REQUIREMENTS[targetTool];
             if (req && this.currentTownTier < req.tier) {
                 const tierNames = { 1: { en: 'Hamlet', ja: '集落' }, 2: { en: 'Post Town', ja: '宿場町' }, 3: { en: 'Modern Town', ja: '地方都市' }, 4: { en: 'Metropolis', ja: '帝都大都市' } };
                 const tierName = tierNames[req.tier]?.[lang] || `Tier ${req.tier}`;
-                const lockMsg = isJa
-                    ? `🔒 第${req.tier}段階「${tierName}」(人口 ${req.pop}名) 到達で開放`
-                    : `🔒 Unlocks at ${tierName} (Tier ${req.tier} - Population ${req.pop})`;
-                this.dom.inspectorLock.textContent = lockMsg;
+                this.dom.inspectorLock.textContent = isJa ? `🔒 第${req.tier}段階「${tierName}」(人口 ${req.pop}名) 到達で開放` : `🔒 Unlocks at ${tierName} (Tier ${req.tier} - Population ${req.pop})`;
                 this.dom.inspectorLock.style.display = 'block';
             } else if (targetTool === 'monument_pavilion' || targetTool === CONFIG.TOOLS.PAVILION) {
-                this.dom.inspectorLock.textContent = isJa
-                    ? '🏛️ 開放要件: 人口600名以上・鉄道路線・電信局・船着場'
-                    : '🏛️ Requires: Pop 600+, active Rail, Telegraph, and Cargo Pier';
+                this.dom.inspectorLock.textContent = isJa ? '🏛️ 開放要件: 人口600名以上・鉄道路線・電信局・船着場' : '🏛️ Requires: Pop 600+, active Rail, Telegraph, and Cargo Pier';
                 this.dom.inspectorLock.style.display = 'block';
             } else {
                 this.dom.inspectorLock.textContent = '';
@@ -315,52 +230,14 @@ export class BuildDrawer {
 
     updateFAB(toolName) {
         const metadata = this.getToolMetadata(toolName);
-
-        if (this.dom.fabName) {
-            this.dom.fabName.textContent = metadata.name;
-        }
-
-        if (this.dom.fabIcon) {
-            this.dom.fabIcon.innerHTML = metadata.iconHtml;
-        }
-
-        if (this.dom.fabCancel) {
-            if (toolName === CONFIG.TOOLS.INSPECT) {
-                this.dom.fabCancel.style.display = 'none';
-            } else {
-                this.dom.fabCancel.style.display = 'inline-flex';
-            }
-        }
-
-        if (this.dom.fabRotate) {
-            const rotatableTools = [
-                CONFIG.TOOLS.TRAIN_DEPOT,
-                CONFIG.TOOLS.KOBAN,
-                CONFIG.TOOLS.WATCHTOWER,
-                CONFIG.TOOLS.FIRE_DEPOT,
-                CONFIG.TOOLS.WELL,
-                CONFIG.TOOLS.OCHAYA,
-                CONFIG.TOOLS.SENTO,
-                CONFIG.TOOLS.SHRINE_PARK,
-                CONFIG.TOOLS.RESIDENTIAL,
-                CONFIG.TOOLS.COMMERCIAL,
-                CONFIG.TOOLS.INDUSTRIAL,
-                CONFIG.TOOLS.SCHOOL,
-                CONFIG.TOOLS.TELEGRAPH,
-                CONFIG.TOOLS.HARBOR_PIER,
-                CONFIG.TOOLS.POWER_PLANT,
-                CONFIG.TOOLS.WATERWORKS,
-                CONFIG.TOOLS.PAVILION,
-                CONFIG.TOOLS.SUIMON,
-            ];
-            this.dom.fabRotate.style.display = rotatableTools.includes(toolName) ? 'inline-flex' : 'none';
-        }
+        if (this.dom.fabName) this.dom.fabName.textContent = metadata.name;
+        if (this.dom.fabIcon) this.dom.fabIcon.innerHTML = metadata.iconHtml;
+        if (this.dom.fabCancel) this.dom.fabCancel.style.display = toolName === CONFIG.TOOLS.INSPECT ? 'none' : 'inline-flex';
+        if (this.dom.fabRotate) this.dom.fabRotate.style.display = ROTATABLE_TOOLS.has(toolName) ? 'inline-flex' : 'none';
     }
 
     updateRotateBtn(rotation = 0) {
-        if (this.dom.fabRotateDeg) {
-            this.dom.fabRotateDeg.textContent = `${(rotation % 4) * 90}°`;
-        }
+        if (this.dom.fabRotateDeg) this.dom.fabRotateDeg.textContent = `${(rotation % 4) * 90}°`;
     }
 
     updateTabs() {
@@ -382,9 +259,7 @@ export class BuildDrawer {
         if (!titleEl) return;
         const isJa = i18n.getLanguage() === 'ja';
         const sub = titleEl.querySelector('.drawer-subtitle') || titleEl.querySelector('span:not(.kanji)');
-        if (sub) {
-            sub.textContent = isJa ? '(都市造営・普請)' : 'Construction Catalogue';
-        }
+        if (sub) sub.textContent = isJa ? '(都市造営・普請)' : 'Construction Catalogue';
     }
 
     updateDrawerItems() {
@@ -396,8 +271,6 @@ export class BuildDrawer {
                 const meta = this.getToolMetadata(tool);
                 if (meta && meta.name) nameSpan.textContent = meta.name;
             }
-
-            // Milestone Gating Enforcement
             const req = TOOL_TIER_REQUIREMENTS[tool];
             if (req && this.currentTownTier < req.tier) {
                 btn.classList.add('tool-locked');

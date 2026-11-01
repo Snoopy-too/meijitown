@@ -411,7 +411,7 @@ export class WorldRenderer {
         CanalMesh.updateWater(delta * (isSimRunning ? Math.max(0.5, speedMult * 0.6) : 0.3));
         if (this.trainTraffic) this.trainTraffic.update(delta, speedMult);
         if (this.simulation?.typhoon) this.simulation.typhoon.updateRain(delta);
-        if (this.fx) this.fx.update(delta);
+        if (this.fx) this.fx.update(delta, speedMult, this.tileMeshes, this.state?.currentMonth || 1);
         const isStorm = !!this.simulation?.typhoon?.isStormActive;
         if (this.lighting && typeof this.lighting.update === 'function') this.lighting.update(delta);
         if (this.backdrop && typeof this.backdrop.update === 'function') this.backdrop.update(delta, isStorm);

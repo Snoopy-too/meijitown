@@ -183,7 +183,7 @@ export class ParticleManager {
         this.fireEmitters.delete(key);
     }
 
-    update(delta = 0.016) {
+    update(delta = 0.016, speedMult = 1, tileMeshes = null, month = 1) {
         // 1. Update demolition, ember, and smoke particles
         for (let i = this.particles.length - 1; i >= 0; i--) {
             const p = this.particles[i];
@@ -198,6 +198,14 @@ export class ParticleManager {
             } else if (p.isEmber) {
                 p.mesh.position.x += Math.sin(p.life * 10) * delta * 0.4;
                 p.mesh.material.opacity = Math.max(0, p.life / p.maxLife);
+            } else if (p.isFoliage) {
+                p.mesh.position.x += Math.sin(p.life * 2.4 + p.seed) * delta * 0.5 + delta * 0.35;
+                p.mesh.position.z += Math.cos(p.life * 1.9 + p.seed) * delta * 0.4 + delta * 0.25;
+                p.mesh.rotation.x += delta * 1.8;
+                p.mesh.rotation.y += delta * 1.4;
+                p.mesh.rotation.z += delta * 1.6;
+                p.mesh.material.opacity = Math.min(0.9, (p.life / p.maxLife) * 1.4);
+                if (p.mesh.position.y <= 0.04) p.life = 0;
             } else {
                 p.velocity.y -= 9.8 * delta;
                 const progress = p.life / p.maxLife;
@@ -291,6 +299,98 @@ export class ParticleManager {
                         isEmber: true
                     });
                 }
+            }
+        }
+
+        // 4. Ambient Industrial Motion: Waterwheels & Working Smokestacks
+        if (tileMeshes && tileMeshes.size > 0) {
+            this.ambientTimer = (this.ambientTimer || 0) + delta;
+            const shouldEmitStack = this.ambientTimer > 0.24 && this.particles.length < 45;
+            if (shouldEmitStack) this.ambientTimer = 0;
+
+            for (const [_, meshGroup] of tileMeshes) {
+                if (!meshGroup || !meshGroup.traverse) continue;
+                meshGroup.traverse((child) => {
+                    if (child.name === 'wheel_hub') {
+                        child.rotation.x += delta * (1.6 + (speedMult || 1) * 0.8);
+                    }
+                    if (shouldEmitStack && child.userData && child.userData.isSmokestack) {
+                        const wp = new THREE.Vector3();
+                        if (typeof child.getWorldPosition === 'function') {
+                            child.getWorldPosition(wp);
+                        } else {
+                            wp.copy(meshGroup.position);
+                            wp.y += (child.userData.stackHeight || 1.8);
+                        }
+                        const puffGeo = new THREE.DodecahedronGeometry(0.12, 0);
+                        const puffMat = new THREE.MeshLambertMaterial({
+                            color: Math.random() > 0.4 ? 0x4a4745 : 0xd8dbde,
+                            transparent: true,
+                            opacity: 0.55
+                        });
+                        const puffMesh = new THREE.Mesh(puffGeo, puffMat);
+                        puffMesh.position.set(wp.x + (Math.random() - 0.5) * 0.1, wp.y + 0.08, wp.z + (Math.random() - 0.5) * 0.1);
+                        this.scene.add(puffMesh);
+                        this.particles.push({
+                            mesh: puffMesh,
+                            velocity: new THREE.Vector3(
+                                (Math.random() - 0.35) * 0.25 + 0.15,
+                                0.95 + Math.random() * 0.45,
+                                (Math.random() - 0.5) * 0.25
+                            ),
+                            life: 1.6,
+                            maxLife: 1.6,
+                            isSmoke: true
+                        });
+                    }
+                });
+            }
+        }
+
+        // 5. Seasonal Drifting Foliage Petals, Momiji Leaves & Winter Snow Flurries
+        this.foliageTimer = (this.foliageTimer || 0) + delta;
+        if (this.foliageTimer > 0.18 && this.particles.length < 40) {
+            this.foliageTimer = 0;
+            const isSpring = month >= 3 && month <= 5;
+            const isAutumn = month >= 9 && month <= 11;
+            const isWinter = month === 12 || month <= 2;
+
+            if (isSpring || isAutumn || isWinter) {
+                let pColor = 0xf7c4cb;
+                let pGeo = null;
+                if (isSpring) {
+                    const springColors = [0xf7c4cb, 0xffe6ea, 0xf2b6c1, 0xffffff];
+                    pColor = springColors[Math.floor(Math.random() * springColors.length)];
+                    pGeo = new THREE.BoxGeometry(0.065, 0.015, 0.045);
+                } else if (isAutumn) {
+                    const autumnColors = [0xd94e28, 0xc0392b, 0xe67e22, 0xb83b26];
+                    pColor = autumnColors[Math.floor(Math.random() * autumnColors.length)];
+                    pGeo = new THREE.DodecahedronGeometry(0.045, 0);
+                } else {
+                    pColor = 0xf4f7fa;
+                    pGeo = new THREE.BoxGeometry(0.035, 0.035, 0.035);
+                }
+
+                const fMat = new THREE.MeshBasicMaterial({ color: pColor, transparent: true, opacity: 0.85 });
+                const fMesh = new THREE.Mesh(pGeo, fMat);
+                fMesh.position.set(
+                    Math.random() * 70,
+                    10.0 + Math.random() * 6.0,
+                    Math.random() * 70
+                );
+                this.scene.add(fMesh);
+                this.particles.push({
+                    mesh: fMesh,
+                    velocity: new THREE.Vector3(
+                        0.25 + Math.random() * 0.35,
+                        -(0.55 + Math.random() * 0.45),
+                        0.20 + Math.random() * 0.30
+                    ),
+                    seed: Math.random() * 6.28,
+                    life: 8.0,
+                    maxLife: 8.0,
+                    isFoliage: true
+                });
             }
         }
     }

@@ -49,7 +49,8 @@ export class IndustrialMeshes {
 
         // Tapered brick smokestack with banded iron collar
         Kit.addPart(sub, new THREE.CylinderGeometry(0.09, 0.13, 1.35, 8), brickMat, [0.46, 1.04, -0.52], true);
-        Kit.addPart(sub, new THREE.CylinderGeometry(0.14, 0.14, 0.08, 8), ironMat, [0.46, 1.70, -0.52]);
+        const stackCollar = Kit.addPart(sub, new THREE.CylinderGeometry(0.14, 0.14, 0.08, 8), ironMat, [0.46, 1.70, -0.52]);
+        stackCollar.userData = { isSmokestack: true, stackHeight: 1.74 };
 
         // 4. Yard staging: Stacked cordwood logs & timber drying racks
         const logGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.52, 6);
@@ -106,7 +107,8 @@ export class IndustrialMeshes {
 
         // Tapered smokestack with banded iron collar
         Kit.addPart(sub, new THREE.CylinderGeometry(0.10, 0.16, 1.75, 8), brickMat, [0.54, 1.30, -0.45], true);
-        Kit.addPart(sub, new THREE.CylinderGeometry(0.16, 0.16, 0.10, 8), ironMat, [0.54, 2.15, -0.45]);
+        const millCollar = Kit.addPart(sub, new THREE.CylinderGeometry(0.16, 0.16, 0.10, 8), ironMat, [0.54, 2.15, -0.45]);
+        millCollar.userData = { isSmokestack: true, stackHeight: 2.20 };
 
         // 4. Detailed multi-spoke waterwheel attached to child group named 'wheel_hub'
         const wheelGroup = new THREE.Group();
@@ -123,10 +125,15 @@ export class IndustrialMeshes {
         rimGeo.rotateZ(Math.PI / 2);
         Kit.addPart(wheelGroup, rimGeo, ironMat, [0, 0, 0], true);
 
-        // 8 radiating timber spokes & buckets
+        // 8 radiating timber spokes & paddles
         for (let i = 0; i < 4; i++) {
             const spoke = Kit.addPart(wheelGroup, new THREE.BoxGeometry(0.03, 0.54, 0.04), woodMat, [0, 0, 0]);
             spoke.rotation.x = (i * Math.PI) / 4;
+        }
+        for (let i = 0; i < 8; i++) {
+            const a = (i * Math.PI) / 4;
+            const paddle = Kit.addPart(wheelGroup, new THREE.BoxGeometry(0.06, 0.02, 0.08), woodMat, [0, Math.sin(a) * 0.26, Math.cos(a) * 0.26]);
+            paddle.rotation.x = a;
         }
 
         sub.add(wheelGroup);
@@ -189,7 +196,8 @@ export class IndustrialMeshes {
         for (const sz of [0.18 * s, 0.54 * s]) {
             Kit.addPart(sub, new THREE.CylinderGeometry(0.18, 0.22, 0.45, 8), brickMat, [0.55 * s, 0.95, sz], true);
             Kit.addPart(sub, new THREE.CylinderGeometry(0.13, 0.16, 2.50, 8), ironMat, [0.55 * s, 2.40, sz], true);
-            Kit.addPart(sub, new THREE.CylinderGeometry(0.17, 0.17, 0.08, 8), ironMat, [0.55 * s, 3.62, sz]); // Top rim
+            const plantRim = Kit.addPart(sub, new THREE.CylinderGeometry(0.17, 0.17, 0.08, 8), ironMat, [0.55 * s, 3.62, sz]); // Top rim
+            plantRim.userData = { isSmokestack: true, stackHeight: 3.66 };
         }
 
         sub.rotation.y = facingAngle;
