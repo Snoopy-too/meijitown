@@ -13,8 +13,8 @@ export const MILESTONE_TIERS = [
         popMin: 0,
         popMax: 100,
         grant: 0,
-        featuresEn: ['Basic dirt roads & rice paddies', 'Traditional Machiya & Craft Workshops', 'Surveyor Scope & Land Clearance'],
-        featuresJa: ['往来土道・灌漑水田', '伝統的長屋・町家・職人工房', '測量手帳・区画整理'],
+        featuresEn: ['Basic dirt roads, communal wells & rice paddies', 'Traditional Machiya & Craft Workshops', 'Surveyor Scope & Land Clearance'],
+        featuresJa: ['往来土道・共同井戸・灌漑水田', '伝統的長屋・町家・職人工房', '測量手帳・区画整理'],
         badgeEn: 'Village (T1)',
         badgeJa: '村 (第1段階)'
     },

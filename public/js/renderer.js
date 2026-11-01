@@ -186,6 +186,7 @@ export class WorldRenderer {
     updateDayNight(month) {
         if (this.lighting && typeof this.lighting.updateMonth === 'function') this.lighting.updateMonth(month);
         if (this.clouds && typeof this.clouds.updateDayNight === 'function') this.clouds.updateDayNight(month);
+        if (this.backdrop && typeof this.backdrop.updateDayNight === 'function') this.backdrop.updateDayNight(month);
     }
 
     getTileWorldPos(x, y) {
@@ -407,24 +408,21 @@ export class WorldRenderer {
 
         this.traffic.update(speedMult, delta);
         if (this.canalTraffic) this.canalTraffic.update(speedMult, delta);
+        CanalMesh.updateWater(delta * (isSimRunning ? Math.max(0.5, speedMult * 0.6) : 0.3));
         if (this.trainTraffic) this.trainTraffic.update(delta, speedMult);
         if (this.simulation?.typhoon) this.simulation.typhoon.updateRain(delta);
         if (this.fx) this.fx.update(delta);
+        const isStorm = !!this.simulation?.typhoon?.isStormActive;
         if (this.lighting && typeof this.lighting.update === 'function') this.lighting.update(delta);
-        if (this.clouds) this.clouds.update(delta, isSimRunning ? speedMult : 1, !!this.simulation?.typhoon?.isStormActive);
+        if (this.backdrop && typeof this.backdrop.update === 'function') this.backdrop.update(delta, isStorm);
+        if (this.clouds) this.clouds.update(delta, isSimRunning ? speedMult : 1, isStorm);
         this.renderer.render(this.scene, this.camera);
     }
 
     destroy() {
         this.isDestroyed = true;
-        if (this.animFrameId) {
-            cancelAnimationFrame(this.animFrameId);
-            this.animFrameId = null;
-        }
-        if (this.resizeObserver) {
-            this.resizeObserver.disconnect();
-            this.resizeObserver = null;
-        }
+        if (this.animFrameId) { cancelAnimationFrame(this.animFrameId); this.animFrameId = null; }
+        if (this.resizeObserver) { this.resizeObserver.disconnect(); this.resizeObserver = null; }
         if (this.backdrop?.group) this.scene.remove(this.backdrop.group);
         if (this.clouds?.group) this.scene.remove(this.clouds.group);
         if (this.renderer?.domElement?.parentNode) this.renderer.domElement.parentNode.removeChild(this.renderer.domElement);
