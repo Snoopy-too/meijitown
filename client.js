@@ -222,6 +222,12 @@ function getTemplateHtml(mode = 'standard', playerName = 'Mayor', gameName = 'me
         <button id="btn-save" class="action-btn btn-primary" title="Save city progress to local device or database" data-i18n-title="action.save_title">
           <span>💾</span><span class="btn-label" data-i18n="action.save">${isJa ? ' 保存' : ' Save'}</span>
         </button>
+        <button id="btn-reload" class="action-btn" title="Reload saved state from local device" data-i18n-title="action.reload_title">
+          <span>🔄</span><span class="btn-label" data-i18n="action.reload">${isJa ? ' 再読込' : ' Reload'}</span>
+        </button>
+        <button id="btn-new-game" class="action-btn btn-danger" title="Start a completely new settlement (Meiji 1872)" data-i18n-title="action.new_title">
+          <span>⛩️</span><span class="btn-label" data-i18n="action.new">${isJa ? ' 新規開始' : ' New'}</span>
+        </button>
       </div>
 
       <!-- Feedback Toasts & Inline Drag Badge -->
@@ -436,8 +442,16 @@ function mountMeijiClient(container, config) {
       return;
     }
 
-    if (G.vitals && G.vitals.treasury !== undefined) {
-      window.game.treasury = G.vitals.treasury;
+    if (G.vitals) {
+      if (G.vitals.treasury !== undefined) {
+        window.game.treasury = G.vitals.treasury;
+      }
+      if (G.vitals.cityName) {
+        window.game.cityName = G.vitals.cityName;
+      }
+      if (G.vitals.population !== undefined) {
+        window.game.population = G.vitals.population;
+      }
     }
     if (G.chronicle) {
       window.game.currentYear = G.chronicle.currentYear;
@@ -447,6 +461,10 @@ function mountMeijiClient(container, config) {
       try {
         window.game.grid.loadFromMap(G.gridSnapshot);
       } catch (e) {}
+    }
+    if (window.game.renderer) {
+      window.game.renderer.updateSeason(window.game.currentMonth);
+      window.game.renderer.updateDayNight(window.game.currentMonth);
     }
     window.game.updateHUD();
   }
@@ -485,9 +503,9 @@ function mountMeijiClient(container, config) {
         }
 
         let lastSaveTime = 0;
-        window.game.saveMatch = (isAuto = false) => {
+        window.game.saveMatch = (isAuto = false, force = false) => {
           const now = Date.now();
-          if (now - lastSaveTime < 800) return;
+          if (!force && now - lastSaveTime < 800) return;
           lastSaveTime = now;
 
           // 1. ALWAYS persist locally on the player's device for guest / unauthenticated players

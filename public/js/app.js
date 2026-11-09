@@ -91,6 +91,7 @@ class GameStateManager {
         window.addEventListener('keydown', initAudio);
 
         this.initButtons();
+        modalManager.setRoot(this.root);
         i18n.updateDOM(this.root);
 
         // Periodic local auto-save and tab exit persistence for guests
@@ -437,6 +438,11 @@ class GameStateManager {
             // Persist the fresh settlement state locally for guest
             if (!this.isLoggedIn() && this.saveManager) {
                 this.saveManager.saveLocalCity(true);
+            }
+
+            // In online lounge mode, synchronize the new clean settlement to MySQL match via socket
+            if (typeof this.saveMatch === 'function') {
+                this.saveMatch(true, true);
             }
 
             this.showToast('⛩️ A new settlement begins! Meiji Year 5 (1872).');

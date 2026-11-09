@@ -2,14 +2,23 @@
 // ponytail: promise-based modal service replacing window.confirm/alert (< 100 lines)
 
 export class ModalManager {
-    constructor() {
+    constructor(root = null) {
+        this.root = root;
         this.dom = null;
         this.activeResolve = null;
     }
 
+    setRoot(root) {
+        if (this.root !== root) {
+            this.root = root;
+            this.dom = null;
+        }
+    }
+
     ensureDOM() {
         if (this.dom) return this.dom;
-        let overlay = document.getElementById('confirmation-modal');
+        const root = this.root || (typeof document !== 'undefined' ? document : null);
+        let overlay = root ? (root.querySelector ? root.querySelector('#confirmation-modal') : root.getElementById?.('confirmation-modal')) : null;
         if (!overlay) {
             overlay = document.createElement('div');
             overlay.id = 'confirmation-modal';
@@ -29,11 +38,12 @@ export class ModalManager {
                     </div>
                 </div>
             `;
-            document.body.appendChild(overlay);
+            const mountTarget = (root && root.appendChild) ? root : (document.body || document.documentElement);
+            mountTarget.appendChild(overlay);
         } else {
-            let inputContainer = document.getElementById('confirm-modal-input-container');
+            let inputContainer = overlay.querySelector('#confirm-modal-input-container');
             if (!inputContainer) {
-                const messageEl = document.getElementById('confirm-modal-message');
+                const messageEl = overlay.querySelector('#confirm-modal-message');
                 inputContainer = document.createElement('div');
                 inputContainer.id = 'confirm-modal-input-container';
                 inputContainer.style.display = 'none';
@@ -45,13 +55,13 @@ export class ModalManager {
 
         this.dom = {
             overlay,
-            icon: document.getElementById('confirm-modal-icon'),
-            title: document.getElementById('confirm-modal-title'),
-            message: document.getElementById('confirm-modal-message'),
-            inputContainer: document.getElementById('confirm-modal-input-container'),
-            input: document.getElementById('confirm-modal-input'),
-            cancelBtn: document.getElementById('confirm-modal-cancel'),
-            okBtn: document.getElementById('confirm-modal-ok'),
+            icon: overlay.querySelector('#confirm-modal-icon'),
+            title: overlay.querySelector('#confirm-modal-title'),
+            message: overlay.querySelector('#confirm-modal-message'),
+            inputContainer: overlay.querySelector('#confirm-modal-input-container'),
+            input: overlay.querySelector('#confirm-modal-input'),
+            cancelBtn: overlay.querySelector('#confirm-modal-cancel'),
+            okBtn: overlay.querySelector('#confirm-modal-ok'),
         };
 
         this.dom.cancelBtn?.addEventListener('click', () => this.resolve(false));
