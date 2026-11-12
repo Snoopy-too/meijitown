@@ -69,6 +69,7 @@ export class WorldRenderer {
                 this.updateTileMesh(data.x, data.y, data.tile);
                 this.refreshAdjacentRoads(data.x, data.y);
                 this.refreshAdjacentBuildings(data.x, data.y);
+                this.syncGroundTopography();
                 if (this.isFoliageTile(data.x, data.y)) {
                     this.rebuildInstancedBatches();
                 }
@@ -122,13 +123,27 @@ export class WorldRenderer {
     initGround() {
         const totalSizeX = CONFIG.GRID_WIDTH * CONFIG.TILE_SIZE;
         const totalSizeZ = CONFIG.GRID_HEIGHT * CONFIG.TILE_SIZE;
+        const segsX = CONFIG.GRID_WIDTH * 4;
+        const segsZ = CONFIG.GRID_HEIGHT * 4;
+
+        const groundGeo = new THREE.PlaneGeometry(totalSizeX, totalSizeZ, segsX, segsZ);
+        groundGeo.rotateX(-Math.PI / 2);
         this.groundMesh = new THREE.Mesh(
-            new THREE.BoxGeometry(totalSizeX, 1.0, totalSizeZ),
+            groundGeo,
             MaterialLibrary.get('meadowGround').clone()
         );
-        this.groundMesh.position.set(totalSizeX / 2, -0.5, totalSizeZ / 2);
+        this.groundMesh.position.set(totalSizeX / 2, 0.0, totalSizeZ / 2);
         this.groundMesh.receiveShadow = true;
         this.scene.add(this.groundMesh);
+
+        // Sub-surface diorama earthen plinth below recessed canal bed level (y = -0.22 to -1.0)
+        this.groundPlinth = new THREE.Mesh(
+            new THREE.BoxGeometry(totalSizeX, 0.78, totalSizeZ),
+            MaterialLibrary.get('stoneGranite')
+        );
+        this.groundPlinth.position.set(totalSizeX / 2, -0.61, totalSizeZ / 2);
+        this.groundPlinth.receiveShadow = true;
+        this.scene.add(this.groundPlinth);
 
         const gridHelper = new THREE.GridHelper(totalSizeX, CONFIG.GRID_WIDTH, 0x3b4d30, 0x455939);
         gridHelper.position.set(totalSizeX / 2, 0.012, totalSizeZ / 2);
@@ -139,6 +154,81 @@ export class WorldRenderer {
         }
         this.gridHelper = gridHelper;
         this.scene.add(gridHelper);
+        this.syncGroundTopography();
+    }
+
+    syncGroundTopography() {
+        if (!this.groundMesh?.geometry?.attributes?.position || !this.grid) return;
+        const pos = this.groundMesh.geometry.attributes.position;
+        if (typeof pos.getX !== 'function' || typeof pos.setY !== 'function') return;
+
+        const s = CONFIG.TILE_SIZE;
+        const halfX = (CONFIG.GRID_WIDTH * s) / 2;
+        const halfZ = (CONFIG.GRID_HEIGHT * s) / 2;
+
+        for (let i = 0; i < pos.count; i++) {
+            const wx = pos.getX(i) + halfX;
+            const wz = pos.getZ(i) + halfZ;
+            const tx = Math.min(CONFIG.GRID_WIDTH - 1, Math.max(0, Math.floor(wx / s)));
+            const ty = Math.min(CONFIG.GRID_HEIGHT - 1, Math.max(0, Math.floor(wz / s)));
+            const tile = this.grid.getTile(tx, ty);
+
+            const lx = wx - (tx + 0.5) * s;
+            const lz = wz - (ty + 0.5) * s;
+            const edgeDist = Math.max(Math.abs(lx), Math.abs(lz));
+
+            let targetY = 0.0;
+            if (tile && tile.type === CONFIG.TYPES.CANAL) {
+                // Physical canal excavation: carve terrain down to -0.20m inside canal envelope
+                targetY = edgeDist < (s * 0.48) ? -0.20 : -0.04;
+            } else if (tile && tile.type === CONFIG.TYPES.AGRICULTURE) {
+                // Gently recessed irrigated rice paddy basin interior
+                targetY = edgeDist < (s * 0.38) ? -0.022 : 0.0;
+            } else if (!tile || tile.type === CONFIG.TYPES.EMPTY) {
+                // Subtle natural turf micro-relief on unbuilt meadow tiles (zero on tile borders)
+                if (edgeDist < s * 0.40) {
+                    targetY = Math.sin(wx * 1.35 + wz * 0.95) * Math.cos(wx * 0.85 - wz * 1.25) * 0.012;
+                }
+            }
+            pos.setY(i, targetY);
+        }
+        pos.needsUpdate = true;
+        if (typeof this.groundMesh.geometry.computeVertexNormals === 'function') {
+            this.groundMesh.geometry.computeVertexNormals();
+        }
+
+        // Prevent gridHelper lines (y = 0.012) from floating in mid-air across recessed canal trenches
+        if (this.gridHelper?.geometry && typeof this.gridHelper.geometry.setAttribute === 'function' && THREE.Float32BufferAttribute) {
+            const verts = [];
+            const gw = CONFIG.GRID_WIDTH;
+            const gh = CONFIG.GRID_HEIGHT;
+            const isCanal = (x, y) => {
+                if (!this.grid.isValidCoord(x, y)) return false;
+                const t = this.grid.getTile(x, y);
+                return Boolean(t && t.type === CONFIG.TYPES.CANAL);
+            };
+            for (let x = 0; x <= gw; x++) {
+                const lx = x * s - halfX;
+                for (let y = 0; y < gh; y++) {
+                    if (isCanal(x - 1, y) && isCanal(x, y)) continue;
+                    verts.push(lx, 0, y * s - halfZ, lx, 0, (y + 1) * s - halfZ);
+                }
+            }
+            for (let y = 0; y <= gh; y++) {
+                const lz = y * s - halfZ;
+                for (let x = 0; x < gw; x++) {
+                    if (isCanal(x, y - 1) && isCanal(x, y)) continue;
+                    verts.push(x * s - halfX, 0, lz, (x + 1) * s - halfX, 0, lz);
+                }
+            }
+            this.gridHelper.geometry.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+            if (this.gridHelper.geometry.attributes?.color && typeof this.gridHelper.geometry.deleteAttribute === 'function') {
+                this.gridHelper.geometry.deleteAttribute('color');
+            }
+            if (this.gridHelper.material) {
+                this.gridHelper.material.vertexColors = false;
+            }
+        }
     }
 
     bindEvents() {
@@ -393,6 +483,7 @@ export class WorldRenderer {
             }
         }
         this.rebuildInstancedBatches();
+        this.syncGroundTopography();
     }
 
     dispatchBrigadeCart(roadPath, onArrival) { this.traffic.dispatchBrigadeCart(roadPath, onArrival); }

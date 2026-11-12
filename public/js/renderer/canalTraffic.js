@@ -1,8 +1,9 @@
 // Project Meiji - Canal Waterway Traffic & Takasebune Cargo Barges (canalTraffic.js)
-// Phase 2 /artisan: Takasebune Cargo Barges, Woven Bamboo Awning, Rice Sacks & Poled Boatman (<= 400 lines)
+// Phase 3 /artisan: PBR Takasebune Cargo Barges, Recessed Waterline Grounding (y = -0.06), Woven Bamboo Awning & Articulated Sendō Boatman
 
 import * as THREE from 'three';
 import { CONFIG } from '../config.js';
+import { CanalMesh } from './canal_mesh.js';
 
 export class CanalTrafficManager {
     constructor(scene, gridModel, getTileWorldPosFn, modelCache = null) {
@@ -17,90 +18,137 @@ export class CanalTrafficManager {
         this.animTime = 0;
     }
 
-    // Authentic Meiji Takasebune (高瀬舟) river cargo barge
+    static getWaterElevation() {
+        return typeof CanalMesh?.WATER_LEVEL === 'number' ? CanalMesh.WATER_LEVEL : -0.06;
+    }
+
+    // Authentic Meiji Takasebune (高瀬舟) river cargo barge with PBR materials & articulated Sendō
     createProceduralBargeMesh() {
         const group = new THREE.Group();
-        const hullMat = new THREE.MeshLambertMaterial({ color: 0x4a3422 });
-        const gunwaleMat = new THREE.MeshLambertMaterial({ color: 0x382618 });
-        const bambooMat = new THREE.MeshLambertMaterial({ color: 0xc8aa64 });
-        const strawMat = new THREE.MeshLambertMaterial({ color: 0xbfa366 });
-        const wakeMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.40 });
+        const hullMat = new THREE.MeshStandardMaterial({ color: 0x4a3422, roughness: 0.78, metalness: 0.04 });
+        const gunwaleMat = new THREE.MeshStandardMaterial({ color: 0x342316, roughness: 0.82, metalness: 0.05 });
+        const bambooMat = new THREE.MeshStandardMaterial({ color: 0xc8aa64, roughness: 0.74, metalness: 0.02 });
+        const strawMat = new THREE.MeshStandardMaterial({ color: 0xbfa366, roughness: 0.86, metalness: 0.0 });
+        const ironMat = new THREE.MeshStandardMaterial({ color: 0x24272b, roughness: 0.45, metalness: 0.72 });
+        const wakeMat = new THREE.MeshBasicMaterial({ color: 0xdff6fa, transparent: true, opacity: 0.42 });
 
-        // 1. Flat-bottomed Swept Timber Hull
-        const hull = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.05, 0.92), hullMat);
-        hull.position.y = 0.025;
+        // 1. Flat-bottomed Swept Timber Hull & Ribbed Thwarts
+        const hull = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.055, 0.92), hullMat);
+        hull.position.y = 0.022;
         hull.castShadow = true;
+        hull.receiveShadow = true;
         group.add(hull);
 
-        // Raised sweeping Prow (Bow)
-        const prow = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.05, 0.22), hullMat);
+        // Raised sweeping Prow (Bow) & Stern Transom
+        const prow = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.05, 0.24), hullMat);
         prow.position.set(0, 0.055, 0.52);
-        prow.rotation.x = -0.22;
+        prow.rotation.x = -0.24;
         prow.castShadow = true;
         group.add(prow);
 
-        // Left and Right timber gunwale sideboards
+        const sternDeck = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.045, 0.20), hullMat);
+        sternDeck.position.set(0, 0.048, -0.46);
+        sternDeck.rotation.x = 0.14;
+        sternDeck.castShadow = true;
+        group.add(sternDeck);
+
+        // Left and Right timber gunwale sideboards & transverse thwarts
         for (const gx of [-0.18, 0.18]) {
-            const side = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.07, 0.94), gunwaleMat);
+            const side = new THREE.Mesh(new THREE.BoxGeometry(0.032, 0.075, 0.96), gunwaleMat);
             side.position.set(gx, 0.065, 0.02);
+            side.castShadow = true;
             group.add(side);
         }
+        for (const tz of [-0.26, 0.26]) {
+            const thwart = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.024, 0.045), gunwaleMat);
+            thwart.position.set(0, 0.072, tz);
+            group.add(thwart);
+        }
 
-        // 2. Woven Bamboo / Reed Cargo Canopy Awning (Tomabune / 苫舟)
-        const awning = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.45, 8, 1, false, 0, Math.PI), bambooMat);
+        // 2. Woven Bamboo / Reed Cargo Canopy Awning (Tomabune / 苫舟) with bamboo ribs
+        const awning = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.46, 10, 1, false, 0, Math.PI), bambooMat);
         awning.rotation.set(0, 0, -Math.PI / 2);
         awning.scale.set(0.65, 1.0, 1.0);
         awning.position.set(0, 0.12, -0.04);
         awning.castShadow = true;
         group.add(awning);
 
-        // 3. Cargo under & behind awning: Straw Rice Bales (Tawara) & Sake Casks
-        const tawaraGeo = new THREE.CylinderGeometry(0.055, 0.055, 0.22, 6);
+        // 3. Cargo under & ahead of awning: Bound Straw Rice Bales (Kome-dawara) & Hooped Sake Casks
+        const tawaraGeo = new THREE.CylinderGeometry(0.058, 0.058, 0.23, 8);
         tawaraGeo.rotateZ(Math.PI / 2);
-        const t1 = new THREE.Mesh(tawaraGeo, strawMat);
-        t1.position.set(0, 0.07, 0.18);
-        t1.castShadow = true;
-        group.add(t1);
+        for (const [ty, tz] of [[0.072, 0.18], [0.072, 0.31], [0.145, 0.24]]) {
+            const bale = new THREE.Mesh(tawaraGeo, strawMat);
+            bale.position.set(0, ty, tz);
+            bale.castShadow = true;
+            group.add(bale);
+        }
 
-        const caskGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.09, 8);
-        const c1 = new THREE.Mesh(caskGeo, gunwaleMat);
-        c1.position.set(-0.08, 0.08, -0.04);
-        group.add(c1);
-        const c2 = new THREE.Mesh(caskGeo, gunwaleMat);
-        c2.position.set(0.08, 0.08, -0.04);
-        group.add(c2);
+        const caskGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.095, 8);
+        for (const cx of [-0.08, 0.08]) {
+            const cask = new THREE.Mesh(caskGeo, gunwaleMat);
+            cask.position.set(cx, 0.08, -0.04);
+            group.add(cask);
+        }
 
-        // 4. Articulated Boatman (Sendō 船頭) at Stern
-        const coatMat = new THREE.MeshLambertMaterial({ color: 0x1f3652 });
-        const body = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.14, 0.08), coatMat);
-        body.position.set(0, 0.11, -0.32);
-        group.add(body);
+        // Warm bow navigation lantern (Chōchin)
+        const bowPost = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.01, 0.16, 5), ironMat);
+        bowPost.position.set(0, 0.14, 0.58);
+        group.add(bowPost);
+        const bowLantern = new THREE.Mesh(
+            new THREE.SphereGeometry(0.032, 8, 6),
+            new THREE.MeshStandardMaterial({ color: 0xffddaa, emissive: 0xff8822, emissiveIntensity: 0.65, roughness: 0.4 })
+        );
+        bowLantern.name = 'Lantern_Body';
+        bowLantern.position.set(0, 0.19, 0.58);
+        group.add(bowLantern);
 
-        const head = new THREE.Mesh(new THREE.SphereGeometry(0.045, 5, 5), new THREE.MeshLambertMaterial({ color: 0xf2cbb0 }));
-        head.position.set(0, 0.20, -0.32);
-        group.add(head);
+        // 4. Articulated Boatman (Sendō 船頭) at Stern with Upper/Lower Body & Poling Arms
+        const coatMat = new THREE.MeshStandardMaterial({ color: 0x1f3652, roughness: 0.84 });
+        const skinMat = new THREE.MeshStandardMaterial({ color: 0xe5c29f, roughness: 0.75 });
+        const boatmanGroup = new THREE.Group();
+        boatmanGroup.position.set(0, 0.05, -0.36);
+
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.054, 0.18, 8), coatMat);
+        body.position.set(0, 0.12, 0);
+        body.castShadow = true;
+        boatmanGroup.add(body);
+
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.042, 8, 8), skinMat);
+        head.position.set(0, 0.24, 0);
+        boatmanGroup.add(head);
 
         // Conical straw hat (Sugegasa)
-        const hat = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.045, 8), bambooMat);
-        hat.position.set(0, 0.23, -0.32);
-        group.add(hat);
+        const hat = new THREE.Mesh(new THREE.ConeGeometry(0.125, 0.05, 10), bambooMat);
+        hat.position.set(0, 0.275, 0);
+        hat.castShadow = true;
+        boatmanGroup.add(hat);
 
-        // Long Bamboo Push-Pole (Sao 竿) angled into the water
-        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.55, 4), bambooMat);
-        pole.rotation.set(Math.PI / 4, 0, -0.25);
-        pole.position.set(0.12, 0.06, -0.38);
-        group.add(pole);
+        // Articulated Poling Arms & Long Bamboo Push-Pole (Sao 竿) reaching into the canal bed
+        const polePivot = new THREE.Group();
+        polePivot.position.set(0.06, 0.16, 0);
+        const armR = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.014, 0.12, 6), coatMat);
+        armR.rotation.x = 0.7;
+        armR.position.set(0, -0.02, 0.03);
+        polePivot.add(armR);
 
-        // 5. White trailing water wake ribbons
-        const wakeL = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.005, 0.35), wakeMat);
-        wakeL.position.set(-0.16, 0.035, -0.58);
-        wakeL.rotation.y = -0.22;
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.010, 0.012, 0.68, 6), bambooMat);
+        pole.rotation.set(Math.PI / 3.6, 0, -0.20);
+        pole.position.set(0.04, -0.08, -0.06);
+        polePivot.add(pole);
+        boatmanGroup.add(polePivot);
+        group.add(boatmanGroup);
+
+        // 5. V-Shaped Trailing Water Wake Ribbons
+        const wakeL = new THREE.Mesh(new THREE.BoxGeometry(0.028, 0.004, 0.42), wakeMat);
+        wakeL.position.set(-0.17, 0.012, -0.62);
+        wakeL.rotation.y = -0.24;
         group.add(wakeL);
-        const wakeR = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.005, 0.35), wakeMat);
-        wakeR.position.set(0.16, 0.035, -0.58);
-        wakeR.rotation.y = 0.22;
+        const wakeR = new THREE.Mesh(new THREE.BoxGeometry(0.028, 0.004, 0.42), wakeMat);
+        wakeR.position.set(0.17, 0.012, -0.62);
+        wakeR.rotation.y = 0.24;
         group.add(wakeR);
 
+        group.userData = { polePivot };
         return group;
     }
 
@@ -230,9 +278,10 @@ export class CanalTrafficManager {
         const tilePath = this.buildWaterwayRoute(chosenNet);
         if (!tilePath || tilePath.length < 2) return;
 
+        const waterY = CanalTrafficManager.getWaterElevation();
         const waypoints = tilePath.map(t => {
             const p = this.getTileWorldPos(t.x, t.y);
-            return new THREE.Vector3(p.x, 0.038, p.z);
+            return new THREE.Vector3(p.x, waterY, p.z);
         });
 
         const mesh = this.createBargeInstance();
@@ -282,9 +331,13 @@ export class CanalTrafficManager {
                 barge.waypointIndex++;
                 barge.progress = 0;
             } else {
+                const waterY = CanalTrafficManager.getWaterElevation();
                 barge.mesh.position.lerpVectors(from, to, barge.progress);
-                // Gentle floating water rocking bob
-                barge.mesh.position.y = 0.038 + Math.sin(this.animTime * 2.8 + i) * 0.008;
+                // Gentle floating water rocking bob on the recessed canal surface
+                barge.mesh.position.y = waterY + Math.sin(this.animTime * 2.8 + i) * 0.007;
+                if (barge.mesh.userData?.polePivot) {
+                    barge.mesh.userData.polePivot.rotation.x = Math.sin(this.animTime * 3.2 + i) * 0.18;
+                }
 
                 const dirX = to.x - from.x;
                 const dirZ = to.z - from.z;

@@ -1,5 +1,5 @@
 // Project Meiji - Procedural Telegraph Renderer (telegraphRenderer.js)
-// Phase 2 /artisan: In-scale Meiji cedar pole (2.05m), copper rain cap, dual crossarms, Gaishi insulators & catenary wires
+// Phase 3 /artisan: In-scale Meiji cedar pole (2.05m), Ne-maki ground guard, dual Gaishi tiers & true Math.cosh catenary wires
 
 import * as THREE from 'three';
 import { CONFIG } from '../config.js';
@@ -9,29 +9,47 @@ export class TelegraphRenderer {
     static getMaterials() {
         if (this._materials) return this._materials;
         this._materials = {
-            wood: new THREE.MeshStandardMaterial({ color: 0x4a3525, roughness: 0.85 }),
-            crossarm: new THREE.MeshStandardMaterial({ color: 0x5c4330, roughness: 0.82 }),
-            brace: new THREE.MeshStandardMaterial({ color: 0x26292e, roughness: 0.5, metalness: 0.6 }),
-            copperCap: new THREE.MeshStandardMaterial({ color: 0x3b6e66, roughness: 0.5, metalness: 0.4 }),
+            wood: new THREE.MeshStandardMaterial({ color: 0x4a3525, roughness: 0.85, metalness: 0.04 }),
+            nemaki: new THREE.MeshStandardMaterial({ color: 0x6e5438, roughness: 0.88, metalness: 0.02 }),
+            rope: new THREE.MeshStandardMaterial({ color: 0x1d1a17, roughness: 0.92, metalness: 0.0 }),
+            crossarm: new THREE.MeshStandardMaterial({ color: 0x5c4330, roughness: 0.82, metalness: 0.04 }),
+            brace: new THREE.MeshStandardMaterial({ color: 0x26292e, roughness: 0.45, metalness: 0.68 }),
+            copperCap: new THREE.MeshStandardMaterial({ color: 0x3b6e66, roughness: 0.42, metalness: 0.48 }),
             insulator: new THREE.MeshStandardMaterial({
                 color: 0xf4f1ea,
-                roughness: 0.25,
-                metalness: 0.1
+                roughness: 0.18,
+                metalness: 0.12
             }),
-            wire: new THREE.MeshBasicMaterial({ color: 0x22252a })
+            wire: new THREE.MeshStandardMaterial({
+                color: 0x24282e,
+                roughness: 0.38,
+                metalness: 0.78
+            })
         };
         return this._materials;
     }
 
     // Build proportional Meiji telegraph pole (2.05 units tall, matching 1-2 story eaves)
-    static createTelegraphPole(orientation = 'NS', s = CONFIG.TILE_SIZE) {
+    static createTelegraphPole(orientation = 'NS', s = CONFIG.TILE_SIZE, spanOptions = null) {
         const poleGroup = new THREE.Group();
         const mats = this.getMaterials();
 
-        // 1. Stone base plinth & tapered cedar pole (2.05m tall, not 4.5m!)
-        const baseCollar = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.068, 0.16, 7), MaterialLibrary.get('stoneGranite'));
-        baseCollar.position.y = 0.08;
+        // 1. Stone base plinth, Ne-maki (根巻き) timber ground-protector & shuro-nawa rope bindings
+        const baseCollar = new THREE.Mesh(new THREE.CylinderGeometry(0.058, 0.072, 0.12, 8), MaterialLibrary.get('stoneGranite'));
+        baseCollar.position.y = 0.06;
+        baseCollar.receiveShadow = true;
         poleGroup.add(baseCollar);
+
+        const nemaki = new THREE.Mesh(new THREE.CylinderGeometry(0.050, 0.056, 0.34, 8), mats.nemaki);
+        nemaki.position.y = 0.25;
+        nemaki.castShadow = true;
+        poleGroup.add(nemaki);
+
+        for (const ry of [0.16, 0.26, 0.36]) {
+            const ropeBand = new THREE.Mesh(new THREE.CylinderGeometry(0.054, 0.055, 0.018, 8), mats.rope);
+            ropeBand.position.y = ry;
+            poleGroup.add(ropeBand);
+        }
 
         const poleH = 2.05;
         const poleGeo = new THREE.CylinderGeometry(0.028, 0.046, poleH, 8);
@@ -77,23 +95,26 @@ export class TelegraphRenderer {
         poleGroup.add(braceL);
         poleGroup.add(braceR);
 
-        // 4. Glazed white porcelain insulators (Gaishi / 碍子)
+        // 4. Glazed white porcelain insulators (Gaishi / 碍子) on both upper and lower crossarms
         const insGeo = new THREE.CylinderGeometry(0.018, 0.022, 0.048, 6);
-        const insOffsets = [-0.20, -0.08, 0.08, 0.20];
-        const insY = 1.92;
+        const upperOffsets = [-0.20, -0.08, 0.08, 0.20];
+        const lowerOffsets = [-0.16, 0.16];
 
-        for (const off of insOffsets) {
+        for (const off of upperOffsets) {
             const insMesh = new THREE.Mesh(insGeo, mats.insulator);
-            if (orientation === 'NS') {
-                insMesh.position.set(off, insY, 0);
-            } else {
-                insMesh.position.set(0, insY, off);
-            }
+            if (orientation === 'NS') insMesh.position.set(off, 1.92, 0);
+            else insMesh.position.set(0, 1.92, off);
+            poleGroup.add(insMesh);
+        }
+        for (const off of lowerOffsets) {
+            const insMesh = new THREE.Mesh(insGeo, mats.insulator);
+            if (orientation === 'NS') insMesh.position.set(off, 1.74, 0);
+            else insMesh.position.set(0, 1.74, off);
             poleGroup.add(insMesh);
         }
 
-        // 5. Twin catenary sagging wires along road channel
-        const wireMeshes = this.createCatenaryWires(orientation, s, mats.wire);
+        // 5. True hyperbolic-cosine (Math.cosh) catenary sagging wires along road channel
+        const wireMeshes = this.createCatenaryWires(orientation, s, mats.wire, spanOptions);
         for (const w of wireMeshes) {
             poleGroup.add(w);
         }
@@ -101,39 +122,79 @@ export class TelegraphRenderer {
         return poleGroup;
     }
 
-    // Generate catenary wire geometry with proportional height and natural gravity sag
-    static createCatenaryWires(orientation = 'NS', s = CONFIG.TILE_SIZE, wireMat = null) {
+    // Generate true Math.cosh catenary wire geometry across upper & lower insulator tiers
+    static createCatenaryWires(orientation = 'NS', s = CONFIG.TILE_SIZE, wireMat = null, spanOptions = null) {
         const mat = wireMat || this.getMaterials().wire;
         const wires = [];
-        const wireY = 1.93;
-        const sagY = 1.86;
-        const wireOffsets = [-0.14, 0.14];
 
-        for (const wOff of wireOffsets) {
-            let curve;
-            if (orientation === 'NS') {
-                curve = new THREE.QuadraticBezierCurve3(
-                    new THREE.Vector3(wOff, wireY, -s / 2),
-                    new THREE.Vector3(wOff, sagY, 0),
-                    new THREE.Vector3(wOff, wireY, s / 2)
-                );
-            } else {
-                curve = new THREE.QuadraticBezierCurve3(
-                    new THREE.Vector3(-s / 2, wireY, wOff),
-                    new THREE.Vector3(0, sagY, wOff),
-                    new THREE.Vector3(s / 2, wireY, wOff)
-                );
+        const spanStart = (spanOptions && typeof spanOptions.spanStart === 'number') ? spanOptions.spanStart : -s / 2;
+        const spanEnd = (spanOptions && typeof spanOptions.spanEnd === 'number') ? spanOptions.spanEnd : s / 2;
+        const spanLength = Math.max(0.5, spanEnd - spanStart);
+        const midCoord = (spanStart + spanEnd) / 2;
+
+        // Upper tier (2 outer wires) + Lower tier (1 inner wire) with authentic catenary sag
+        const wireSpecs = [
+            { off: -0.20, pinY: 1.935, sag: 0.085 * (spanLength / s) },
+            { off:  0.20, pinY: 1.935, sag: 0.085 * (spanLength / s) },
+            { off: -0.16, pinY: 1.755, sag: 0.075 * (spanLength / s) },
+        ];
+
+        const k = 1.35; // Catenary curvature parameter
+        const coshNorm = Math.cosh(k) - 1.0;
+
+        for (const spec of wireSpecs) {
+            const samplePoints = [];
+            const numSamples = 9;
+            for (let i = 0; i <= numSamples; i++) {
+                const t = i / numSamples;
+                const u = (t - 0.5) * 2.0; // [-1, 1]
+                const coord = midCoord + u * (spanLength / 2);
+                const catenaryDrop = spec.sag * (1.0 - (Math.cosh(k * u) - 1.0) / coshNorm);
+                const y = spec.pinY - catenaryDrop;
+
+                if (orientation === 'NS') {
+                    samplePoints.push(new THREE.Vector3(spec.off, y, coord));
+                } else {
+                    samplePoints.push(new THREE.Vector3(coord, y, spec.off));
+                }
             }
-            const wireGeo = new THREE.TubeGeometry(curve, 6, 0.007, 4, false);
+            const curve = new THREE.CatmullRomCurve3(samplePoints);
+            const wireGeo = new THREE.TubeGeometry(curve, 8, 0.0065, 4, false);
             wires.push(new THREE.Mesh(wireGeo, mat));
         }
 
         return wires;
     }
 
-    // Attach positioned pole to road mesh group
-    static attachToRoad(group, orientation, trackWidth, s = CONFIG.TILE_SIZE) {
-        const poleGroup = this.createTelegraphPole(orientation, s);
+    // Attach positioned pole to road mesh group and compute continuous multi-tile catenary wire span
+    static attachToRoad(group, orientation, trackWidth, s = CONFIG.TILE_SIZE, x = null, y = null, grid = null) {
+        let spanOptions = { spanStart: -s / 2, spanEnd: s / 2 };
+
+        if (grid && typeof x === 'number' && typeof y === 'number') {
+            const isRoad = (tx, ty) => {
+                if (!grid.isValidCoord(tx, ty)) return false;
+                const t = grid.getTile(tx, ty);
+                return grid.isRoadTile ? grid.isRoadTile(t) : Boolean(t && t.type === CONFIG.TYPES.ROAD);
+            };
+            // Since poles spawn every 2 tiles ((x + y) % 2 === 0), extend forward wire span 1.5 tiles to meet the next pole
+            if (orientation === 'NS') {
+                const hasNorth2 = isRoad(x, y - 1) && isRoad(x, y - 2);
+                const hasSouth2 = isRoad(x, y + 1) && isRoad(x, y + 2);
+                spanOptions = {
+                    spanStart: hasNorth2 ? -s : -s * 0.48,
+                    spanEnd: hasSouth2 ? s : s * 0.48,
+                };
+            } else {
+                const hasWest2 = isRoad(x - 1, y) && isRoad(x - 2, y);
+                const hasEast2 = isRoad(x + 1, y) && isRoad(x + 2, y);
+                spanOptions = {
+                    spanStart: hasWest2 ? -s : -s * 0.48,
+                    spanEnd: hasEast2 ? s : s * 0.48,
+                };
+            }
+        }
+
+        const poleGroup = this.createTelegraphPole(orientation, s, spanOptions);
         const offsetDist = trackWidth / 2 + 0.16;
         if (orientation === 'NS') {
             poleGroup.position.set(offsetDist, 0, 0);

@@ -1,9 +1,10 @@
 // Project Meiji - Dynamic Street Traffic & Cart Movement Engine (traffic_manager.js)
-// Phase 2 /artisan: Articulated Citizens, Jinrikisha Rickshaws, Hikeshi Hand-Pump Carts & Walking Cycles (<= 580 lines)
+// Phase 3 /artisan: Road & Taiko-bashi Bridge Surface Grounding, Knee-Articulated Citizens, PBR Jinrikisha & Hikeshi Carts
 
 import * as THREE from 'three';
 import { CONFIG } from '../config.js';
 import { SOUND } from '../fx.js';
+import { CanalMesh } from './canal_mesh.js';
 
 export class TrafficManager {
     constructor(scene, gridModel, getTileWorldPosFn, fxManager) {
@@ -31,22 +32,57 @@ export class TrafficManager {
         }
     }
 
-    // Procedural 4-Wheel Hand-Pump Fire Brigade Cart (Ryūtosui 竜吐水)
+    /**
+     * Evaluates exact street-crown or parabolic Taiko-bashi bridge deck elevation & pitch angle at (wx, wz).
+     */
+    getSurfacePose(wx, wz, dirX = 0, dirZ = 1) {
+        if (!this.grid) return { y: 0.05, pitch: 0 };
+        const s = CONFIG.TILE_SIZE;
+        const tx = Math.floor(wx / s);
+        const ty = Math.floor(wz / s);
+        if (!this.grid.isValidCoord(tx, ty)) return { y: 0.05, pitch: 0 };
+
+        const tile = this.grid.getTile(tx, ty);
+        if (!tile) return { y: 0.05, pitch: 0 };
+
+        // Parabolic Taiko-bashi canal bridge grounding & slope pitch
+        if (tile.type === CONFIG.TYPES.CANAL && tile.hasBridge) {
+            const center = this.getTileWorldPos(tx, ty);
+            const east = this.grid.getTile(tx + 1, ty);
+            const west = this.grid.getTile(tx - 1, ty);
+            const isRoad = t => t && (t.type === CONFIG.TYPES.ROAD || (t.type === CONFIG.TYPES.CANAL && t.hasBridge));
+            const isEastWest = isRoad(east) || isRoad(west);
+
+            const bridgeLen = s * 1.04;
+            const localCoord = isEastWest ? (wx - center.x) : (wz - center.z);
+            const t = Math.max(0, Math.min(1, (localCoord / bridgeLen) + 0.5));
+            const archY = CanalMesh.evalBridgeArchY(t) + 0.028;
+            const dYdCoord = CanalMesh.evalBridgeArchSlope(t, bridgeLen);
+            const travelSign = isEastWest ? (dirX >= 0 ? 1 : -1) : (dirZ >= 0 ? 1 : -1);
+            const pitch = -Math.atan(dYdCoord * travelSign);
+            return { y: archY, pitch };
+        }
+
+        const roadSurfaceY = (tile.roadTier === 2) ? 0.068 : 0.058;
+        return { y: roadSurfaceY, pitch: 0 };
+    }
+
+    // Procedural 4-Wheel Hand-Pump Fire Brigade Cart (Ryūtosui 竜吐水) with PBR materials & articulated Hikeshi
     createHandPumpCartMesh() {
         const group = new THREE.Group();
 
         // 1. Wooden Wagon Bed
         const bedGeo = new THREE.BoxGeometry(0.38, 0.08, 0.62);
-        const bedMat = new THREE.MeshLambertMaterial({ color: 0x5a4632 });
+        const bedMat = new THREE.MeshStandardMaterial({ color: 0x5a4632, roughness: 0.80, metalness: 0.05 });
         const bed = new THREE.Mesh(bedGeo, bedMat);
         bed.position.y = 0.16;
         bed.castShadow = true;
         group.add(bed);
 
-        // 2. Four Wooden Spoke Wheels (Front & Rear pairs)
-        const wheelGeo = new THREE.CylinderGeometry(0.13, 0.13, 0.04, 8);
+        // 2. Four Wooden Spoke Wheels with Wrought-Iron Tire Bands
+        const wheelGeo = new THREE.CylinderGeometry(0.13, 0.13, 0.04, 10);
         wheelGeo.rotateZ(Math.PI / 2);
-        const wheelMat = new THREE.MeshLambertMaterial({ color: 0x3d2b1f });
+        const wheelMat = new THREE.MeshStandardMaterial({ color: 0x3d2b1f, roughness: 0.78, metalness: 0.12 });
         const wheels = [];
         for (const [wx, wz] of [[-0.22, -0.18], [0.22, -0.18], [-0.22, 0.18], [0.22, 0.18]]) {
             const w = new THREE.Mesh(wheelGeo, wheelMat);
@@ -56,9 +92,9 @@ export class TrafficManager {
             wheels.push(w);
         }
 
-        // 3. Brass Ryūtosui Hand-Pump Box
+        // 3. Polished Brass Ryūtosui Hand-Pump Box
         const pumpGeo = new THREE.BoxGeometry(0.22, 0.24, 0.20);
-        const pumpMat = new THREE.MeshLambertMaterial({ color: 0xb58900 });
+        const pumpMat = new THREE.MeshStandardMaterial({ color: 0xc89b28, roughness: 0.28, metalness: 0.78 });
         const pump = new THREE.Mesh(pumpGeo, pumpMat);
         pump.position.set(0, 0.30, -0.05);
         pump.castShadow = true;
@@ -67,16 +103,17 @@ export class TrafficManager {
         // Rocking Pump Lever Handle
         const handleGeo = new THREE.CylinderGeometry(0.015, 0.015, 0.36, 6);
         handleGeo.rotateX(Math.PI / 2);
-        const handleMat = new THREE.MeshLambertMaterial({ color: 0x2e1f14 });
+        const handleMat = new THREE.MeshStandardMaterial({ color: 0x2e1f14, roughness: 0.75, metalness: 0.15 });
         const handle = new THREE.Mesh(handleGeo, handleMat);
         handle.position.set(0, 0.44, -0.05);
         group.add(handle);
 
-        // 4. Lacquered Red Water Barrels
-        const barrelMat = new THREE.MeshLambertMaterial({ color: 0x8a2b1f });
+        // 4. Lacquered Vermilion Water Barrels
+        const barrelMat = new THREE.MeshStandardMaterial({ color: 0x8a2b1f, roughness: 0.42, metalness: 0.08 });
         for (const bx of [-0.08, 0.08]) {
-            const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.20, 6), barrelMat);
+            const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.07, 0.20, 8), barrelMat);
             barrel.position.set(bx, 0.28, 0.18);
+            barrel.castShadow = true;
             group.add(barrel);
         }
 
@@ -89,6 +126,7 @@ export class TrafficManager {
 
         const runnerBody = new THREE.Mesh(new THREE.CylinderGeometry(0.048, 0.062, 0.24, 8), runnerBodyMat);
         runnerBody.position.y = 0.24;
+        runnerBody.castShadow = true;
         runnerGroup.add(runnerBody);
 
         const head = new THREE.Mesh(new THREE.SphereGeometry(0.046, 10, 10), skinMat);
@@ -99,27 +137,34 @@ export class TrafficManager {
         runnerGroup.add(hairCap);
 
         // White brigade headband (Hachimaki)
-        const hachi = new THREE.Mesh(new THREE.CylinderGeometry(0.050, 0.050, 0.018, 10), new THREE.MeshLambertMaterial({ color: 0xf5f5f0 }));
+        const hachi = new THREE.Mesh(new THREE.CylinderGeometry(0.050, 0.050, 0.018, 10), new THREE.MeshStandardMaterial({ color: 0xf5f5f0, roughness: 0.8 }));
         hachi.position.y = 0.42;
         runnerGroup.add(hachi);
 
-        // Articulated legs
-        const legL = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.020, 0.14, 6), runnerBodyMat);
-        legL.position.set(-0.032, 0.07, 0);
+        // Knee-articulated legs (thigh + shin)
+        const legL = new THREE.Mesh(new THREE.CylinderGeometry(0.023, 0.020, 0.08, 6), runnerBodyMat);
+        legL.position.set(-0.032, 0.11, 0);
+        const shinL = new THREE.Mesh(new THREE.CylinderGeometry(0.019, 0.017, 0.08, 6), skinMat);
+        shinL.position.set(0, -0.07, 0);
+        legL.add(shinL);
         runnerGroup.add(legL);
-        const legR = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.020, 0.14, 6), runnerBodyMat);
-        legR.position.set(0.032, 0.07, 0);
+
+        const legR = new THREE.Mesh(new THREE.CylinderGeometry(0.023, 0.020, 0.08, 6), runnerBodyMat);
+        legR.position.set(0.032, 0.11, 0);
+        const shinR = new THREE.Mesh(new THREE.CylinderGeometry(0.019, 0.017, 0.08, 6), skinMat);
+        shinR.position.set(0, -0.07, 0);
+        legR.add(shinR);
         runnerGroup.add(legR);
 
         // Matoi Standard Pole & Gilded Crest
-        const matoiPole = new THREE.Mesh(new THREE.CylinderGeometry(0.010, 0.010, 0.62, 5), bedMat);
+        const matoiPole = new THREE.Mesh(new THREE.CylinderGeometry(0.010, 0.010, 0.62, 6), bedMat);
         matoiPole.position.set(0.09, 0.40, -0.04);
         runnerGroup.add(matoiPole);
-        const matoiHead = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.11, 6), new THREE.MeshLambertMaterial({ color: 0xd4af37 }));
+        const matoiHead = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.11, 8), new THREE.MeshStandardMaterial({ color: 0xd4af37, roughness: 0.3, metalness: 0.82 }));
         matoiHead.position.set(0.09, 0.72, -0.04);
         runnerGroup.add(matoiHead);
 
-        runnerGroup.userData = { legL, legR };
+        runnerGroup.userData = { legL, legR, shinL, shinR };
         group.userData = { wheels, pumpHandle: handle, runner: runnerGroup };
         group.add(runnerGroup);
         return group;
@@ -135,7 +180,8 @@ export class TrafficManager {
         const cart = this.createHandPumpCartMesh();
         const startTile = roadPath[0];
         const startPos = this.getTileWorldPos(startTile.x, startTile.y);
-        cart.position.set(startPos.x, 0, startPos.z);
+        const startPose = this.getSurfacePose(startPos.x, startPos.z);
+        cart.position.set(startPos.x, startPose.y, startPos.z);
         this.scene.add(cart);
 
         const waypoints = roadPath.map(t => {
@@ -155,14 +201,15 @@ export class TrafficManager {
         });
     }
 
-    // Procedural Jinrikisha (Rickshaw 人力車 & Shafu Runner)
+    // Procedural Jinrikisha (Rickshaw 人力車 & Shafu Runner) with PBR lacquer, swinging lantern & knee articulation
     createRickshawMesh() {
         const group = new THREE.Group();
 
-        // 1. Spoked wheels & axle
-        const wheelGeo = new THREE.CylinderGeometry(0.18, 0.18, 0.035, 8);
+        // 1. Spoked wheels & iron axle
+        const wheelGeo = new THREE.CylinderGeometry(0.18, 0.18, 0.035, 10);
         wheelGeo.rotateZ(Math.PI / 2);
-        const wheelMat = new THREE.MeshLambertMaterial({ color: 0x2e1f14 });
+        const wheelMat = new THREE.MeshStandardMaterial({ color: 0x2e1f14, roughness: 0.72, metalness: 0.18 });
+        const ironMat = new THREE.MeshStandardMaterial({ color: 0x1f2226, roughness: 0.42, metalness: 0.75 });
 
         const wheelL = new THREE.Mesh(wheelGeo, wheelMat);
         wheelL.position.set(-0.20, 0.18, -0.05);
@@ -174,20 +221,21 @@ export class TrafficManager {
         wheelR.castShadow = true;
         group.add(wheelR);
 
-        const axle = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.40, 4), new THREE.MeshLambertMaterial({ color: 0x1f1f1f }));
+        const axle = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.40, 6), ironMat);
         axle.rotation.z = Math.PI / 2;
         axle.position.set(0, 0.18, -0.05);
         group.add(axle);
 
-        // 2. Lacquered seat carriage
-        const seat = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.14, 0.30), new THREE.MeshLambertMaterial({ color: 0x8a241c }));
+        // 2. Glossy Urushi-lacquered seat carriage & brass trim
+        const seat = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.14, 0.30), new THREE.MeshStandardMaterial({ color: 0x7d1e16, roughness: 0.28, metalness: 0.12 }));
         seat.position.set(0, 0.24, -0.05);
         seat.castShadow = true;
         group.add(seat);
 
-        // Backrest & Folded Canvas Hood
-        const hood = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.22, 0.12), new THREE.MeshLambertMaterial({ color: 0x222222 }));
+        // Backrest & Folded Oiled-Canvas Hood (Horo)
+        const hood = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.22, 0.12), new THREE.MeshStandardMaterial({ color: 0x222428, roughness: 0.78, metalness: 0.05 }));
         hood.position.set(0, 0.40, -0.16);
+        hood.castShadow = true;
         group.add(hood);
 
         // Seated Passenger in Kimono with Hair Crown
@@ -203,8 +251,8 @@ export class TrafficManager {
         passHair.position.set(0, 0.535, -0.07);
         group.add(passHair);
 
-        // 3. Wooden shafts
-        const shaftMat = new THREE.MeshLambertMaterial({ color: 0x5a4632 });
+        // 3. Wooden pulling shafts (Kajibo) & swinging Burabura-chōchin paper lantern
+        const shaftMat = new THREE.MeshStandardMaterial({ color: 0x5a4632, roughness: 0.78, metalness: 0.04 });
         const shaftGeo = new THREE.BoxGeometry(0.022, 0.022, 0.56);
         const shaftL = new THREE.Mesh(shaftGeo, shaftMat);
         shaftL.position.set(-0.12, 0.20, 0.24);
@@ -213,7 +261,18 @@ export class TrafficManager {
         shaftR.position.set(0.12, 0.20, 0.24);
         group.add(shaftR);
 
-        // 4. Articulated Rickshaw Runner (Shafu 車夫)
+        const lanternGroup = new THREE.Group();
+        lanternGroup.position.set(0.12, 0.19, 0.46);
+        const lanternBody = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.026, 0.024, 0.065, 8),
+            new THREE.MeshStandardMaterial({ color: 0xffeedd, emissive: 0xff9933, emissiveIntensity: 0.55, roughness: 0.5 })
+        );
+        lanternBody.name = 'Lantern_Body';
+        lanternBody.position.y = -0.035;
+        lanternGroup.add(lanternBody);
+        group.add(lanternGroup);
+
+        // 4. Articulated Rickshaw Runner (Shafu 車夫) with Knee-Jointed Stride
         const runnerGroup = new THREE.Group();
         runnerGroup.position.set(0, 0, 0.38);
         const runnerMat = new THREE.MeshStandardMaterial({ color: 0x1e3a5f, roughness: 0.85 });
@@ -233,16 +292,23 @@ export class TrafficManager {
         hat.castShadow = true;
         runnerGroup.add(hat);
 
-        // Articulated runner legs
-        const legL = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.020, 0.16, 6), runnerMat);
-        legL.position.set(-0.035, 0.08, 0);
+        // Two-segment articulated runner legs (thigh + shin)
+        const legL = new THREE.Mesh(new THREE.CylinderGeometry(0.023, 0.020, 0.09, 6), runnerMat);
+        legL.position.set(-0.035, 0.12, 0);
+        const shinL = new THREE.Mesh(new THREE.CylinderGeometry(0.019, 0.016, 0.085, 6), skinMat);
+        shinL.position.set(0, -0.075, 0);
+        legL.add(shinL);
         runnerGroup.add(legL);
-        const legR = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.020, 0.16, 6), runnerMat);
-        legR.position.set(0.035, 0.08, 0);
+
+        const legR = new THREE.Mesh(new THREE.CylinderGeometry(0.023, 0.020, 0.09, 6), runnerMat);
+        legR.position.set(0.035, 0.12, 0);
+        const shinR = new THREE.Mesh(new THREE.CylinderGeometry(0.019, 0.016, 0.085, 6), skinMat);
+        shinR.position.set(0, -0.075, 0);
+        legR.add(shinR);
         runnerGroup.add(legR);
 
-        runnerGroup.userData = { legL, legR };
-        group.userData = { wheels: [wheelL, wheelR], runner: runnerGroup };
+        runnerGroup.userData = { legL, legR, shinL, shinR };
+        group.userData = { wheels: [wheelL, wheelR], runner: runnerGroup, lantern: lanternGroup };
         group.add(runnerGroup);
         return group;
     }
@@ -310,35 +376,41 @@ export class TrafficManager {
         armR.position.set(0.068, 0.30, 0);
         group.add(armR);
 
-        // 4. Articulated Lower Legs & Wooden Geta Sandals
-        const legGeo = new THREE.CylinderGeometry(0.024, 0.020, 0.16, 6);
-        const legL = new THREE.Mesh(legGeo, kimonoMat);
-        legL.position.set(-0.028, 0.09, 0);
-        group.add(legL);
-        const legR = new THREE.Mesh(legGeo, kimonoMat);
-        legR.position.set(0.028, 0.09, 0);
-        group.add(legR);
-
+        // 4. Knee-Articulated Lower Legs & Wooden Geta Sandals
         const getaMat = new THREE.MeshStandardMaterial({ color: 0x4a321e, roughness: 0.85 });
         const getaGeo = new THREE.BoxGeometry(0.036, 0.018, 0.068);
+
+        const legL = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.021, 0.09, 6), kimonoMat);
+        legL.position.set(-0.028, 0.125, 0);
+        const shinL = new THREE.Mesh(new THREE.CylinderGeometry(0.019, 0.016, 0.08, 6), skinMat);
+        shinL.position.set(0, -0.07, 0);
         const getaL = new THREE.Mesh(getaGeo, getaMat);
-        getaL.position.set(-0.028, 0.01, 0.01);
-        group.add(getaL);
+        getaL.position.set(0, -0.042, 0.01);
+        shinL.add(getaL);
+        legL.add(shinL);
+        group.add(legL);
+
+        const legR = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.021, 0.09, 6), kimonoMat);
+        legR.position.set(0.028, 0.125, 0);
+        const shinR = new THREE.Mesh(new THREE.CylinderGeometry(0.019, 0.016, 0.08, 6), skinMat);
+        shinR.position.set(0, -0.07, 0);
         const getaR = new THREE.Mesh(getaGeo, getaMat);
-        getaR.position.set(0.028, 0.01, 0.01);
-        group.add(getaR);
+        getaR.position.set(0, -0.042, 0.01);
+        shinR.add(getaR);
+        legR.add(shinR);
+        group.add(legR);
 
         // 5. Traditional Japanese Oil-Paper Umbrella (Janome-gasa)
         if (Math.random() < 0.50) {
             const umbrellaGroup = new THREE.Group();
             umbrellaGroup.position.set(0.085, 0.32, 0.04);
-            const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.42, 4), new THREE.MeshLambertMaterial({ color: 0x8a7042 }));
+            const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.42, 6), new THREE.MeshStandardMaterial({ color: 0x8a7042, roughness: 0.72 }));
             shaft.position.y = 0.21;
             umbrellaGroup.add(shaft);
 
             const uColors = [0xa83222, 0x243b55, 0xc8961e, 0x3b5932];
             const uColor = uColors[Math.floor(Math.random() * uColors.length)];
-            const canopy = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.085, 12), new THREE.MeshStandardMaterial({ color: uColor, roughness: 0.75 }));
+            const canopy = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.085, 12), new THREE.MeshStandardMaterial({ color: uColor, roughness: 0.72 }));
             canopy.position.y = 0.41;
             canopy.rotation.x = 0.14;
             canopy.castShadow = true;
@@ -346,7 +418,7 @@ export class TrafficManager {
             group.add(umbrellaGroup);
         }
 
-        group.userData = { armL, armR, legL, legR, getaL, getaR };
+        group.userData = { armL, armR, legL, legR, shinL, shinR, getaL, getaR };
         return group;
     }
 
@@ -434,7 +506,8 @@ export class TrafficManager {
 
         const startTile = path[0];
         const startPos = this.getTileWorldPos(startTile.x, startTile.y);
-        mesh.position.set(startPos.x, 0, startPos.z);
+        const startPose = this.getSurfacePose(startPos.x, startPos.z);
+        mesh.position.set(startPos.x, startPose.y, startPos.z);
         this.scene.add(mesh);
 
         const waypoints = path.map(t => {
@@ -453,7 +526,7 @@ export class TrafficManager {
         });
     }
 
-    // Advance agent positions and procedural walking limb animations
+    // Advance agent positions, road/bridge surface grounding, and knee-jointed limb animations
     update(speedMult = 1.0, delta = 0.016) {
         if (!delta || delta <= 0) return;
         this.animTime += delta * (speedMult > 0 ? speedMult : 0);
@@ -493,17 +566,22 @@ export class TrafficManager {
                 c.mesh.position.lerpVectors(from, to, c.progress);
                 const dirX = to.x - from.x;
                 const dirZ = to.z - from.z;
+                const pose = this.getSurfacePose(c.mesh.position.x, c.mesh.position.z, dirX, dirZ);
+                c.mesh.position.y = pose.y;
                 if (Math.hypot(dirX, dirZ) > 0.01) {
                     c.mesh.rotation.y = Math.atan2(dirX, dirZ);
                 }
+                c.mesh.rotation.x = pose.pitch;
             }
 
-            // Animate runner legs & pump handle
+            // Animate runner legs, knees & pump handle
             if (c.mesh.userData.runner?.userData) {
                 const r = c.mesh.userData.runner.userData;
                 const legSwing = Math.sin(this.animTime * 14) * 0.45;
                 if (r.legL) r.legL.rotation.x = legSwing;
                 if (r.legR) r.legR.rotation.x = -legSwing;
+                if (r.shinL) r.shinL.rotation.x = Math.max(0, -legSwing * 0.85);
+                if (r.shinR) r.shinR.rotation.x = Math.max(0, legSwing * 0.85);
             }
             if (c.mesh.userData.wheels) {
                 for (const w of c.mesh.userData.wheels) {
@@ -543,26 +621,35 @@ export class TrafficManager {
             const step = (agent.speed * speedMult * delta) / Math.max(0.01, dist);
             agent.progress += step;
 
+            let dirX = to.x - from.x;
+            let dirZ = to.z - from.z;
             if (agent.progress >= 1.0) {
                 agent.waypointIndex++;
                 agent.progress = 0;
             } else {
                 agent.mesh.position.lerpVectors(from, to, agent.progress);
-                const dirX = to.x - from.x;
-                const dirZ = to.z - from.z;
                 if (Math.hypot(dirX, dirZ) > 0.01) {
                     agent.mesh.rotation.y = Math.atan2(dirX, dirZ);
                 }
             }
 
-            // Procedural walking animation
+            const pose = this.getSurfacePose(agent.mesh.position.x, agent.mesh.position.z, dirX, dirZ);
+
+            // Procedural walking & bridge-climbing animation
             if (agent.isRickshaw) {
-                // Shafu runner leg swing & wheel rotation
+                agent.mesh.position.y = pose.y;
+                agent.mesh.rotation.x = pose.pitch;
                 if (agent.mesh.userData.runner?.userData) {
                     const r = agent.mesh.userData.runner.userData;
-                    const legSwing = Math.sin(this.animTime * 10) * 0.40;
+                    const legSwing = Math.sin(this.animTime * 10) * 0.42;
                     if (r.legL) r.legL.rotation.x = legSwing;
                     if (r.legR) r.legR.rotation.x = -legSwing;
+                    if (r.shinL) r.shinL.rotation.x = Math.max(0, -legSwing * 0.8);
+                    if (r.shinR) r.shinR.rotation.x = Math.max(0, legSwing * 0.8);
+                }
+                if (agent.mesh.userData.lantern) {
+                    agent.mesh.userData.lantern.rotation.x = Math.sin(this.animTime * 9) * 0.16;
+                    agent.mesh.userData.lantern.rotation.z = Math.cos(this.animTime * 7) * 0.10;
                 }
                 if (agent.mesh.userData.wheels) {
                     for (const w of agent.mesh.userData.wheels) {
@@ -570,14 +657,16 @@ export class TrafficManager {
                     }
                 }
             } else {
-                // Pedestrian limb swing & subtle vertical bob
+                // Pedestrian limb swing, knee articulation & road/bridge surface grounding
                 const u = agent.mesh.userData;
-                const stride = Math.sin(this.animTime * 7) * 0.32;
+                const stride = Math.sin(this.animTime * 7) * 0.34;
                 if (u.legL) u.legL.rotation.x = stride;
                 if (u.legR) u.legR.rotation.x = -stride;
+                if (u.shinL) u.shinL.rotation.x = Math.max(0, -stride * 0.75);
+                if (u.shinR) u.shinR.rotation.x = Math.max(0, stride * 0.75);
                 if (u.armL) u.armL.rotation.x = -stride;
                 if (u.armR) u.armR.rotation.x = stride;
-                agent.mesh.position.y = Math.abs(Math.sin(this.animTime * 14)) * 0.02;
+                agent.mesh.position.y = pose.y + Math.abs(Math.sin(this.animTime * 14)) * 0.018;
             }
         }
     }

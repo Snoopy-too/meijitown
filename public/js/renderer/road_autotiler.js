@@ -49,6 +49,7 @@ export class RoadAutotiler {
             if (isStone) {
                 this.addStoneCurbs(group, trackWidth, s, true);
             }
+            this.addDrainageGutters(group, x, y, grid, trackWidth, shoulderWidth, s, true, isStone);
             this.maybeAddTelegraphPole(group, x, y, grid, 'NS', trackWidth, s);
             return group;
         }
@@ -70,6 +71,7 @@ export class RoadAutotiler {
             if (isStone) {
                 this.addStoneCurbs(group, trackWidth, s, false);
             }
+            this.addDrainageGutters(group, x, y, grid, trackWidth, shoulderWidth, s, false, isStone);
             this.maybeAddTelegraphPole(group, x, y, grid, 'EW', trackWidth, s);
             return group;
         }
@@ -97,6 +99,7 @@ export class RoadAutotiler {
             this.addArm(group, roadMat, shoulderMat, trackWidth, trackHeight, shoulderWidth, shoulderHeight, armLen, shArmLen, 'W');
 
             if (isStone) {
+                this.addIntersectionCurbCorners(group, trackWidth, s);
                 this.maybeAddIntersectionLantern(group, trackWidth, s, x, y);
             }
             return group;
@@ -190,6 +193,72 @@ export class RoadAutotiler {
         }
     }
 
+        // Add streetside drainage gutters (Dobu / 溝) & wooden Dobu-ita threshold planks
+    static addDrainageGutters(group, x, y, grid, trackWidth, shoulderWidth, s, isNS, isStone) {
+        const gutterMat = RoadTextureManager.getGutterChannelMaterial();
+        const plankMat = new THREE.MeshStandardMaterial({ color: 0x6b4e33, roughness: 0.82, metalness: 0.04 });
+        const gutterOffset = (trackWidth / 2) + 0.065;
+        const gutterWidth = 0.048;
+
+        for (const side of [-1, 1]) {
+            const gGeo = isNS
+                ? new THREE.BoxGeometry(gutterWidth, 0.016, s)
+                : new THREE.BoxGeometry(s, 0.016, gutterWidth);
+            const gMesh = new THREE.Mesh(gGeo, gutterMat);
+            if (isNS) gMesh.position.set(side * gutterOffset, 0.022, 0);
+            else gMesh.position.set(0, 0.022, side * gutterOffset);
+            gMesh.receiveShadow = true;
+            group.add(gMesh);
+
+            // Place wooden Dobu-ita (どぶ板) footbridge plank over the gutter when bordering a built zone or civic structure
+            if (grid) {
+                const nx = isNS ? x + side : x;
+                const ny = isNS ? y : y + side;
+                const nt = grid.isValidCoord(nx, ny) ? grid.getTile(nx, ny) : null;
+                if (nt && (nt.type === CONFIG.TYPES.ZONE || nt.type === CONFIG.TYPES.SERVICE)) {
+                    const plankGeo = isNS
+                        ? new THREE.BoxGeometry(0.14, 0.024, 0.42)
+                        : new THREE.BoxGeometry(0.42, 0.024, 0.14);
+                    const plank = new THREE.Mesh(plankGeo, plankMat);
+                    if (isNS) plank.position.set(side * gutterOffset, 0.036, 0);
+                    else plank.position.set(0, 0.036, side * gutterOffset);
+                    plank.castShadow = true;
+                    plank.receiveShadow = true;
+                    group.add(plank);
+                }
+            }
+        }
+    }
+
+    // Add Corner Granite Curb Returns & Carved Meiji Dōhyō (道標) Wayfinder Milestone at 4-way intersections
+    static addIntersectionCurbCorners(group, trackWidth, s) {
+        const curbMat = RoadTextureManager.getStoneKerbMaterial();
+        const cornerPos = trackWidth / 2 + 0.04;
+        const blockGeo = new THREE.BoxGeometry(0.08, 0.085, 0.08);
+
+        for (const cx of [-cornerPos, cornerPos]) {
+            for (const cz of [-cornerPos, cornerPos]) {
+                const block = new THREE.Mesh(blockGeo, curbMat);
+                block.position.set(cx, 0.048, cz);
+                block.castShadow = true;
+                block.receiveShadow = true;
+                group.add(block);
+            }
+        }
+
+        // Carved granite Dōhyō (道標) milestone pillar on opposite corner (-cornerOffset)
+        const dohyoOffset = -(trackWidth / 2 + 0.14);
+        const dohyoShaft = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.46, 0.085), curbMat);
+        dohyoShaft.position.set(dohyoOffset, 0.23, dohyoOffset);
+        dohyoShaft.castShadow = true;
+        group.add(dohyoShaft);
+
+        const dohyoCap = new THREE.Mesh(new THREE.ConeGeometry(0.068, 0.065, 4), curbMat);
+        dohyoCap.rotation.y = Math.PI / 4;
+        dohyoCap.position.set(dohyoOffset, 0.49, dohyoOffset);
+        group.add(dohyoCap);
+    }
+
     // Procedural Telegraph Poles (電信柱 / Denshin) along Commercial Thoroughfares
     // ponytail: authentic Meiji timber pole with broad T-crossarm, diagonal braces & glazed porcelain insulators
     static maybeAddTelegraphPole(group, x, y, grid, orientation, trackWidth, s) {
@@ -214,26 +283,38 @@ export class RoadAutotiler {
         // Space poles every 2 tiles for historical spacing
         if ((x + y) % 2 !== 0) return;
 
-        TelegraphRenderer.attachToRoad(group, orientation, trackWidth, s);
+        TelegraphRenderer.attachToRoad(group, orientation, trackWidth, s, x, y, grid);
     }
 
     // Traditional Meiji Wooden Street Lantern Post (街灯 / Chōchin-Gaitō) at Stone Intersections
     static maybeAddIntersectionLantern(group, trackWidth, s, tileX = 0, tileY = 0) {
         const lanternGroup = new THREE.Group();
-        const woodMat = new THREE.MeshLambertMaterial({ color: 0x3a2c20 });
+        const woodMat = new THREE.MeshStandardMaterial({ color: 0x3a2c20, roughness: 0.82, metalness: 0.05 });
+        const stoneMat = RoadTextureManager.getStoneKerbMaterial();
+
+        // Dressed granite base pedestal
+        const plinth = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.14, 0.13), stoneMat);
+        plinth.position.y = 0.07;
+        plinth.castShadow = true;
+        lanternGroup.add(plinth);
 
         // Slender wooden cedar post (1.35m)
-        const postGeo = new THREE.CylinderGeometry(0.025, 0.035, 1.35, 6);
+        const postGeo = new THREE.CylinderGeometry(0.025, 0.035, 1.35, 8);
         const post = new THREE.Mesh(postGeo, woodMat);
         post.position.y = 0.675;
         post.castShadow = true;
         lanternGroup.add(post);
 
-        // Wooden cross-cap bracket
+        // Pitched copper/wood roof cap & finial
         const capGeo = new THREE.BoxGeometry(0.24, 0.04, 0.24);
         const cap = new THREE.Mesh(capGeo, woodMat);
         cap.position.y = 1.38;
         lanternGroup.add(cap);
+
+        const roofPeak = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.07, 4), woodMat);
+        roofPeak.rotation.y = Math.PI / 4;
+        roofPeak.position.y = 1.43;
+        lanternGroup.add(roofPeak);
 
         // Shoji paper lantern core with emissive night glow capability
         const paperMat = new THREE.MeshStandardMaterial({
