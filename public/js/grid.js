@@ -81,7 +81,7 @@ export class CityGridModel {
                 const item = tilesMap[key];
                 if (item && item.type && item.type !== CONFIG.TYPES.EMPTY) {
                     const level = parseInt(item.level || 0, 10);
-                    this.tiles.set(this.getKey(item.x, item.y), {
+                    const tileObj = {
                         x: parseInt(item.x, 10),
                         y: parseInt(item.y, 10),
                         type: item.type,
@@ -89,9 +89,9 @@ export class CityGridModel {
                         level: level,
                         occupied: Boolean(item.occupied || false),
                         stage: item.stage || (item.type === CONFIG.TYPES.ZONE && level > 0 ? CONFIG.STAGES.BUILT : CONFIG.STAGES.NONE),
-                        constructionTicks: 0,
+                        constructionTicks: parseInt(item.constructionTicks || 0, 10),
                         ageTicks: parseInt(item.ageTicks || 0, 10),
-                        targetLevel: level > 0 ? level : 1,
+                        targetLevel: parseInt(item.targetLevel || (level > 0 ? level : 1), 10),
                         serviceType: item.serviceType || null,
                         roadTier: parseInt(item.roadTier || 1, 10),
                         hasBridge: Boolean(item.hasBridge || false),
@@ -99,17 +99,89 @@ export class CityGridModel {
                         subType: item.subType || null,
                         rotation: parseInt(item.rotation || 0, 10),
                         manualRotation: Boolean(item.manualRotation || false),
-                    });
+                    };
+
+                    if (item.isOrigin !== undefined) tileObj.isOrigin = Boolean(item.isOrigin);
+                    if (item.multiSize !== undefined && item.multiSize !== null) tileObj.multiSize = parseInt(item.multiSize, 10);
+                    if (item.originX !== undefined && item.originX !== null) tileObj.originX = parseInt(item.originX, 10);
+                    if (item.originY !== undefined && item.originY !== null) tileObj.originY = parseInt(item.originY, 10);
+                    if (item.constructionMonths !== undefined) tileObj.constructionMonths = parseInt(item.constructionMonths || 0, 10);
+                    if (item.targetMonths !== undefined) tileObj.targetMonths = parseInt(item.targetMonths || 6, 10);
+                    if (item.fireTicks !== undefined) tileObj.fireTicks = parseInt(item.fireTicks || 0, 10);
+                    if (item.threatTimer !== undefined) tileObj.threatTimer = parseInt(item.threatTimer || 0, 10);
+
+                    this.tiles.set(this.getKey(tileObj.x, tileObj.y), tileObj);
                 }
             }
         }
+
+        // Self-heal multi-tile buildings (Primary School, Harbor Pier, Power Plant, Waterworks, Pavilion)
+        // in case a legacy save stripped isOrigin / originX / originY
+        const multiFootprints = {
+            [CONFIG.SERVICES.SCHOOL]: { w: 2, h: 2, size: 2 },
+            [CONFIG.SERVICES.HARBOR_PIER]: { w: 2, h: 2, size: 2 },
+            [CONFIG.SERVICES.POWER_PLANT]: { w: 2, h: 2, size: 2 },
+            [CONFIG.SERVICES.WATERWORKS]: { w: 2, h: 1, size: 2 },
+            [CONFIG.SERVICES.PAVILION]: { w: 3, h: 3, size: 3 },
+        };
+        const healedVisited = new Set();
+        for (let y = 0; y < this.height; y++) {
+            for (let x = 0; x < this.width; x++) {
+                const key = this.getKey(x, y);
+                if (healedVisited.has(key)) continue;
+                const t = this.tiles.get(key);
+                if (!t || t.type !== CONFIG.TYPES.SERVICE || !multiFootprints[t.serviceType]) continue;
+
+                // If already has explicit origin metadata, mark its footprint visited
+                if (t.isOrigin === true && t.originX !== undefined && t.originY !== undefined) {
+                    const fp = multiFootprints[t.serviceType];
+                    for (let dy = 0; dy < fp.h; dy++) {
+                        for (let dx = 0; dx < fp.w; dx++) {
+                            const sub = this.tiles.get(this.getKey(x + dx, y + dy));
+                            if (sub && sub.serviceType === t.serviceType) {
+                                sub.isOrigin = (dx === 0 && dy === 0);
+                                sub.originX = x;
+                                sub.originY = y;
+                                sub.multiSize = fp.size;
+                                healedVisited.add(this.getKey(x + dx, y + dy));
+                            }
+                        }
+                    }
+                    continue;
+                }
+
+                if (t.isOrigin === undefined) {
+                    const fp = multiFootprints[t.serviceType];
+                    t.isOrigin = true;
+                    t.originX = x;
+                    t.originY = y;
+                    t.multiSize = fp.size;
+                    healedVisited.add(key);
+                    for (let dy = 0; dy < fp.h; dy++) {
+                        for (let dx = 0; dx < fp.w; dx++) {
+                            if (dx === 0 && dy === 0) continue;
+                            const sk = this.getKey(x + dx, y + dy);
+                            const sub = this.tiles.get(sk);
+                            if (sub && sub.serviceType === t.serviceType) {
+                                sub.isOrigin = false;
+                                sub.originX = x;
+                                sub.originY = y;
+                                sub.multiSize = fp.size;
+                                healedVisited.add(sk);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         this.notifyAll();
     }
 
     exportToArray() {
         const result = [];
         for (const [_, tile] of this.tiles.entries()) {
-            result.push({
+            const exported = {
                 x: tile.x,
                 y: tile.y,
                 type: tile.type,
@@ -117,7 +189,9 @@ export class CityGridModel {
                 level: tile.level,
                 occupied: tile.occupied,
                 stage: tile.stage,
+                constructionTicks: tile.constructionTicks || 0,
                 ageTicks: tile.ageTicks || 0,
+                targetLevel: tile.targetLevel || (tile.level > 0 ? tile.level : 1),
                 serviceType: tile.serviceType || null,
                 roadTier: tile.roadTier || 1,
                 hasBridge: Boolean(tile.hasBridge || false),
@@ -125,7 +199,16 @@ export class CityGridModel {
                 subType: tile.subType || null,
                 rotation: tile.rotation || 0,
                 manualRotation: Boolean(tile.manualRotation || false),
-            });
+            };
+            if (tile.isOrigin !== undefined) exported.isOrigin = Boolean(tile.isOrigin);
+            if (tile.multiSize !== undefined && tile.multiSize !== null) exported.multiSize = tile.multiSize;
+            if (tile.originX !== undefined && tile.originX !== null) exported.originX = tile.originX;
+            if (tile.originY !== undefined && tile.originY !== null) exported.originY = tile.originY;
+            if (tile.constructionMonths !== undefined) exported.constructionMonths = tile.constructionMonths;
+            if (tile.targetMonths !== undefined) exported.targetMonths = tile.targetMonths;
+            if (tile.fireTicks) exported.fireTicks = tile.fireTicks;
+            if (tile.threatTimer) exported.threatTimer = tile.threatTimer;
+            result.push(exported);
         }
         return result;
     }

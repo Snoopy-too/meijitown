@@ -123,6 +123,11 @@ export class SimulationEngine {
             this.state.renderer.overlay.refresh();
         }
         this.state.updateHUD();
+        if (this.state.isLoungeMode && typeof this.state.saveMatch === 'function') {
+            this.state.saveMatch(true, false, true);
+        } else if (this.state.saveManager && typeof this.state.isLoggedIn === 'function' && !this.state.isLoggedIn()) {
+            this.state.saveManager.saveLocalCity(true, true);
+        }
     }
 
     ageActiveBuildings() {

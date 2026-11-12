@@ -183,15 +183,8 @@ export class SaveManager {
             this.game.grid.loadFromMap(tiles);
         }
 
-        // 7. Visual Render & HUD Updates
-        if (this.game.renderer) {
-            if (typeof this.game.renderer.updateSeason === 'function') {
-                this.game.renderer.updateSeason(this.game.currentMonth);
-            }
-            if (typeof this.game.renderer.updateDayNight === 'function') {
-                this.game.renderer.updateDayNight(this.game.currentMonth);
-            }
-        }
+        // 7. Rehydrate Derived Simulation Networks & Visuals
+        this.rehydrateSubsystems();
 
         if (typeof this.game.updateHUD === 'function') {
             this.game.updateHUD();
@@ -201,9 +194,56 @@ export class SaveManager {
     }
 
     /**
+     * Rehydrates derived simulation networks (Schools, Piers, Power, Telegraph, Milestones, Visuals)
+     * immediately after loading tiles into the grid.
+     */
+    rehydrateSubsystems() {
+        if (!this.game) return;
+
+        // Re-sync Harbor Cargo Pier activePiers registry from grid
+        const pierMgr = this.game.tradePierManager || this.game.simulation?.tradePier;
+        if (pierMgr && pierMgr.activePiers && this.game.grid?.tiles) {
+            pierMgr.activePiers.clear();
+            for (const [_, tile] of this.game.grid.tiles.entries()) {
+                if (tile.type === 'service' && tile.serviceType === 'harbor_pier' && tile.isOrigin) {
+                    pierMgr.activePiers.add(`${tile.x},${tile.y}`);
+                }
+            }
+        }
+
+        // Recompute Telegraph & Electrical Power networks
+        if (this.game.simulation?.telegraph && typeof this.game.simulation.telegraph.updateNetwork === 'function') {
+            this.game.simulation.telegraph.updateNetwork();
+        }
+        if (this.game.simulation?.powerSystem && typeof this.game.simulation.powerSystem.updateNetwork === 'function') {
+            this.game.simulation.powerSystem.updateNetwork();
+        }
+
+        // Ensure town tier unlocks match loaded population
+        if (this.game.milestones && typeof this.game.milestones.checkPopulation === 'function') {
+            this.game.milestones.checkPopulation(this.game.population || 0);
+            if (this.game.drawer && typeof this.game.drawer.updateTownTier === 'function') {
+                this.game.drawer.updateTownTier(this.game.milestones.currentTier);
+            }
+        }
+
+        if (this.game.renderer) {
+            if (typeof this.game.renderer.updateSeason === 'function') {
+                this.game.renderer.updateSeason(this.game.currentMonth);
+            }
+            if (typeof this.game.renderer.updateDayNight === 'function') {
+                this.game.renderer.updateDayNight(this.game.currentMonth);
+            }
+            if (this.game.renderer.overlay && this.game.renderer.overlay.currentMode !== 'none') {
+                this.game.renderer.overlay.refresh();
+            }
+        }
+    }
+
+    /**
      * Saves game state to the player's own machine via localStorage.
      */
-    saveLocalCity(isAuto = false) {
+    saveLocalCity(isAuto = false, silent = false) {
         if (typeof localStorage === 'undefined') {
             console.warn('[Meiji] localStorage is unavailable on this device.');
             return null;
@@ -214,7 +254,7 @@ export class SaveManager {
             const serialized = JSON.stringify(state);
             localStorage.setItem(SaveManager.LOCAL_STORAGE_KEY, serialized);
 
-            if (this.game?.showToast) {
+            if (this.game?.showToast && !silent) {
                 const isJa = typeof this.game.isJa === 'function' ? this.game.isJa() : false;
                 if (isAuto) {
                     this.game.showToast(isJa ? '💾 街の状態を自動保存しました (端末)' : '💾 Auto-saved settlement to your device.');
@@ -229,7 +269,7 @@ export class SaveManager {
             return state;
         } catch (err) {
             console.error('[Meiji] Failed to save locally:', err);
-            if (this.game?.showToast && !isAuto) {
+            if (this.game?.showToast && !isAuto && !silent) {
                 this.game.showToast(`Local save failed: ${err.message}`, true);
             }
             return null;
@@ -369,10 +409,7 @@ export class SaveManager {
                 this.game.grid.loadFromMap(tilesMapOrArray);
             }
 
-            if (this.game.renderer) {
-                this.game.renderer.updateSeason(this.game.currentMonth);
-                this.game.renderer.updateDayNight(this.game.currentMonth);
-            }
+            this.rehydrateSubsystems();
             this.game.updateHUD();
 
             this.game.showToast(`⛩️ Rehydrated "${this.game.cityName}" (Slot #${this.currentSlotId})!`);

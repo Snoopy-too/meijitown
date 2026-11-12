@@ -57,7 +57,16 @@ final class Tile
         public private(set) int $roadTier = 1,
         public private(set) bool $hasBridge = false,
         public private(set) ?string $subType = null,
-        public private(set) int $rotation = 0
+        public private(set) int $rotation = 0,
+        public private(set) bool $hasCrossing = false,
+        public private(set) bool $manualRotation = false,
+        public private(set) ?bool $isOrigin = null,
+        public private(set) ?int $multiSize = null,
+        public private(set) ?int $originX = null,
+        public private(set) ?int $originY = null,
+        public private(set) int $ageTicks = 0,
+        public private(set) ?int $constructionMonths = null,
+        public private(set) ?int $targetMonths = null
     ) {
         if ($this->x < 0 || $this->y < 0) {
             throw new InvalidArgumentException("Tile coordinates must be non-negative: ({$this->x}, {$this->y})");
@@ -109,7 +118,7 @@ final class Tile
 
     public function toArray(): array
     {
-        return [
+        $arr = [
             'x' => $this->x,
             'y' => $this->y,
             'type' => $this->type,
@@ -120,9 +129,31 @@ final class Tile
             'serviceType' => $this->serviceType,
             'roadTier' => $this->roadTier,
             'hasBridge' => $this->hasBridge,
+            'hasCrossing' => $this->hasCrossing,
             'subType' => $this->subType,
             'rotation' => $this->rotation,
+            'manualRotation' => $this->manualRotation,
+            'ageTicks' => $this->ageTicks,
         ];
+        if ($this->isOrigin !== null) {
+            $arr['isOrigin'] = $this->isOrigin;
+        }
+        if ($this->multiSize !== null) {
+            $arr['multiSize'] = $this->multiSize;
+        }
+        if ($this->originX !== null) {
+            $arr['originX'] = $this->originX;
+        }
+        if ($this->originY !== null) {
+            $arr['originY'] = $this->originY;
+        }
+        if ($this->constructionMonths !== null) {
+            $arr['constructionMonths'] = $this->constructionMonths;
+        }
+        if ($this->targetMonths !== null) {
+            $arr['targetMonths'] = $this->targetMonths;
+        }
+        return $arr;
     }
 
     public static function fromArray(array $data): self
@@ -140,7 +171,16 @@ final class Tile
             roadTier: (int) ($data['roadTier'] ?? 1),
             hasBridge: (bool) ($data['hasBridge'] ?? false),
             subType: isset($data['subType']) && $data['subType'] !== '' ? (string) $data['subType'] : null,
-            rotation: (int) ($data['rotation'] ?? 0)
+            rotation: (int) ($data['rotation'] ?? 0),
+            hasCrossing: (bool) ($data['hasCrossing'] ?? false),
+            manualRotation: (bool) ($data['manualRotation'] ?? false),
+            isOrigin: array_key_exists('isOrigin', $data) && $data['isOrigin'] !== null ? (bool) $data['isOrigin'] : null,
+            multiSize: isset($data['multiSize']) ? (int) $data['multiSize'] : null,
+            originX: isset($data['originX']) ? (int) $data['originX'] : null,
+            originY: isset($data['originY']) ? (int) $data['originY'] : null,
+            ageTicks: (int) ($data['ageTicks'] ?? 0),
+            constructionMonths: isset($data['constructionMonths']) ? (int) $data['constructionMonths'] : null,
+            targetMonths: isset($data['targetMonths']) ? (int) $data['targetMonths'] : null
         );
     }
 }

@@ -77,10 +77,20 @@ const MeijiTownGame = {
       if (payload.metrics) {
         G.metrics = { ...G.metrics, ...payload.metrics };
       }
+      if (payload.activeEdicts) {
+        G.activeEdicts = { ...payload.activeEdicts };
+      }
+      if (payload.milestones) {
+        G.milestones = { ...payload.milestones };
+      }
+      if (payload.stats) {
+        G.stats = { ...payload.stats };
+      }
       if (payload.gridSnapshot) {
         G.gridSnapshot = payload.gridSnapshot;
       }
-      G.lastSaved = Date.now();
+      G.savedAt = payload.savedAt || Date.now();
+      G.lastSaved = G.savedAt;
     },
 
     /**

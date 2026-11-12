@@ -431,13 +431,20 @@ function mountMeijiClient(container, config) {
       Array.isArray(G.gridSnapshot) ? G.gridSnapshot.length > 0 : Object.keys(G.gridSnapshot).length > 0
     );
 
-    // If this is a fresh/unpopulated server match and the player has a local save,
-    // restore their local save rather than wiping them with empty defaults!
-    if (!hasGridData && window.game.saveManager && window.game.saveManager.hasLocalSave() && !window.game.isLoggedIn()) {
-      console.log('[Meiji] Unpopulated lounge match: restoring local save from player device.');
+    // Check if the player has a newer local save on their device than the server's snapshot
+    const localInfo = (window.game.saveManager && window.game.saveManager.hasLocalSave() && !window.game.isLoggedIn())
+      ? window.game.saveManager.getLocalSaveInfo()
+      : null;
+    const serverSavedAt = Number(G.savedAt || G.lastSaved || 0);
+    const localIsNewer = Boolean(localInfo && localInfo.savedAt && Number(localInfo.savedAt) > serverSavedAt);
+
+    // If this is an unpopulated server match OR the local save on device is newer than the server snapshot,
+    // restore the local save and push it to the server rather than overwriting newer progress!
+    if ((!hasGridData || localIsNewer) && window.game.saveManager && window.game.saveManager.hasLocalSave() && !window.game.isLoggedIn()) {
+      console.log('[Meiji] Restoring newer/populated local save from player device.');
       window.game.saveManager.loadLocalCity(true);
       if (typeof window.game.saveMatch === 'function') {
-        window.game.saveMatch(true);
+        window.game.saveMatch(true, true, true);
       }
       return;
     }
@@ -452,6 +459,24 @@ function mountMeijiClient(container, config) {
       if (G.vitals.population !== undefined) {
         window.game.population = G.vitals.population;
       }
+      if (G.vitals.lastCashflow !== undefined) {
+        window.game.lastCashflow = G.vitals.lastCashflow;
+      }
+    }
+    if (G.metrics && typeof G.metrics === 'object') {
+      window.game.metrics = { ...window.game.metrics, ...G.metrics };
+    }
+    if (G.activeEdicts && (window.game.policies || window.game.policyManager)) {
+      const polMgr = window.game.policies || window.game.policyManager;
+      if (typeof polMgr.setPolicies === 'function') polMgr.setPolicies(G.activeEdicts);
+    }
+    if (G.milestones && window.game.milestones) {
+      if (Array.isArray(G.milestones.claimedTiers)) window.game.milestones.claimedTiers = G.milestones.claimedTiers;
+      if (G.milestones.currentTier !== undefined) window.game.milestones.currentTier = G.milestones.currentTier;
+      if (G.milestones.hasTriumphCompleted !== undefined) window.game.milestones.hasTriumphCompleted = Boolean(G.milestones.hasTriumphCompleted);
+    }
+    if (G.stats && typeof G.stats === 'object') {
+      window.game.stats = { ...window.game.stats, ...G.stats };
     }
     if (G.chronicle) {
       window.game.currentYear = G.chronicle.currentYear;
@@ -462,7 +487,9 @@ function mountMeijiClient(container, config) {
         window.game.grid.loadFromMap(G.gridSnapshot);
       } catch (e) {}
     }
-    if (window.game.renderer) {
+    if (window.game.saveManager && typeof window.game.saveManager.rehydrateSubsystems === 'function') {
+      window.game.saveManager.rehydrateSubsystems();
+    } else if (window.game.renderer) {
       window.game.renderer.updateSeason(window.game.currentMonth);
       window.game.renderer.updateDayNight(window.game.currentMonth);
     }
@@ -503,25 +530,36 @@ function mountMeijiClient(container, config) {
         }
 
         let lastSaveTime = 0;
-        window.game.saveMatch = (isAuto = false, force = false) => {
+        window.game.saveMatch = (isAuto = false, force = false, silent = false) => {
           const now = Date.now();
-          if (!force && now - lastSaveTime < 800) return;
+          if (!force && now - lastSaveTime < 500) return;
           lastSaveTime = now;
 
           // 1. ALWAYS persist locally on the player's device for guest / unauthenticated players
           if (window.game && window.game.saveManager && !window.game.isLoggedIn()) {
-            window.game.saveManager.saveLocalCity(isAuto);
+            window.game.saveManager.saveLocalCity(isAuto, silent);
           }
 
           // 2. Also emit live move to boardgame.io socket for match synchrony if connected
           if (socket && socket.connected && window.game) {
+            const polMgr = window.game.policies || window.game.policyManager;
             const snapshot = {
+              savedAt: now,
               vitals: {
                 cityName: window.game.cityName,
                 treasury: window.game.treasury,
                 population: window.game.population,
+                lastCashflow: window.game.lastCashflow || 0,
                 satisfaction: window.game.metrics?.townHappiness || 65
               },
+              metrics: { ...(window.game.metrics || {}) },
+              activeEdicts: (polMgr && typeof polMgr.getActivePolicies === 'function') ? polMgr.getActivePolicies() : {},
+              milestones: window.game.milestones ? {
+                currentTier: window.game.milestones.currentTier || 1,
+                claimedTiers: Array.isArray(window.game.milestones.claimedTiers) ? [...window.game.milestones.claimedTiers] : [1],
+                hasTriumphCompleted: Boolean(window.game.milestones.hasTriumphCompleted),
+              } : null,
+              stats: window.game.stats ? { ...window.game.stats } : null,
               chronicle: {
                 currentYear: window.game.currentYear,
                 currentMonth: window.game.currentMonth
@@ -560,6 +598,11 @@ function mountMeijiClient(container, config) {
 }
 
 function unmountMeijiClient() {
+  if (window.game && typeof window.game.saveMatch === 'function') {
+    try { window.game.saveMatch(true, true, true); } catch (e) {}
+  } else if (window.game && window.game.saveManager && !window.game.isLoggedIn()) {
+    try { window.game.saveManager.saveLocalCity(true, true); } catch (e) {}
+  }
   if (window.__meijiAutoSaveTimer) {
     clearInterval(window.__meijiAutoSaveTimer);
     window.__meijiAutoSaveTimer = null;

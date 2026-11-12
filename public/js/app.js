@@ -94,8 +94,23 @@ class GameStateManager {
         modalManager.setRoot(this.root);
         i18n.updateDOM(this.root);
 
-        // Periodic local auto-save and tab exit persistence for guests
+        // Periodic local auto-save, immediate debounced tile-change persistence, and tab exit persistence
         if (typeof window !== 'undefined') {
+            this.isHydrating = true;
+            this.grid.subscribe((event) => {
+                if (this.isHydrating) return;
+                if (event === 'tile_updated' || event === 'grid_reset') {
+                    if (this._debouncedSaveTimer) clearTimeout(this._debouncedSaveTimer);
+                    this._debouncedSaveTimer = setTimeout(() => {
+                        if (this.isLoungeMode && typeof this.saveMatch === 'function') {
+                            this.saveMatch(true, false, true);
+                        } else if (!this.isLoggedIn() && this.saveManager) {
+                            this.saveManager.saveLocalCity(true, true);
+                        }
+                    }, 600);
+                }
+            });
+
             this.autoSaveInterval = setInterval(() => {
                 if (!this.isLoggedIn() && this.saveManager) {
                     this.saveManager.saveLocalCity(true);
@@ -103,13 +118,16 @@ class GameStateManager {
             }, 60000);
 
             window.addEventListener('beforeunload', () => {
-                if (!this.isLoggedIn() && this.saveManager) {
+                if (this.isLoungeMode && typeof this.saveMatch === 'function') {
+                    this.saveMatch(true, true);
+                } else if (!this.isLoggedIn() && this.saveManager) {
                     this.saveManager.saveLocalCity(true);
                 }
             });
         }
 
         this.loadCityFromApi().then(() => {
+            this.isHydrating = false;
             this.simulation.start();
         });
     }
