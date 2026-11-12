@@ -12,7 +12,7 @@ export class BackdropManager {
         this.group.name = 'backdrop_environment';
 
         const groundColor = (CONFIG.COLORS && CONFIG.COLORS.GROUND) || 0x5a7d4b;
-        this.skirtMaterial = new THREE.MeshStandardMaterial({ color: groundColor, roughness: 0.92, metalness: 0.02, flatShading: true });
+        this.skirtMaterial = new THREE.MeshStandardMaterial({ color: groundColor, roughness: 0.92, metalness: 0.02, flatShading: false });
         this.foothillMaterial = new THREE.MeshStandardMaterial({ color: 0x35523a, roughness: 0.88, metalness: 0.02, flatShading: true });
         this.mountainMaterial = new THREE.MeshStandardMaterial({ color: 0x465b63, roughness: 0.82, metalness: 0.05, flatShading: true });
         this.fujiBodyMaterial = new THREE.MeshStandardMaterial({ color: 0x3b4d6b, roughness: 0.78, metalness: 0.06, flatShading: true });
@@ -54,49 +54,111 @@ export class BackdropManager {
         return { dist: minDist, riverY };
     }
 
-    // 1. Extended rolling valley skirt with carved riverbed canyon pass (Road/River ∩ Terrain compliant)
+    // 1. Seamless rolling valley skirt connecting flush to playable bounds (Road/River ∩ Terrain compliant)
     buildExtendedSkirt() {
-        const skirtGeo = new THREE.PlaneGeometry(280, 280, 24, 24);
-        skirtGeo.rotateX(-Math.PI / 2);
-
         const cx = (CONFIG.GRID_WIDTH * CONFIG.TILE_SIZE) / 2;
         const cz = (CONFIG.GRID_HEIGHT * CONFIG.TILE_SIZE) / 2;
         const halfPlayable = (CONFIG.GRID_WIDTH * CONFIG.TILE_SIZE) / 2;
+        const outerBound = 140;
 
-        const pos = skirtGeo.attributes.position;
-        for (let i = 0; i < pos.count; i++) {
-            const vx = pos.getX(i), vz = pos.getZ(i);
-            const wx = vx + cx, wz = vz + cz;
-            const dx = Math.max(0, Math.abs(vx) - halfPlayable);
-            const dz = Math.max(0, Math.abs(vz) - halfPlayable);
-            const distFromPlayable = Math.hypot(dx, dz);
+        const numRings = 16;
+        const segsPerSide = 24;
+        const vertsPerRing = 4 * segsPerSide;
 
-            if (distFromPlayable <= 0.1) {
-                pos.setY(i, -0.55);
-            } else {
-                const normalized = Math.min(1.0, distFromPlayable / 95);
-                const elevation = Math.pow(normalized, 1.65) * 15.0;
-                const ridgeWave = Math.sin(wx * 0.07) * Math.cos(wz * 0.07) * 2.2 * normalized;
-                const detailWave = Math.sin((vx * 0.19) + (vz * 0.15)) * 0.85 * normalized;
-                let y = -0.55 + elevation + ridgeWave + detailWave;
+        const positions = [];
+        const uvs = [];
+        const indices = [];
 
-                // Carve natural riverbed gorge & terraced banks along river corridor
-                const { dist, riverY } = this.sampleRiverGorge(wx, wz);
-                if (dist < 18.5) {
-                    const channelBedY = riverY - 0.62;
-                    if (dist <= 4.4) {
-                        y = channelBedY;
-                    } else {
-                        const u = (dist - 4.4) / (18.5 - 4.4);
-                        const smooth = u * u * (3 - 2 * u);
-                        y = channelBedY * (1 - smooth) + y * smooth;
+        for (let r = 0; r <= numRings; r++) {
+            const t = r / numRings;
+            // r = 0 sits exactly on the playable perimeter (span = halfPlayable)
+            const span = (r === 0)
+                ? halfPlayable
+                : halfPlayable + (outerBound - halfPlayable) * Math.pow(t, 1.25);
+
+            for (let side = 0; side < 4; side++) {
+                for (let s = 0; s < segsPerSide; s++) {
+                    const u = s / segsPerSide;
+                    let vx = 0, vz = 0;
+
+                    if (side === 0) { // North edge: -span to +span at -span
+                        vx = -span + 2 * span * u;
+                        vz = -span;
+                    } else if (side === 1) { // East edge: +span at -span to +span
+                        vx = span;
+                        vz = -span + 2 * span * u;
+                    } else if (side === 2) { // South edge: +span to -span at +span
+                        vx = span - 2 * span * u;
+                        vz = span;
+                    } else { // West edge: -span at +span to -span
+                        vx = -span;
+                        vz = span - 2 * span * u;
                     }
+
+                    let y = 0.0;
+                    if (r > 0) {
+                        const wx = vx + cx, wz = vz + cz;
+                        const dx = Math.max(0, Math.abs(vx) - halfPlayable);
+                        const dz = Math.max(0, Math.abs(vz) - halfPlayable);
+                        const distFromPlayable = Math.hypot(dx, dz);
+
+                        const normalized = Math.min(1.0, distFromPlayable / 95);
+                        const elevation = Math.pow(normalized, 1.85) * 16.0;
+                        const ridgeWave = Math.sin(wx * 0.07) * Math.cos(wz * 0.07) * 2.2 * normalized;
+                        const detailWave = Math.sin((vx * 0.19) + (vz * 0.15)) * 0.85 * normalized;
+                        y = elevation + ridgeWave + detailWave;
+
+                        // Carve natural riverbed gorge & terraced banks along river corridor
+                        const { dist, riverY } = this.sampleRiverGorge(wx, wz);
+                        if (dist < 18.5) {
+                            const channelBedY = riverY - 0.62;
+                            if (dist <= 4.4) {
+                                y = channelBedY;
+                            } else {
+                                const uBlend = (dist - 4.4) / (18.5 - 4.4);
+                                const smooth = uBlend * uBlend * (3 - 2 * uBlend);
+                                y = channelBedY * (1 - smooth) + y * smooth;
+                            }
+                        }
+                    }
+
+                    positions.push(vx, y, vz);
+                    uvs.push((vx + outerBound) / (2 * outerBound), (vz + outerBound) / (2 * outerBound));
                 }
-                pos.setY(i, y);
             }
         }
 
+        // Generate quad indices between consecutive rings
+        for (let r = 0; r < numRings; r++) {
+            const base0 = r * vertsPerRing;
+            const base1 = (r + 1) * vertsPerRing;
+            for (let i = 0; i < vertsPerRing; i++) {
+                const nextI = (i + 1) % vertsPerRing;
+                const v00 = base0 + i;
+                const v01 = base0 + nextI;
+                const v10 = base1 + i;
+                const v11 = base1 + nextI;
+
+                indices.push(v00, v01, v10);
+                indices.push(v01, v11, v10);
+            }
+        }
+
+        const skirtGeo = new THREE.BufferGeometry();
+        skirtGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        skirtGeo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+        skirtGeo.setIndex(indices);
         skirtGeo.computeVertexNormals();
+
+        // Pin ring 0 normals to (0, 1, 0) to guarantee a perfectly seamless lighting boundary
+        const normals = skirtGeo.attributes.normal;
+        if (normals && typeof normals.setXYZ === 'function') {
+            for (let i = 0; i < vertsPerRing; i++) {
+                normals.setXYZ(i, 0, 1, 0);
+            }
+            normals.needsUpdate = true;
+        }
+
         const skirtMesh = new THREE.Mesh(skirtGeo, this.skirtMaterial);
         skirtMesh.position.set(cx, 0, cz);
         skirtMesh.receiveShadow = true;

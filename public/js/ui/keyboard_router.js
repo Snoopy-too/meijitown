@@ -8,6 +8,13 @@ export function bindKeyboardHotkeys(toolController, stateManager, renderer) {
         if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
         const key = e.key.toLowerCase();
 
+        // Escape: Deselect current placement tool & return to Surveyor's Scope (hides grid lines)
+        if (key === 'escape' || e.code === 'Escape') {
+            e.preventDefault();
+            toolController.setActiveTool(CONFIG.TOOLS.INSPECT);
+            return;
+        }
+
         // Space: Toggle Pause / Resume
         if (e.code === 'Space' || key === ' ') {
             e.preventDefault();

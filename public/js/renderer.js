@@ -128,30 +128,23 @@ export class WorldRenderer {
 
         const groundGeo = new THREE.PlaneGeometry(totalSizeX, totalSizeZ, segsX, segsZ);
         groundGeo.rotateX(-Math.PI / 2);
+        const groundMat = this.backdrop?.skirtMaterial || MaterialLibrary.get('meadowGround').clone();
         this.groundMesh = new THREE.Mesh(
             groundGeo,
-            MaterialLibrary.get('meadowGround').clone()
+            groundMat
         );
         this.groundMesh.position.set(totalSizeX / 2, 0.0, totalSizeZ / 2);
         this.groundMesh.receiveShadow = true;
         this.scene.add(this.groundMesh);
 
-        // Sub-surface diorama earthen plinth below recessed canal bed level (y = -0.22 to -1.0)
-        this.groundPlinth = new THREE.Mesh(
-            new THREE.BoxGeometry(totalSizeX, 0.78, totalSizeZ),
-            MaterialLibrary.get('stoneGranite')
-        );
-        this.groundPlinth.position.set(totalSizeX / 2, -0.61, totalSizeZ / 2);
-        this.groundPlinth.receiveShadow = true;
-        this.scene.add(this.groundPlinth);
-
         const gridHelper = new THREE.GridHelper(totalSizeX, CONFIG.GRID_WIDTH, 0x3b4d30, 0x455939);
         gridHelper.position.set(totalSizeX / 2, 0.012, totalSizeZ / 2);
         if (gridHelper.material) {
             gridHelper.material.transparent = true;
-            gridHelper.material.opacity = 0.14;
+            gridHelper.material.opacity = 0.0;
             gridHelper.material.depthWrite = false;
         }
+        gridHelper.visible = false;
         this.gridHelper = gridHelper;
         this.scene.add(gridHelper);
         this.syncGroundTopography();
@@ -279,7 +272,12 @@ export class WorldRenderer {
 
     setBuildMode(isBuilding) {
         this.cameraManager.setBuildMode(isBuilding);
-        if (this.gridHelper?.material) this.gridHelper.material.opacity = isBuilding ? 0.36 : 0.14;
+        if (this.gridHelper) {
+            this.gridHelper.visible = isBuilding;
+            if (this.gridHelper.material) {
+                this.gridHelper.material.opacity = isBuilding ? 0.36 : 0.0;
+            }
+        }
     }
     rotateCameraBy(angleDelta, durationMs = 200) { this.cameraManager.rotateCameraBy(angleDelta, durationMs); }
 
@@ -295,8 +293,8 @@ export class WorldRenderer {
         if (this.seasonalFoliageMaterial) this.seasonalFoliageMaterial.color.setHex(color);
         if (this.instancing) this.instancing.setSeasonalMaterial(this.seasonalFoliageMaterial);
         if (this.backdrop) this.backdrop.updateSeason(month);
-        if (this.groundMesh?.material) {
-            const gCol = (month >= 3 && month <= 5) ? 0xddebd4 : (month >= 6 && month <= 8) ? 0xffffff : (month >= 9 && month <= 11) ? 0xdec49b : 0xd2d6cf;
+        if (this.groundMesh?.material && this.groundMesh.material !== this.backdrop?.skirtMaterial) {
+            const gCol = (month >= 3 && month <= 5) ? 0x638a53 : (month >= 6 && month <= 8) ? 0x4e7840 : (month >= 9 && month <= 11) ? 0x8a724b : 0x7a7d76;
             this.groundMesh.material.color.setHex(gCol);
         }
         for (const [_, tile] of this.grid.tiles.entries()) {
