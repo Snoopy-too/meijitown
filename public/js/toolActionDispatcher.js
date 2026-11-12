@@ -158,10 +158,60 @@ export class ToolActionDispatcher {
     }
 
     handleRailPlacement(tileKey, existing, x, y, isDrag) {
+        const isRailOrDepot = (tx, ty) => {
+            if (!this.grid.isValidCoord(tx, ty)) return false;
+            const t = this.grid.getTile(tx, ty);
+            return Boolean(t && (t.type === CONFIG.TYPES.RAIL || (t.type === CONFIG.TYPES.SERVICE && t.serviceType === CONFIG.SERVICES.TRAIN_DEPOT)));
+        };
+
+        // Diagonal auto-stepping: if (x, y) has no orthogonal rail neighbor but has a 1-step diagonal rail neighbor,
+        // automatically insert the connecting orthogonal elbow tile so curves never break or derail!
+        const hasOrthoRail = isRailOrDepot(x + 1, y) || isRailOrDepot(x - 1, y) || isRailOrDepot(x, y + 1) || isRailOrDepot(x, y - 1);
+        if (!hasOrthoRail && existing.type !== CONFIG.TYPES.RAIL) {
+            const diagCandidates = [];
+            if (this.ctrl.lastRailCoord) {
+                const lx = this.ctrl.lastRailCoord.x, ly = this.ctrl.lastRailCoord.y;
+                if (Math.abs(x - lx) === 1 && Math.abs(y - ly) === 1 && isRailOrDepot(lx, ly)) {
+                    diagCandidates.push({ px: lx, py: ly });
+                }
+            }
+            for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+                const px = x + dx, py = y + dy;
+                if (isRailOrDepot(px, py) && !diagCandidates.some(c => c.px === px && c.py === py)) {
+                    diagCandidates.push({ px, py });
+                }
+            }
+
+            if (diagCandidates.length > 0 && this.state.treasury >= CONFIG.COSTS.RAIL * 2) {
+                const { px, py } = diagCandidates[0];
+                // Prefer the elbow tile that continues (px, py)'s existing straight axis before turning 90°
+                const pHasEW = isRailOrDepot(px - 1, py) || isRailOrDepot(px + 1, py);
+                const elbows = pHasEW
+                    ? [{ ex: x, ey: py }, { ex: px, ey: y }]
+                    : [{ ex: px, ey: y }, { ex: x, ey: py }];
+
+                for (const { ex, ey } of elbows) {
+                    const eTile = this.grid.getTile(ex, ey);
+                    if (eTile && (eTile.type === CONFIG.TYPES.EMPTY || (eTile.type === CONFIG.TYPES.ZONE && eTile.stage === CONFIG.STAGES.NONE)) && !eTile.occupied) {
+                        if (this.state.deductTreasury(CONFIG.COSTS.RAIL)) {
+                            this.grid.setTile(ex, ey, CONFIG.TYPES.RAIL, null, 1, true, CONFIG.STAGES.BUILT);
+                            if (isDrag && this.ctrl.dragBatch) {
+                                this.ctrl.paintedInBatch.add(`${ex}_${ey}`);
+                                this.ctrl.dragBatch.count++;
+                                this.ctrl.dragBatch.cost += CONFIG.COSTS.RAIL;
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
         if (existing.type === CONFIG.TYPES.ROAD) {
             if (this.state.deductTreasury(CONFIG.COSTS.RAIL)) {
                 this.grid.setTile(x, y, CONFIG.TYPES.RAIL, null, 1, true, CONFIG.STAGES.BUILT, existing.roadTier || 1, false, null, 0, true);
                 this.ctrl.lastPaintedTile = tileKey;
+                this.ctrl.lastRailCoord = { x, y };
                 SOUND.playMalletClack();
                 this.state.showToast(`Laid rail across road [-¥${CONFIG.COSTS.RAIL}]`);
             }
@@ -169,6 +219,7 @@ export class ToolActionDispatcher {
         }
         if (existing.type !== CONFIG.TYPES.RAIL && this.state.deductTreasury(CONFIG.COSTS.RAIL)) {
             this.grid.setTile(x, y, CONFIG.TYPES.RAIL, null, 1, true, CONFIG.STAGES.BUILT);
+            this.ctrl.lastRailCoord = { x, y };
             SOUND.playMalletClack();
             this.ctrl.recordPlacement(tileKey, CONFIG.COSTS.RAIL, `Laid rail track [-¥${CONFIG.COSTS.RAIL}]`, isDrag);
         }
@@ -237,11 +288,12 @@ export class ToolActionDispatcher {
         }
 
         if (this.state.deductTreasury(s.cost)) {
-            this.grid.setTile(x, y, CONFIG.TYPES.SERVICE, null, 1, true, CONFIG.STAGES.BUILT, 1, false, null, this.ctrl.placementRotation);
+            const rot = this.ctrl.getEffectiveRotation ? this.ctrl.getEffectiveRotation(x, y) : this.ctrl.placementRotation;
+            this.grid.setTile(x, y, CONFIG.TYPES.SERVICE, null, 1, true, CONFIG.STAGES.BUILT, 1, false, null, rot);
             const tile = this.grid.getTile(x, y);
             tile.serviceType = s.type;
-            tile.rotation = this.ctrl.placementRotation;
-            tile.manualRotation = true;
+            tile.rotation = rot;
+            tile.manualRotation = Boolean(this.ctrl.hasManuallyRotated);
             this.grid.notifyChange(x, y);
             SOUND.playBellChime();
             this.ctrl.lastPaintedTile = tileKey;

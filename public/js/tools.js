@@ -46,6 +46,20 @@ export class ToolController {
 
     getEffectiveRotation(x, y) {
         if (this.hasManuallyRotated) return this.placementRotation;
+        if (this.currentTool === CONFIG.TOOLS.TRAIN_DEPOT && this.grid) {
+            const isRail = (dx, dy) => {
+                const t = this.grid.getTile(x + dx, y + dy);
+                return Boolean(t && (t.type === CONFIG.TYPES.RAIL || (t.type === CONFIG.TYPES.SERVICE && t.serviceType === CONFIG.SERVICES.TRAIN_DEPOT)));
+            };
+            const isRoad = (dx, dy) => {
+                const t = this.grid.getTile(x + dx, y + dy);
+                return Boolean(t && (t.type === CONFIG.TYPES.ROAD || (t.type === CONFIG.TYPES.CANAL && t.hasBridge)));
+            };
+            const railNS = isRail(0, -1) || isRail(0, 1);
+            const railEW = isRail(-1, 0) || isRail(1, 0);
+            if (railNS && !railEW) return isRoad(1, 0) ? 3 : 1;
+            if (railEW && !railNS) return isRoad(0, 1) ? 2 : 0;
+        }
         const isZone = this.currentTool === CONFIG.TOOLS.RESIDENTIAL || this.currentTool === CONFIG.TOOLS.COMMERCIAL || this.currentTool === CONFIG.TOOLS.INDUSTRIAL;
         if (isZone && this.grid) {
             const dirs = [{ dx: 0, dy: 1, rot: 0 }, { dx: 1, dy: 0, rot: 1 }, { dx: 0, dy: -1, rot: 2 }, { dx: -1, dy: 0, rot: 3 }];

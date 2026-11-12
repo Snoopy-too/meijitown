@@ -293,6 +293,7 @@ export class TrainTrafficManager {
         this.trains.push({
             mesh,
             waypoints,
+            networkSize: network.length,
             waypointIndex: 0,
             progress: 0,
             speed: 3.8, // World units per second (~1.9 rail tiles/sec)
@@ -337,12 +338,22 @@ export class TrainTrafficManager {
     update(delta, speedMultiplier = 1.0) {
         const effectiveDelta = delta * speedMultiplier;
 
-        // Periodic spawn check
+        // Periodic spawn & live route expansion check
         this.spawnCheckTimer += effectiveDelta;
         if (this.spawnCheckTimer >= 3.0) {
             this.spawnCheckTimer = 0;
             if (this.trains.length < this.maxTrains) {
                 this.spawnTrain();
+            } else {
+                const networks = this.findRailNetworks();
+                if (networks.length > 0 && this.trains[0] && networks[0].length !== this.trains[0].networkSize) {
+                    const updatedWps = this.buildRailRoute(networks[0]);
+                    if (updatedWps && updatedWps.length >= 2) {
+                        this.trains[0].waypoints = updatedWps;
+                        this.trains[0].networkSize = networks[0].length;
+                        this.trains[0].waypointIndex = Math.min(this.trains[0].waypointIndex, updatedWps.length - 1);
+                    }
+                }
             }
         }
 

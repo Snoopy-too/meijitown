@@ -236,7 +236,7 @@ export class CanalMesh {
         const waterY = this.WATER_LEVEL; // -0.06m recessed water surface
 
         // 1. Recessed Canal Silt Bed & Submerged River Stones (y = -0.18)
-        const bedGeo = new THREE.PlaneGeometry(s, s);
+        const bedGeo = new THREE.PlaneGeometry(s * 1.01, s * 1.01);
         bedGeo.rotateX(-Math.PI / 2);
         const bedMesh = new THREE.Mesh(bedGeo, this.getBedMaterial());
         bedMesh.position.y = bedY;
@@ -256,7 +256,7 @@ export class CanalMesh {
         }
 
         // 2. Recessed Reflective Water Surface (y = -0.06)
-        const waterGeo = new THREE.PlaneGeometry(s, s);
+        const waterGeo = new THREE.PlaneGeometry(s * 1.004, s * 1.004);
         waterGeo.rotateX(-Math.PI / 2);
         const waterMesh = new THREE.Mesh(waterGeo, this.getWaterMaterial());
         waterMesh.position.y = waterY;

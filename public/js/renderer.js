@@ -166,6 +166,12 @@ export class WorldRenderer {
         const halfX = (CONFIG.GRID_WIDTH * s) / 2;
         const halfZ = (CONFIG.GRID_HEIGHT * s) / 2;
 
+        const isCanal = (x, y) => {
+            if (!this.grid.isValidCoord(x, y)) return false;
+            const t = this.grid.getTile(x, y);
+            return Boolean(t && t.type === CONFIG.TYPES.CANAL);
+        };
+
         for (let i = 0; i < pos.count; i++) {
             const wx = pos.getX(i) + halfX;
             const wz = pos.getZ(i) + halfZ;
@@ -177,10 +183,18 @@ export class WorldRenderer {
             const lz = wz - (ty + 0.5) * s;
             const edgeDist = Math.max(Math.abs(lx), Math.abs(lz));
 
+            // Check all tiles sharing this vertex (handles borders between adjacent canal squares)
+            const eps = 0.02;
+            const tx0 = Math.max(0, Math.min(CONFIG.GRID_WIDTH - 1, Math.floor((wx - eps) / s)));
+            const tx1 = Math.max(0, Math.min(CONFIG.GRID_WIDTH - 1, Math.floor((wx + eps) / s)));
+            const ty0 = Math.max(0, Math.min(CONFIG.GRID_HEIGHT - 1, Math.floor((wz - eps) / s)));
+            const ty1 = Math.max(0, Math.min(CONFIG.GRID_HEIGHT - 1, Math.floor((wz + eps) / s)));
+            const allTouchingCanal = isCanal(tx0, ty0) && isCanal(tx1, ty0) && isCanal(tx0, ty1) && isCanal(tx1, ty1);
+
             let targetY = 0.0;
-            if (tile && tile.type === CONFIG.TYPES.CANAL) {
-                // Physical canal excavation: carve terrain down to -0.20m inside canal envelope
-                targetY = edgeDist < (s * 0.48) ? -0.20 : -0.04;
+            if (allTouchingCanal || (tile && tile.type === CONFIG.TYPES.CANAL && edgeDist < (s * 0.48))) {
+                // Physical canal excavation: carve terrain down to -0.20m across interior & shared canal boundaries
+                targetY = -0.20;
             } else if (tile && tile.type === CONFIG.TYPES.AGRICULTURE) {
                 // Gently recessed irrigated rice paddy basin interior
                 targetY = edgeDist < (s * 0.38) ? -0.022 : 0.0;
@@ -193,6 +207,28 @@ export class WorldRenderer {
             pos.setY(i, targetY);
         }
         pos.needsUpdate = true;
+
+        // Cut out groundMesh grass triangles inside CANAL tiles so sloped turf edges never poke through canal water
+        if (this.groundMesh.geometry.index && typeof this.groundMesh.geometry.setIndex === 'function') {
+            const segsX = CONFIG.GRID_WIDTH * 4;
+            const segsZ = CONFIG.GRID_HEIGHT * 4;
+            const stride = segsX + 1;
+            const indices = [];
+            for (let iz = 0; iz < segsZ; iz++) {
+                const ty = Math.floor(iz / 4);
+                for (let ix = 0; ix < segsX; ix++) {
+                    const tx = Math.floor(ix / 4);
+                    if (isCanal(tx, ty)) continue;
+                    const a = iz * stride + ix;
+                    const b = iz * stride + (ix + 1);
+                    const c = (iz + 1) * stride + ix;
+                    const d = (iz + 1) * stride + (ix + 1);
+                    indices.push(a, c, b, c, d, b);
+                }
+            }
+            this.groundMesh.geometry.setIndex(indices);
+        }
+
         if (typeof this.groundMesh.geometry.computeVertexNormals === 'function') {
             this.groundMesh.geometry.computeVertexNormals();
         }
@@ -202,11 +238,6 @@ export class WorldRenderer {
             const verts = [];
             const gw = CONFIG.GRID_WIDTH;
             const gh = CONFIG.GRID_HEIGHT;
-            const isCanal = (x, y) => {
-                if (!this.grid.isValidCoord(x, y)) return false;
-                const t = this.grid.getTile(x, y);
-                return Boolean(t && t.type === CONFIG.TYPES.CANAL);
-            };
             for (let x = 0; x <= gw; x++) {
                 const lx = x * s - halfX;
                 for (let y = 0; y < gh; y++) {
@@ -302,9 +333,38 @@ export class WorldRenderer {
 
     getFacingAngleForTile(x, y) {
         const tile = this.grid.getTile(x, y);
-        if (tile && (tile.manualRotation || (typeof tile.rotation === 'number' && tile.rotation !== 0))) {
+        if (tile && tile.manualRotation) {
+            return ((tile.rotation || 0) % 4) * (Math.PI / 2);
+        }
+
+        // Train Depot: prioritize snapping centerline through-track to adjacent RAIL / TRAIN_DEPOT tiles first
+        if (tile && tile.type === CONFIG.TYPES.SERVICE && tile.serviceType === CONFIG.SERVICES.TRAIN_DEPOT) {
+            const isRailLink = (dx, dy) => {
+                const t = this.grid.getTile(x + dx, y + dy);
+                return Boolean(t && (t.type === CONFIG.TYPES.RAIL || (t.type === CONFIG.TYPES.SERVICE && t.serviceType === CONFIG.SERVICES.TRAIN_DEPOT)));
+            };
+            const isRoadLink = (dx, dy) => {
+                const t = this.grid.getTile(x + dx, y + dy);
+                return Boolean(t && (t.type === CONFIG.TYPES.ROAD || (t.type === CONFIG.TYPES.CANAL && t.hasBridge)));
+            };
+
+            const railNS = isRailLink(0, -1) || isRailLink(0, 1);
+            const railEW = isRailLink(-1, 0) || isRailLink(1, 0);
+
+            if (railNS && !railEW) {
+                // Track runs North-South (rotation Math.PI/2 or -Math.PI/2); place station house toward adjacent road
+                return isRoadLink(1, 0) ? -Math.PI / 2 : Math.PI / 2;
+            }
+            if (railEW && !railNS) {
+                // Track runs East-West (rotation 0 or Math.PI); place station house (-Z local) toward North road (0) or South road (Math.PI)
+                return isRoadLink(0, 1) ? Math.PI : 0;
+            }
+        }
+
+        if (tile && typeof tile.rotation === 'number' && tile.rotation !== 0) {
             return (tile.rotation % 4) * (Math.PI / 2);
         }
+
         const dirs = [{ dx: 0, dy: 1, a: 0 }, { dx: 1, dy: 0, a: Math.PI / 2 }, { dx: 0, dy: -1, a: Math.PI }, { dx: -1, dy: 0, a: -Math.PI / 2 }];
         for (const d of dirs) {
             const t = this.grid.getTile(x + d.dx, y + d.dy);
@@ -406,7 +466,10 @@ export class WorldRenderer {
             const nx = x + dx, ny = y + dy;
             if (this.grid.isValidCoord(nx, ny)) {
                 const t = this.grid.getTile(nx, ny);
-                if (t && (t.type === CONFIG.TYPES.ROAD || t.type === CONFIG.TYPES.CANAL || t.type === CONFIG.TYPES.RAIL)) this.updateTileMesh(nx, ny, t);
+                const isTrainDepot = t && t.type === CONFIG.TYPES.SERVICE && t.serviceType === CONFIG.SERVICES.TRAIN_DEPOT;
+                if (t && (t.type === CONFIG.TYPES.ROAD || t.type === CONFIG.TYPES.CANAL || t.type === CONFIG.TYPES.RAIL || isTrainDepot)) {
+                    this.updateTileMesh(nx, ny, t);
+                }
             }
         }
     }

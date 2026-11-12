@@ -82,7 +82,7 @@ export class InfrastructureMeshes {
         return group;
     }
 
-    // 2. Train Depot Platform & Waiting Shed (驛舎)
+    // 2. Train Depot Platform & Waiting Shed (驛舎 - Seamless Centerline Through-Station)
     static createTrainDepotMesh(tile, facingAngle = 0) {
         const group = new THREE.Group();
         const s = CONFIG.TILE_SIZE;
@@ -93,50 +93,99 @@ export class InfrastructureMeshes {
         const brickMat = MaterialLibrary.get('redBrick');
         const stoneMat = MaterialLibrary.get('stoneGranite');
         const trimMat = MaterialLibrary.get('stoneTrim');
+        const whiteMat = MaterialLibrary.get('plasterWhite');
+        const warmPlaster = MaterialLibrary.get('plasterWarm');
+        const brassMat = new THREE.MeshStandardMaterial({ color: 0xc2a24a, metalness: 0.82, roughness: 0.26 });
 
-        // 1. Cut-stone passenger platform with white safety edge curb
-        Kit.addPart(group, new THREE.BoxGeometry(s * 0.96, 0.14, 0.90), stoneMat, [0, 0.07, -0.32], true, null, true);
-        Kit.addPart(group, new THREE.BoxGeometry(s * 0.96, 0.025, 0.08), MaterialLibrary.get('plasterWhite'), [0, 0.145, 0.12]); // White safety curb
+        // 1. Centerline Mainline Through-Track (z = 0, exact 0.44m gauge & y = 0.065 rail height matching RailAutoTiler)
+        const ballastBaseMat = new THREE.MeshLambertMaterial({ color: 0x3d3a36 });
+        const ballastCrownMat = new THREE.MeshLambertMaterial({ color: 0x4c4843 });
+        const tieMat = new THREE.MeshLambertMaterial({ color: 0x362518 });
+        const plateMat = new THREE.MeshStandardMaterial({ color: 0x26282c, metalness: 0.75, roughness: 0.40 });
+        const railMat = new THREE.MeshStandardMaterial({ color: 0x43474d, metalness: 0.72, roughness: 0.30 });
 
-        // 2. Timber-and-brick station building & waiting shed
-        Kit.addPart(group, new THREE.BoxGeometry(0.50, 0.68, 0.48), brickMat, [-0.22, 0.48, -0.52], true, null, true);
-        Kit.addPart(group, new THREE.BoxGeometry(0.22, 0.34, 0.02), MaterialLibrary.get('shojiWindow'), [-0.22, 0.52, -0.27], false, null, false, 'Front_Koushi'); // Ticket window
+        Kit.addPart(group, new THREE.BoxGeometry(s * 1.01, 0.018, 1.22), ballastBaseMat, [0, 0.009, 0], false, null, true);
+        Kit.addPart(group, new THREE.BoxGeometry(s * 1.01, 0.018, 0.96), ballastCrownMat, [0, 0.022, 0], false, null, true);
 
-        // Gabled wooden waiting canopy posts
-        const postGeo = new THREE.CylinderGeometry(0.035, 0.035, 0.88, 6);
-        for (const px of [0.12, 0.44]) {
-            for (const pz of [-0.68, -0.22]) {
-                Kit.addPart(group, postGeo, woodMat, [px, 0.55, pz], true);
+        const gauge = 0.44;
+        const tieCount = 6;
+        const tieSpacing = s / tieCount;
+        const tieGeo = new THREE.BoxGeometry(0.11, 0.03, 0.84);
+        const plateGeo = new THREE.BoxGeometry(0.13, 0.012, 0.08);
+
+        for (let i = 0; i < tieCount; i++) {
+            const x = (i + 0.5) * tieSpacing - (s / 2);
+            Kit.addPart(group, tieGeo, tieMat, [x, 0.036, 0], true, null, true);
+            Kit.addPart(group, plateGeo, plateMat, [x, 0.052, -gauge / 2]);
+            Kit.addPart(group, plateGeo, plateMat, [x, 0.052, gauge / 2]);
+        }
+
+        const railGeo = new THREE.BoxGeometry(s * 1.02, 0.05, 0.042);
+        Kit.addPart(group, railGeo, railMat, [0, 0.065, -gauge / 2], true);
+        Kit.addPart(group, railGeo, railMat, [0, 0.065, gauge / 2], true);
+
+        // Inlaid cedar plank passenger barrow crossing at East end of platform (x = +0.72)
+        Kit.addPart(group, new THREE.BoxGeometry(0.32, 0.046, 0.36), lightWood, [0.72, 0.048, 0], false, null, true);
+
+        // 2. Main Dressed-Granite Passenger Platform (z = -0.28 to -0.96, clear of locomotive loading gauge)
+        Kit.addPart(group, new THREE.BoxGeometry(s * 0.96, 0.15, 0.66), stoneMat, [0, 0.075, -0.62], true, null, true);
+        Kit.addPart(group, new THREE.BoxGeometry(s * 0.98, 0.026, 0.68), trimMat, [0, 0.15, -0.62], false, null, true);
+        // White safety curb along trackside edge (z = -0.31)
+        Kit.addPart(group, new THREE.BoxGeometry(s * 0.96, 0.028, 0.06), whiteMat, [0, 0.154, -0.31]);
+
+        // Stepped granite access stairs at West & East platform ends
+        for (const endX of [-0.92, 0.92]) {
+            Kit.addPart(group, new THREE.BoxGeometry(0.08, 0.10, 0.42), trimMat, [endX, 0.05, -0.58], true);
+            Kit.addPart(group, new THREE.BoxGeometry(0.08, 0.05, 0.42), stoneMat, [endX + (endX > 0 ? 0.06 : -0.06), 0.025, -0.58], true);
+        }
+
+        // 3. Meiji Giyōfū Red-Brick & Timber Station House (驛舎) on Main Platform
+        Kit.addPart(group, new THREE.BoxGeometry(0.64, 0.68, 0.44), brickMat, [-0.34, 0.49, -0.71], true, null, true);
+        // Quoined white stone corner pilasters & cornice belt
+        for (const qx of [-0.64, -0.04]) {
+            Kit.addPart(group, new THREE.BoxGeometry(0.05, 0.69, 0.46), trimMat, [qx, 0.49, -0.71]);
+        }
+        Kit.addPart(group, new THREE.BoxGeometry(0.68, 0.04, 0.48), trimMat, [-0.34, 0.84, -0.71]);
+        // Pitched slate station roof & ridge cresting
+        Kit.addPart(group, new THREE.BoxGeometry(0.74, 0.06, 0.54), roofMat, [-0.34, 0.89, -0.71], true);
+        Kit.addPart(group, new THREE.BoxGeometry(0.68, 0.06, 0.34), roofMat, [-0.34, 0.95, -0.71], true);
+        // Glazed ticket wicket & entrance doorway facing trackside platform walkway
+        Kit.addPart(group, new THREE.BoxGeometry(0.22, 0.32, 0.02), MaterialLibrary.get('shojiWindow'), [-0.46, 0.52, -0.485], false, null, false, 'Front_Koushi');
+        Kit.addPart(group, new THREE.BoxGeometry(0.18, 0.44, 0.025), woodMat, [-0.18, 0.38, -0.485]);
+        // Brass station clock on gable facade
+        Kit.addPart(group, new THREE.CylinderGeometry(0.055, 0.055, 0.025, 10), brassMat, [-0.34, 0.74, -0.48], false, [Math.PI / 2, 0, 0]);
+        Kit.addPart(group, new THREE.CylinderGeometry(0.042, 0.042, 0.028, 10), warmPlaster, [-0.34, 0.74, -0.478], false, [Math.PI / 2, 0, 0]);
+
+        // 4. Open Timber Passenger Waiting Canopy & Slatted Bench (East half of main platform)
+        const postGeo = new THREE.CylinderGeometry(0.032, 0.036, 0.82, 6);
+        for (const px of [0.10, 0.46, 0.78]) {
+            for (const pz of [-0.84, -0.38]) {
+                Kit.addPart(group, postGeo, woodMat, [px, 0.56, pz], true);
             }
         }
+        const canopyRoof = Kit.addPart(group, new THREE.BoxGeometry(0.82, 0.045, 0.58), roofMat, [0.44, 0.98, -0.60], true);
+        canopyRoof.rotation.x = 0.10; // Slopes gently toward back drainage gutter
 
-        // Slanted corrugated/slate passenger canopy roof
-        const canopyRoof = Kit.addPart(group, new THREE.BoxGeometry(0.68, 0.04, 0.64), roofMat, [0.28, 1.02, -0.45], true);
-        canopyRoof.rotation.x = -0.12;
+        // Slatted cedar waiting bench beneath canopy
+        Kit.addPart(group, new THREE.BoxGeometry(0.46, 0.035, 0.15), lightWood, [0.30, 0.24, -0.74], true);
+        Kit.addPart(group, new THREE.BoxGeometry(0.46, 0.16, 0.03), lightWood, [0.30, 0.33, -0.80], true);
 
-        // Waiting bench (slatted cedar)
-        Kit.addPart(group, new THREE.BoxGeometry(0.48, 0.04, 0.16), lightWood, [0.28, 0.22, -0.50], true);
-        Kit.addPart(group, new THREE.BoxGeometry(0.48, 0.18, 0.03), lightWood, [0.28, 0.33, -0.58], true);
+        // Emissive station bracket gas lamp on canopy post
+        Kit.addPart(group, new THREE.CylinderGeometry(0.015, 0.015, 0.20, 4), ironMat, [0.10, 0.80, -0.36]);
+        Kit.addPart(group, new THREE.CylinderGeometry(0.04, 0.05, 0.12, 6), MaterialLibrary.get('gasLantern'), [0.10, 0.72, -0.36], false, null, false, 'Lantern_Body');
 
-        // Ekimei-hyō traditional station name signpost
-        Kit.addPart(group, new THREE.CylinderGeometry(0.02, 0.02, 0.70, 4), woodMat, [0.42, 0.45, -0.10], true);
-        Kit.addPart(group, new THREE.BoxGeometry(0.24, 0.14, 0.02), MaterialLibrary.get('plasterWhite'), [0.42, 0.68, -0.10]);
-        Kit.addPart(group, new THREE.BoxGeometry(0.26, 0.02, 0.03), woodMat, [0.42, 0.76, -0.10]);
+        // 5. Opposite-Side Wayside Boarding Platform (z = +0.28 to +0.62) & Traditional Ekimei-hyō Signboard
+        Kit.addPart(group, new THREE.BoxGeometry(s * 0.88, 0.12, 0.34), stoneMat, [0, 0.06, 0.45], true, null, true);
+        Kit.addPart(group, new THREE.BoxGeometry(s * 0.88, 0.022, 0.05), whiteMat, [0, 0.125, 0.305]);
 
-        // Emissive station bracket gas lamp
-        Kit.addPart(group, new THREE.CylinderGeometry(0.015, 0.015, 0.22, 4), ironMat, [0.12, 0.82, -0.22]);
-        Kit.addPart(group, new THREE.CylinderGeometry(0.04, 0.05, 0.12, 6), MaterialLibrary.get('gasLantern'), [0.12, 0.72, -0.22], false, null, false, 'Lantern_Body');
+        // Ekimei-hyō (駅名標) timber station nameboard & wayside gas lamp post on opposite platform
+        Kit.addPart(group, new THREE.CylinderGeometry(0.022, 0.022, 0.66, 6), woodMat, [-0.42, 0.42, 0.48], true);
+        Kit.addPart(group, new THREE.CylinderGeometry(0.022, 0.022, 0.66, 6), woodMat, [-0.14, 0.42, 0.48], true);
+        Kit.addPart(group, new THREE.BoxGeometry(0.36, 0.16, 0.025), whiteMat, [-0.28, 0.62, 0.48], true);
+        Kit.addPart(group, new THREE.BoxGeometry(0.40, 0.03, 0.045), woodMat, [-0.28, 0.71, 0.48]);
 
-        // 3. Ballasted siding track with wooden sleepers and steel rails
-        const tieGeo = new THREE.BoxGeometry(0.12, 0.028, 0.72);
-        for (let i = 0; i < 5; i++) {
-            const x = (i - 2) * (s / 4.5);
-            Kit.addPart(group, tieGeo, woodMat, [x, 0.015, 0.50]);
-        }
-
-        const railGeo = new THREE.BoxGeometry(s * 0.98, 0.045, 0.035);
-        Kit.addPart(group, railGeo, ironMat, [0, 0.045, 0.34]);
-        Kit.addPart(group, railGeo, ironMat, [0, 0.045, 0.66]);
+        Kit.addPart(group, new THREE.CylinderGeometry(0.022, 0.028, 0.76, 6), ironMat, [0.46, 0.48, 0.48], true);
+        Kit.addPart(group, new THREE.CylinderGeometry(0.045, 0.055, 0.13, 6), MaterialLibrary.get('gasLantern'), [0.46, 0.88, 0.48], false, null, false, 'Lantern_Body');
 
         group.rotation.y = facingAngle;
         return group;
