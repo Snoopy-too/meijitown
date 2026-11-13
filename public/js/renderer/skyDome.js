@@ -134,7 +134,7 @@ export class SkyDome {
     }
 
     buildSkyHemisphere() {
-        const domeGeo = new THREE.SphereGeometry(235, 20, 10, 0, Math.PI * 2, 0, Math.PI * 0.54);
+        const domeGeo = new THREE.SphereGeometry(235, 36, 18, 0, Math.PI * 2, 0, Math.PI * 0.56);
         if (typeof THREE.ShaderMaterial === 'function') {
             this.skyMaterial = new THREE.ShaderMaterial({
                 uniforms: this.uniforms,
@@ -160,33 +160,75 @@ export class SkyDome {
                     uniform float uTime;
                     varying vec3 vWorldOffset;
 
-                    float hash(vec2 p) {
-                        return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+                    float hash21(vec2 p) {
+                        p = fract(p * vec2(127.1, 311.7));
+                        p += dot(p, p + 41.23);
+                        return fract(p.x * p.y);
+                    }
+
+                    float noise2D(vec2 p) {
+                        vec2 i = floor(p);
+                        vec2 f = fract(p);
+                        f = f * f * (3.0 - 2.0 * f);
+                        return mix(
+                            mix(hash21(i), hash21(i + vec2(1.0, 0.0)), f.x),
+                            mix(hash21(i + vec2(0.0, 1.0)), hash21(i + vec2(1.0, 1.0)), f.x),
+                            f.y
+                        );
+                    }
+
+                    float fbmCirrus(vec2 p) {
+                        float v = 0.0;
+                        float a = 0.52;
+                        mat2 rot = mat2(0.8, -0.6, 0.6, 0.8);
+                        for (int i = 0; i < 4; i++) {
+                            v += a * noise2D(p);
+                            p = rot * p * 2.15;
+                            a *= 0.48;
+                        }
+                        return v;
                     }
 
                     void main() {
                         vec3 dir = normalize(vWorldOffset);
                         float elev = clamp(dir.y, 0.0, 1.0);
 
-                        float horizonBlend = smoothstep(0.0, 0.30, elev);
-                        float zenithBlend = smoothstep(0.24, 0.88, elev);
+                        // Natural Rayleigh sky dome vertical curve + warm horizon dust belt
+                        float horizonBlend = smoothstep(0.0, 0.28, elev);
+                        float zenithBlend = smoothstep(0.20, 0.88, elev);
                         vec3 skyCol = mix(uHorizonColor, uMidSkyColor, horizonBlend);
                         skyCol = mix(skyCol, uZenithColor, zenithBlend);
 
-                        float grain = sin(elev * 140.0) * 0.008;
-                        skyCol += vec3(grain);
+                        // Delicate high-altitude wind-sheared cirrus cloud wisps
+                        if (elev > 0.06) {
+                            vec2 cUv = dir.xz / (elev + 0.22);
+                            float wisp = fbmCirrus(vec2(cUv.x * 1.4 + uTime * 0.008, cUv.y * 3.8));
+                            float wispyMask = smoothstep(0.56, 0.82, wisp) * smoothstep(0.06, 0.35, elev) * (1.0 - smoothstep(0.75, 0.98, elev));
+                            vec3 cirrusCol = mix(uHorizonColor, vec3(1.0, 0.97, 0.93), 0.45);
+                            skyCol = mix(skyCol, cirrusCol, wispyMask * 0.22 * (1.0 - uStarIntensity * 0.65));
+                        }
 
+                        // Mie forward solar/lunar scattering halo + golden/peach horizon scatter
                         float sunDot = max(0.0, dot(dir, normalize(uCelestialDir)));
-                        float halo = pow(sunDot, 5.0) * 0.45 + pow(sunDot, 24.0) * 0.55;
-                        skyCol = mix(skyCol, uHaloColor, clamp(halo * uHaloStrength, 0.0, 0.75));
+                        float wideMie = pow(sunDot, 3.5) * 0.35 + pow(sunDot, 14.0) * 0.45;
+                        float coreMie = pow(sunDot, 56.0) * 0.65;
+                        skyCol = mix(skyCol, uHaloColor, clamp((wideMie + coreMie) * uHaloStrength, 0.0, 0.84));
 
-                        if (uStarIntensity > 0.01 && elev > 0.14) {
-                            vec2 starGrid = floor(dir.xz / (dir.y + 0.35) * 95.0);
-                            float h = hash(starGrid);
-                            if (h > 0.9915) {
-                                float twinkle = 0.65 + 0.35 * sin(uTime * 2.4 + h * 62.8);
-                                float starMask = smoothstep(0.14, 0.42, elev) * uStarIntensity * twinkle;
-                                skyCol += vec3(0.95, 0.97, 1.0) * starMask;
+                        // Crisp circular sub-pixel twinkling stars with multi-temperature tints
+                        if (uStarIntensity > 0.01 && elev > 0.12) {
+                            vec2 starUV = dir.xz / (dir.y + 0.38) * 52.0;
+                            vec2 cell = floor(starUV);
+                            vec2 f = fract(starUV);
+                            float h1 = hash21(cell);
+                            if (h1 > 0.94) {
+                                float h2 = hash21(cell + vec2(7.3, 19.1));
+                                vec2 starCenter = vec2(0.25 + 0.5 * h1, 0.25 + 0.5 * h2);
+                                float dist = length(f - starCenter);
+                                float pin = 1.0 - smoothstep(0.03, 0.14, dist);
+                                float twinkle = 0.65 + 0.35 * sin(uTime * 2.6 + h1 * 90.0);
+                                float elevMask = smoothstep(0.12, 0.38, elev);
+                                vec3 starTint = mix(vec3(0.78, 0.88, 1.0), vec3(1.0, 0.92, 0.78), h2);
+                                skyCol += starTint * pin * twinkle * elevMask * uStarIntensity * 1.15;
                             }
                         }
 
@@ -206,37 +248,120 @@ export class SkyDome {
     }
 
     buildCelestialBodies() {
-        const sunGeo = new THREE.RingGeometry(0.01, 13.5, 16);
-        this.sunMat = new THREE.MeshBasicMaterial({ color: 0xfff6d8, transparent: true, opacity: 0.88, side: THREE.DoubleSide, fog: false, depthWrite: false });
-        this.sunMesh = new THREE.Mesh(sunGeo, this.sunMat);
+        const hasShader = typeof THREE.ShaderMaterial === 'function';
+        const sunPlane = new THREE.PlaneGeometry(54, 54);
+        const moonPlane = new THREE.PlaneGeometry(38, 38);
+
+        if (hasShader) {
+            this.sunMat = new THREE.ShaderMaterial({
+                uniforms: {
+                    uCoreColor: { value: new THREE.Color(0xfff6d8) },
+                    uHaloColor: { value: new THREE.Color(0xffeab3) },
+                    uOpacity: { value: 0.88 }
+                },
+                transparent: true,
+                depthWrite: false,
+                fog: false,
+                blending: THREE.AdditiveBlending,
+                vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+                fragmentShader: `
+                    uniform vec3 uCoreColor;
+                    uniform vec3 uHaloColor;
+                    uniform float uOpacity;
+                    varying vec2 vUv;
+                    void main() {
+                        float r = length(vUv - 0.5) * 2.0;
+                        if (r > 1.0) discard;
+                        float disc = 1.0 - smoothstep(0.16, 0.28, r);
+                        float glow = pow(clamp(1.0 - r, 0.0, 1.0), 2.8) * 0.52;
+                        vec3 col = uCoreColor * disc * 1.35 + uHaloColor * glow;
+                        float alpha = clamp((disc * 0.95 + glow) * uOpacity, 0.0, 1.0);
+                        gl_FragColor = vec4(col, alpha);
+                    }
+                `
+            });
+            // Expose color/opacity adapters for uniform compatibility
+            this.sunMat.color = this.sunMat.uniforms.uCoreColor.value;
+            this.sunMat._opacityVal = 0.88;
+            Object.defineProperty(this.sunMat, 'opacity', {
+                get: () => this.sunMat._opacityVal,
+                set: (v) => {
+                    this.sunMat._opacityVal = v;
+                    this.sunMat.uniforms.uOpacity.value = v;
+                }
+            });
+
+            this.moonMat = new THREE.ShaderMaterial({
+                uniforms: {
+                    uMoonColor: { value: new THREE.Color(0xf4f7fc) },
+                    uHaloColor: { value: new THREE.Color(0x9ab8e6) },
+                    uOpacity: { value: 0.0 }
+                },
+                transparent: true,
+                depthWrite: false,
+                fog: false,
+                vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+                fragmentShader: `
+                    uniform vec3 uMoonColor;
+                    uniform vec3 uHaloColor;
+                    uniform float uOpacity;
+                    varying vec2 vUv;
+                    void main() {
+                        vec2 p = (vUv - 0.5) * 2.0;
+                        float r = length(p);
+                        if (r > 1.0) discard;
+                        float disc = 1.0 - smoothstep(0.22, 0.27, r);
+                        // Subtle lunar sea mottling across face + limb darkening
+                        float mare = sin(p.x * 13.0 + p.y * 9.0) * cos(p.y * 17.0 - p.x * 7.0);
+                        float shade = (0.88 + 0.12 * mare) * (1.0 - 0.25 * smoothstep(0.0, 0.25, r));
+                        float halo = pow(clamp(1.0 - r, 0.0, 1.0), 3.4) * 0.42;
+                        vec3 col = mix(uHaloColor, uMoonColor * shade, clamp(disc * 1.1, 0.0, 1.0));
+                        float alpha = clamp((disc * 0.95 + halo) * uOpacity, 0.0, 1.0);
+                        gl_FragColor = vec4(col, alpha);
+                    }
+                `
+            });
+            this.moonMat.color = this.moonMat.uniforms.uMoonColor.value;
+            this.moonMat._opacityVal = 0.0;
+            Object.defineProperty(this.moonMat, 'opacity', {
+                get: () => this.moonMat._opacityVal,
+                set: (v) => {
+                    this.moonMat._opacityVal = v;
+                    this.moonMat.uniforms.uOpacity.value = v;
+                }
+            });
+
+            this.sunMesh = new THREE.Mesh(sunPlane, this.sunMat);
+            this.moonMesh = new THREE.Mesh(moonPlane, this.moonMat);
+        } else {
+            this.sunMat = new THREE.MeshBasicMaterial({ color: 0xfff6d8, transparent: true, opacity: 0.88, side: THREE.DoubleSide, fog: false, depthWrite: false });
+            this.sunMesh = new THREE.Mesh(sunPlane, this.sunMat);
+            this.moonMat = new THREE.MeshBasicMaterial({ color: 0xf4f7fc, transparent: true, opacity: 0.0, side: THREE.DoubleSide, fog: false, depthWrite: false });
+            this.moonMesh = new THREE.Mesh(moonPlane, this.moonMat);
+        }
+
         this.sunMesh.position.set(this.cx + 95, 92, this.cz + 18);
         if (typeof this.sunMesh.lookAt === 'function') this.sunMesh.lookAt(this.cx, 0, this.cz);
         this.sunMesh.userData = { isBackdrop: true, ignoreRaycast: true };
         this.parentGroup.add(this.sunMesh);
 
-        const coronaGeo = new THREE.RingGeometry(13.2, 25.0, 16);
-        this.sunCoronaMat = new THREE.MeshBasicMaterial({ color: 0xffeab3, transparent: true, opacity: 0.32, side: THREE.DoubleSide, fog: false, depthWrite: false });
-        this.sunCoronaMesh = new THREE.Mesh(coronaGeo, this.sunCoronaMat);
+        // Keep lightweight corona/halo wrappers hidden when ShaderMaterial handles corona directly
+        this.sunCoronaMat = new THREE.MeshBasicMaterial({ color: 0xffeab3, transparent: true, opacity: 0.0, side: THREE.DoubleSide, fog: false, depthWrite: false });
+        this.sunCoronaMesh = new THREE.Mesh(new THREE.RingGeometry(13.2, 25.0, 16), this.sunCoronaMat);
         this.sunCoronaMesh.position.copy(this.sunMesh.position);
-        if (typeof this.sunCoronaMesh.lookAt === 'function') this.sunCoronaMesh.lookAt(this.cx, 0, this.cz);
+        this.sunCoronaMesh.visible = false;
         this.sunCoronaMesh.userData = { isBackdrop: true, ignoreRaycast: true };
-        this.parentGroup.add(this.sunCoronaMesh);
 
-        const moonGeo = new THREE.RingGeometry(0.01, 9.5, 16);
-        this.moonMat = new THREE.MeshBasicMaterial({ color: 0xf4f7fc, transparent: true, opacity: 0.0, side: THREE.DoubleSide, fog: false, depthWrite: false });
-        this.moonMesh = new THREE.Mesh(moonGeo, this.moonMat);
         this.moonMesh.position.set(this.cx - 110, 62, this.cz - 48);
         if (typeof this.moonMesh.lookAt === 'function') this.moonMesh.lookAt(this.cx, 0, this.cz);
         this.moonMesh.userData = { isBackdrop: true, ignoreRaycast: true };
         this.parentGroup.add(this.moonMesh);
 
-        const moonHaloGeo = new THREE.RingGeometry(9.3, 18.5, 16);
         this.moonHaloMat = new THREE.MeshBasicMaterial({ color: 0x9ab8e6, transparent: true, opacity: 0.0, side: THREE.DoubleSide, fog: false, depthWrite: false });
-        this.moonHaloMesh = new THREE.Mesh(moonHaloGeo, this.moonHaloMat);
+        this.moonHaloMesh = new THREE.Mesh(new THREE.RingGeometry(9.3, 18.5, 16), this.moonHaloMat);
         this.moonHaloMesh.position.copy(this.moonMesh.position);
-        if (typeof this.moonHaloMesh.lookAt === 'function') this.moonHaloMesh.lookAt(this.cx, 0, this.cz);
+        this.moonHaloMesh.visible = false;
         this.moonHaloMesh.userData = { isBackdrop: true, ignoreRaycast: true };
-        this.parentGroup.add(this.moonHaloMesh);
     }
 
     setPhase(phaseKey, isStorm = false) {
@@ -285,15 +410,18 @@ export class SkyDome {
 
         lerpColor(this.sunMat.color, this.targetSunColor, lerpSpeed);
         lerpColor(this.sunCoronaMat.color, this.targetSunHalo, lerpSpeed);
+        if (this.sunMat.uniforms?.uHaloColor?.value?.copy) {
+            this.sunMat.uniforms.uHaloColor.value.copy(this.sunCoronaMat.color);
+        }
         this.sunMat.opacity += (this.targetSunOpacity - this.sunMat.opacity) * lerpSpeed;
         this.sunCoronaMat.opacity = this.sunMat.opacity * 0.36;
         this.sunMesh.visible = this.sunMat.opacity > 0.02;
-        this.sunCoronaMesh.visible = this.sunMesh.visible;
+        this.sunCoronaMesh.visible = false;
 
         this.moonMat.opacity += (this.targetMoonOpacity - this.moonMat.opacity) * lerpSpeed;
         this.moonHaloMat.opacity = this.moonMat.opacity * 0.32;
         this.moonMesh.visible = this.moonMat.opacity > 0.02;
-        this.moonHaloMesh.visible = this.moonMesh.visible;
+        this.moonHaloMesh.visible = false;
 
         const activeCelestial = this.moonMat.opacity > this.sunMat.opacity ? this.moonMesh.position : this.sunMesh.position;
         this.uniforms.uCelestialDir.value

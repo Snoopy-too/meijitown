@@ -3,6 +3,7 @@
 
 import * as THREE from 'three';
 import { CONFIG } from '../config.js';
+import { PBRTextureGenerator } from './pbrTextureGenerator.js';
 
 export class LevelCrossingMesh {
     static createLevelCrossingMesh(tile, grid, modelCache = null) {
@@ -48,11 +49,12 @@ export class LevelCrossingMesh {
         // 2. Procedural Fallback Level Crossing
         const crossingGroup = new THREE.Group();
 
-        // Wooden Plank Decking Materials
-        const timberDeckMat = new THREE.MeshLambertMaterial({ color: 0x6e5238 });
-        const timberRampMat = new THREE.MeshLambertMaterial({ color: 0x4a3725 });
-        const warnYellowMat = new THREE.MeshLambertMaterial({ color: 0xdfb418 });
-        const warnBlackMat = new THREE.MeshLambertMaterial({ color: 0x1a1a1a });
+        // Wooden Plank Decking Materials (PBR)
+        const woodPBR = PBRTextureGenerator.getWoodWallSet();
+        const timberDeckMat = new THREE.MeshStandardMaterial({ color: 0x6e5238, roughness: 0.80, metalness: 0.04, envMapIntensity: 0.62, ...(woodPBR.normalMap ? { normalMap: woodPBR.normalMap } : {}) });
+        const timberRampMat = new THREE.MeshStandardMaterial({ color: 0x4a3725, roughness: 0.84, metalness: 0.04, envMapIntensity: 0.58, ...(woodPBR.normalMap ? { normalMap: woodPBR.normalMap } : {}) });
+        const warnYellowMat = new THREE.MeshStandardMaterial({ color: 0xdfb418, roughness: 0.46, metalness: 0.08, envMapIntensity: 0.78 });
+        const warnBlackMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.58, metalness: 0.10, envMapIntensity: 0.72 });
 
         // Center timber planks flush with iron rails (between rails, gauge = 0.44)
         const centerPlanks = new THREE.Mesh(

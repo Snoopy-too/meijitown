@@ -4,6 +4,29 @@
 import * as THREE from 'three';
 import { CONFIG } from '../config.js';
 import { LevelCrossingMesh } from './levelCrossing.js';
+import { PBRTextureGenerator } from './pbrTextureGenerator.js';
+
+function getRailMaterials() {
+    if (RailAutoTiler._railMats) return RailAutoTiler._railMats;
+    const stone = PBRTextureGenerator.getStoneSet();
+    const wood = PBRTextureGenerator.getWoodWallSet();
+    RailAutoTiler._railMats = {
+        ballastBase: new THREE.MeshStandardMaterial({ color: 0x3d3a36, roughness: 0.94, metalness: 0.04, envMapIntensity: 0.55, ...(stone.normalMap ? { normalMap: stone.normalMap } : {}) }),
+        ballastCrown: new THREE.MeshStandardMaterial({ color: 0x4c4843, roughness: 0.90, metalness: 0.05, envMapIntensity: 0.58, ...(stone.normalMap ? { normalMap: stone.normalMap } : {}) }),
+        tie: new THREE.MeshStandardMaterial({ color: 0x362518, roughness: 0.85, metalness: 0.04, envMapIntensity: 0.55, ...(wood.normalMap ? { normalMap: wood.normalMap } : {}) }),
+        plate: new THREE.MeshStandardMaterial({ color: 0x26282c, metalness: 0.78, roughness: 0.36, envMapIntensity: 1.25 }),
+        rail: new THREE.MeshStandardMaterial({ color: 0x4d535a, metalness: 0.82, roughness: 0.24, envMapIntensity: 1.45 }),
+        timberStop: new THREE.MeshStandardMaterial({ color: 0x4a321f, roughness: 0.82, envMapIntensity: 0.58, ...(wood.normalMap ? { normalMap: wood.normalMap } : {}) }),
+        ironStop: new THREE.MeshStandardMaterial({ color: 0x22252a, metalness: 0.82, roughness: 0.30, envMapIntensity: 1.35 }),
+        redTarget: new THREE.MeshStandardMaterial({ color: 0xc0392b, roughness: 0.45, metalness: 0.08, envMapIntensity: 0.78 }),
+        whiteTarget: new THREE.MeshStandardMaterial({ color: 0xf2efe9, roughness: 0.52, metalness: 0.06, envMapIntensity: 0.75 }),
+        lampStop: new THREE.MeshStandardMaterial({ color: 0xff5533, emissive: new THREE.Color(0xff2200), emissiveIntensity: 0.75, roughness: 0.35 })
+    };
+    for (const m of Object.values(RailAutoTiler._railMats)) {
+        m.userData = { ...(m.userData || {}), isSharedLibraryMaterial: true };
+    }
+    return RailAutoTiler._railMats;
+}
 
 export class RailAutoTiler {
     // 1. Evaluate 4 orthogonal neighbors (N=1, E=2, S=4, W=8)
@@ -45,11 +68,12 @@ export class RailAutoTiler {
     // 3. Procedural Straight Rail Segment (Contoured Ballast + Makuragi Ties + Tie Plates + Steel Rails)
     static createStraightTrack(isNorthSouth, s = CONFIG.TILE_SIZE) {
         const group = new THREE.Group();
-        const ballastBaseMat = new THREE.MeshLambertMaterial({ color: 0x3d3a36 });
-        const ballastCrownMat = new THREE.MeshLambertMaterial({ color: 0x4c4843 });
-        const tieMat = new THREE.MeshLambertMaterial({ color: 0x362518 });
-        const plateMat = new THREE.MeshStandardMaterial({ color: 0x26282c, metalness: 0.75, roughness: 0.40 });
-        const railMat = new THREE.MeshStandardMaterial({ color: 0x43474d, metalness: 0.72, roughness: 0.30 });
+        const rMats = getRailMaterials();
+        const ballastBaseMat = rMats.ballastBase;
+        const ballastCrownMat = rMats.ballastCrown;
+        const tieMat = rMats.tie;
+        const plateMat = rMats.plate;
+        const railMat = rMats.rail;
 
         // Two-tier contoured crushed-basalt ballast roadbed (no full-tile black square)
         const baseBed = new THREE.Mesh(new THREE.BoxGeometry(1.22, 0.018, s * 1.01), ballastBaseMat);
@@ -106,11 +130,12 @@ export class RailAutoTiler {
     // 4. Procedural 90-Degree Curved Rail Turn (NE=3, SE=6, SW=12, NW=9)
     static createCurvedTrack(cornerType, s = CONFIG.TILE_SIZE) {
         const group = new THREE.Group();
-        const ballastBaseMat = new THREE.MeshLambertMaterial({ color: 0x3d3a36 });
-        const ballastCrownMat = new THREE.MeshLambertMaterial({ color: 0x4c4843 });
-        const tieMat = new THREE.MeshLambertMaterial({ color: 0x362518 });
-        const plateMat = new THREE.MeshStandardMaterial({ color: 0x26282c, metalness: 0.75, roughness: 0.40 });
-        const railMat = new THREE.MeshStandardMaterial({ color: 0x43474d, metalness: 0.72, roughness: 0.30 });
+        const rMats = getRailMaterials();
+        const ballastBaseMat = rMats.ballastBase;
+        const ballastCrownMat = rMats.ballastCrown;
+        const tieMat = rMats.tie;
+        const plateMat = rMats.plate;
+        const railMat = rMats.rail;
 
         const gauge = 0.44;
         const half = s / 2; // 1.0
@@ -218,11 +243,12 @@ export class RailAutoTiler {
     // 4b. Dead-End Timber & Iron Buffer Stop (Kuruma-dome / 車止め) for Terminus Track Ends
     static createBufferStop(mask, s = CONFIG.TILE_SIZE) {
         const group = new THREE.Group();
-        const timberMat = new THREE.MeshLambertMaterial({ color: 0x4a321f });
-        const ironMat = new THREE.MeshStandardMaterial({ color: 0x22252a, metalness: 0.80, roughness: 0.30 });
-        const redMat = new THREE.MeshLambertMaterial({ color: 0xc0392b });
-        const whiteMat = new THREE.MeshLambertMaterial({ color: 0xf2efe9 });
-        const lampMat = new THREE.MeshStandardMaterial({ color: 0xff5533, emissive: new THREE.Color(0xff2200), emissiveIntensity: 0.75 });
+        const rMats = getRailMaterials();
+        const timberMat = rMats.timberStop;
+        const ironMat = rMats.ironStop;
+        const redMat = rMats.redTarget;
+        const whiteMat = rMats.whiteTarget;
+        const lampMat = rMats.lampStop;
 
         const gauge = 0.44;
         const stopZ = 0.70; // Placed near open dead-end of tile
@@ -283,9 +309,10 @@ export class RailAutoTiler {
     // 5. Crossover Frog Plates, Guard Rails & Manual Switch Stand (Masks 7, 11, 13, 14, 15)
     static createSwitchJunction(mask, s = CONFIG.TILE_SIZE) {
         const group = new THREE.Group();
-        const ironPlateMat = new THREE.MeshStandardMaterial({ color: 0x222428, metalness: 0.85, roughness: 0.25 });
-        const redTargetMat = new THREE.MeshLambertMaterial({ color: 0xc0392b });
-        const whiteTargetMat = new THREE.MeshLambertMaterial({ color: 0xf2efe9 });
+        const rMats = getRailMaterials();
+        const ironPlateMat = rMats.ironStop;
+        const redTargetMat = rMats.redTarget;
+        const whiteTargetMat = rMats.whiteTarget;
 
         // Primary Straight Line(s) through the junction
         const connectsNS = (mask & 1) && (mask & 4);

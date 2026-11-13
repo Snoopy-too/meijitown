@@ -24,20 +24,49 @@ export class SceneLighting {
             CONFIG.ATMOSPHERE.SUN_COLOR,
             CONFIG.ATMOSPHERE.SUN_INTENSITY
         );
-        this.sunLight.position.set(28, 52, 24);
+        const gridW = (CONFIG.GRID_WIDTH || 35) * (CONFIG.TILE_SIZE || 2.0);
+        const gridH = (CONFIG.GRID_HEIGHT || 35) * (CONFIG.TILE_SIZE || 2.0);
+        this.shadowFocus = new THREE.Vector3(gridW * 0.5, 0, gridH * 0.5);
+        this.currentSunOffset = new THREE.Vector3(28, 52, 24);
+        this.sunLight.position.set(
+            this.shadowFocus.x + this.currentSunOffset.x,
+            this.currentSunOffset.y,
+            this.shadowFocus.z + this.currentSunOffset.z
+        );
+        if (this.sunLight.target && this.sunLight.target.position) {
+            this.sunLight.target.position.copy(this.shadowFocus);
+            this.scene.add(this.sunLight.target);
+        }
+
         this.sunLight.castShadow = true;
         this.sunLight.shadow.mapSize.width = 2048;
         this.sunLight.shadow.mapSize.height = 2048;
-        this.sunLight.shadow.camera.near = 0.5;
+        this.sunLight.shadow.camera.near = 1.0;
         this.sunLight.shadow.camera.far = 220;
 
-        const d = 52;
-        this.sunLight.shadow.camera.left = -d;
-        this.sunLight.shadow.camera.right = d;
-        this.sunLight.shadow.camera.top = d;
-        this.sunLight.shadow.camera.bottom = -d;
-        this.sunLight.shadow.bias = -0.0003;
+        this.currentShadowHalfSize = 44;
+        this.sunLight.shadow.camera.left = -this.currentShadowHalfSize;
+        this.sunLight.shadow.camera.right = this.currentShadowHalfSize;
+        this.sunLight.shadow.camera.top = this.currentShadowHalfSize;
+        this.sunLight.shadow.camera.bottom = -this.currentShadowHalfSize;
+        this.sunLight.shadow.bias = -0.00018;
+        this.sunLight.shadow.normalBias = 0.018;
         this.scene.add(this.sunLight);
+
+        // Pooled real PointLights for closest glowing street lanterns at Dusk/Night
+        this.lanternLightPool = [];
+        this._lanternPoolScanTimer = 0;
+        this._lanternNodes = [];
+        if (typeof THREE.PointLight === 'function') {
+            for (let i = 0; i < 6; i++) {
+                const pl = new THREE.PointLight(0xff9e4a, 0, 9.0, 2.0);
+                pl.castShadow = false;
+                pl.position.set(this.shadowFocus.x, -20, this.shadowFocus.z);
+                this.scene.add(pl);
+                this.lanternLightPool.push(pl);
+            }
+        }
+        this._cachedSunDir = new THREE.Vector3(0.45, 0.78, 0.35).normalize();
 
         this.currentPhaseKey = 'DAY';
         const initialPreset = CONFIG.ATMOSPHERE.PHASES.DAY;
@@ -105,23 +134,158 @@ export class SceneLighting {
         this.targetEmissiveIntensity = p.EMISSIVE_INTENSITY;
     }
 
-    update(delta = 0.016) {
+    /**
+     * Centers the directional shadow frustum cleanly on the active camera look target
+     * (texel-snapped to eliminate shadow edge shimmer) and scales frustum tight around zoom.
+     */
+    updateShadowFocus(cameraTarget, cameraDistance = 42) {
+        if (!cameraTarget || !this.sunLight?.shadow?.camera) return;
+
+        const targetHalfSize = Math.max(18, Math.min(46, (cameraDistance || 42) * 0.92));
+        if (Math.abs(targetHalfSize - this.currentShadowHalfSize) > 0.35) {
+            this.currentShadowHalfSize = targetHalfSize;
+            const cam = this.sunLight.shadow.camera;
+            cam.left = -targetHalfSize;
+            cam.right = targetHalfSize;
+            cam.top = targetHalfSize;
+            cam.bottom = -targetHalfSize;
+            if (typeof cam.updateProjectionMatrix === 'function') {
+                cam.updateProjectionMatrix();
+            }
+        }
+
+        // Snap focus position onto shadow-map texel grid to prevent shimmering silhouettes when panning
+        const mapW = this.sunLight.shadow.mapSize?.width || 2048;
+        const texelStep = (this.currentShadowHalfSize * 2) / mapW;
+        const snappedX = Math.round(cameraTarget.x / texelStep) * texelStep;
+        const snappedZ = Math.round(cameraTarget.z / texelStep) * texelStep;
+        this.shadowFocus.set(snappedX, 0, snappedZ);
+
+        if (this.sunLight.target?.position) {
+            this.sunLight.target.position.copy(this.shadowFocus);
+        }
+        this.sunLight.position.set(
+            this.shadowFocus.x + this.currentSunOffset.x,
+            this.currentSunOffset.y,
+            this.shadowFocus.z + this.currentSunOffset.z
+        );
+    }
+
+    /**
+     * Refreshes the 6 pooled real PointLights onto the closest active street lanterns
+     * during Twilight/Night so warm amber or arc-blue pools illuminate cobblestones and facades.
+     */
+    updateLanternLightPool(cameraTarget, delta = 0.016) {
+        if (!this.lanternLightPool || this.lanternLightPool.length === 0) return;
+
+        const eIntensity = this.currentEmissiveIntensity;
+        if (eIntensity <= 0.05) {
+            for (const pl of this.lanternLightPool) {
+                pl.intensity = 0;
+            }
+            return;
+        }
+
+        this._lanternPoolScanTimer -= delta;
+        if (this._lanternPoolScanTimer <= 0) {
+            this._lanternPoolScanTimer = 0.35;
+            this._lanternNodes = [];
+            this.scene.traverse((child) => {
+                if (child.userData && child.userData.isLantern) {
+                    this._lanternNodes.push(child);
+                }
+            });
+        }
+
+        const refX = cameraTarget ? cameraTarget.x : this.shadowFocus.x;
+        const refZ = cameraTarget ? cameraTarget.z : this.shadowFocus.z;
+        const pSys = this._powerSystem || (this.state && this.state.powerSystem);
+
+        // Sort nearest lanterns to camera look point
+        const ranked = [];
+        for (const node of this._lanternNodes) {
+            if (!node.parent) continue;
+            const wx = (node.matrixWorld?.elements?.[12]) ?? (node.position?.x || 0);
+            const wy = (node.matrixWorld?.elements?.[13]) ?? (node.position?.y || 1.1);
+            const wz = (node.matrixWorld?.elements?.[14]) ?? (node.position?.z || 0);
+            const d2 = (wx - refX) * (wx - refX) + (wz - refZ) * (wz - refZ);
+            if (d2 <= 625) {
+                ranked.push({ node, wx, wy: wy + 0.85, wz, d2 });
+            }
+        }
+        ranked.sort((a, b) => a.d2 - b.d2);
+
+        for (let i = 0; i < this.lanternLightPool.length; i++) {
+            const pl = this.lanternLightPool[i];
+            if (i < ranked.length) {
+                const entry = ranked[i];
+                const isPowered = (pSys && typeof pSys.hasPower === 'function')
+                    ? pSys.hasPower(entry.node.userData.tileX, entry.node.userData.tileY)
+                    : false;
+                pl.position.set(entry.wx, entry.wy, entry.wz);
+                if (pl.color?.setHex) pl.color.setHex(isPowered ? 0xd2eaff : 0xff9a3c);
+                pl.intensity = (isPowered ? 2.6 : 1.9) * Math.min(1.2, eIntensity);
+            } else {
+                pl.intensity = 0;
+            }
+        }
+    }
+
+    /**
+     * Returns unified instantaneous lighting state for water, terrain, mountain haze, and IBL.
+     */
+    getLightingState() {
+        const sunOffset = this.currentSunOffset;
+        this._cachedSunDir.set(sunOffset.x, Math.max(4, sunOffset.y), sunOffset.z).normalize();
+        const nightMix = (this.currentPhaseKey === 'NIGHT') ? 1.0 : (this.currentPhaseKey === 'TWILIGHT' ? 0.55 : (this.currentPhaseKey === 'DAWN' ? 0.25 : 0.0));
+        return {
+            phaseKey: this.currentPhaseKey,
+            isStorm: this.isStormOverride,
+            sunDir: this._cachedSunDir,
+            sunColor: this.sunLight.color,
+            skyZenith: this.scene.background || this.hemiLight.color,
+            skyHorizon: this.hemiLight.color,
+            fogColor: this.scene.fog ? this.scene.fog.color : this.targetFogColor,
+            fogDensity: this.scene.fog ? this.scene.fog.density : this.targetFogDensity,
+            nightMix,
+            emissiveIntensity: this.currentEmissiveIntensity
+        };
+    }
+
+    update(delta = 0.016, cameraTarget = null, cameraDistance = 42) {
         const lerpSpeed = Math.min(1.0, delta * 2.2);
 
-        this.sunLight.color.lerp(this.targetSunColor, lerpSpeed);
-        this.sunLight.intensity += (this.targetSunIntensity - this.sunLight.intensity) * lerpSpeed;
-        this.sunLight.position.lerp(this.targetSunPos, lerpSpeed);
+        const lerpCol = (cObj, tObj) => {
+            if (cObj && typeof cObj.lerp === 'function') cObj.lerp(tObj, lerpSpeed);
+            else if (cObj && typeof cObj.setHex === 'function' && tObj && typeof tObj.getHex === 'function') cObj.setHex(tObj.getHex());
+        };
 
-        this.hemiLight.color.lerp(this.targetHemiSky, lerpSpeed);
-        this.hemiLight.groundColor.lerp(this.targetHemiGround, lerpSpeed);
+        lerpCol(this.sunLight.color, this.targetSunColor);
+        this.sunLight.intensity += (this.targetSunIntensity - this.sunLight.intensity) * lerpSpeed;
+        if (typeof this.currentSunOffset.lerp === 'function') {
+            this.currentSunOffset.lerp(this.targetSunPos, lerpSpeed);
+        } else {
+            this.currentSunOffset.set(this.targetSunPos.x, this.targetSunPos.y, this.targetSunPos.z);
+        }
+
+        if (cameraTarget) {
+            this.updateShadowFocus(cameraTarget, cameraDistance);
+        } else {
+            this.sunLight.position.set(
+                this.shadowFocus.x + this.currentSunOffset.x,
+                this.currentSunOffset.y,
+                this.shadowFocus.z + this.currentSunOffset.z
+            );
+        }
+
+        lerpCol(this.hemiLight.color, this.targetHemiSky);
+        lerpCol(this.hemiLight.groundColor, this.targetHemiGround);
         this.hemiLight.intensity += (this.targetHemiIntensity - this.hemiLight.intensity) * lerpSpeed;
 
         const activeBgTarget = this.isStormOverride ? this.stormBgColor : this.targetBgColor;
-        if (this.scene.background && typeof this.scene.background.lerp === 'function') {
-            this.scene.background.lerp(activeBgTarget, lerpSpeed);
-        }
+        lerpCol(this.scene.background, activeBgTarget);
         if (this.scene.fog) {
-            this.scene.fog.color.lerp(this.isStormOverride ? this.stormBgColor : this.targetFogColor, lerpSpeed);
+            lerpCol(this.scene.fog.color, this.isStormOverride ? this.stormBgColor : this.targetFogColor);
             this.scene.fog.density += (this.targetFogDensity - this.scene.fog.density) * lerpSpeed;
         }
 
@@ -131,6 +295,7 @@ export class SceneLighting {
         if (Math.abs(prevEmissive - this.currentEmissiveIntensity) > 0.005) {
             this.applyEmissivesToScene(this.currentEmissiveIntensity);
         }
+        this.updateLanternLightPool(cameraTarget, delta);
     }
 
     /**

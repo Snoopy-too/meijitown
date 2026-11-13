@@ -4,6 +4,8 @@
 import * as THREE from 'three';
 import { CONFIG } from '../config.js';
 import { SkyDome } from './skyDome.js';
+import { WaterShaderSystem } from './waterShader.js';
+import { TerrainShaderSystem } from './terrainShader.js';
 
 export class BackdropManager {
     constructor(scene) {
@@ -12,13 +14,27 @@ export class BackdropManager {
         this.group.name = 'backdrop_environment';
 
         const groundColor = (CONFIG.COLORS && CONFIG.COLORS.GROUND) || 0x5a7d4b;
-        this.skirtMaterial = new THREE.MeshStandardMaterial({ color: groundColor, roughness: 0.92, metalness: 0.02, flatShading: false });
-        this.foothillMaterial = new THREE.MeshStandardMaterial({ color: 0x35523a, roughness: 0.88, metalness: 0.02, flatShading: true });
-        this.mountainMaterial = new THREE.MeshStandardMaterial({ color: 0x465b63, roughness: 0.82, metalness: 0.05, flatShading: true });
-        this.fujiBodyMaterial = new THREE.MeshStandardMaterial({ color: 0x3b4d6b, roughness: 0.78, metalness: 0.06, flatShading: true });
-        this.snowMaterial = new THREE.MeshStandardMaterial({ color: 0xf4f6f9, roughness: 0.52, metalness: 0.08, flatShading: true });
-        this.riverBankMaterial = new THREE.MeshStandardMaterial({ color: 0x6e685c, roughness: 0.90, metalness: 0.04, flatShading: true });
-        this.riverMaterial = new THREE.MeshStandardMaterial({ color: 0x2d6378, roughness: 0.16, metalness: 0.22, transparent: true, opacity: 0.92 });
+        this.skirtMaterial = TerrainShaderSystem.enhanceGroundMaterial(
+            new THREE.MeshStandardMaterial({ color: groundColor, roughness: 0.92, metalness: 0.02, envMapIntensity: 0.52, flatShading: false })
+        );
+        this.foothillMaterial = TerrainShaderSystem.enhanceMountainMaterial(
+            new THREE.MeshStandardMaterial({ color: 0x35523a, roughness: 0.88, metalness: 0.02, envMapIntensity: 0.55, flatShading: false }),
+            { hasSnowCap: false }
+        );
+        this.mountainMaterial = TerrainShaderSystem.enhanceMountainMaterial(
+            new THREE.MeshStandardMaterial({ color: 0x465b63, roughness: 0.84, metalness: 0.04, envMapIntensity: 0.60, flatShading: false }),
+            { hasSnowCap: true, snowLine: 19.5 }
+        );
+        this.fujiBodyMaterial = TerrainShaderSystem.enhanceMountainMaterial(
+            new THREE.MeshStandardMaterial({ color: 0x3b4d6b, roughness: 0.80, metalness: 0.05, envMapIntensity: 0.65, flatShading: false }),
+            { hasSnowCap: true, isFuji: true, snowLine: 25.0 }
+        );
+        this.snowMaterial = new THREE.MeshStandardMaterial({ color: 0xf4f6f9, roughness: 0.52, metalness: 0.08, envMapIntensity: 0.85, flatShading: false });
+        this.riverBankMaterial = TerrainShaderSystem.enhanceMountainMaterial(
+            new THREE.MeshStandardMaterial({ color: 0x6e685c, roughness: 0.88, metalness: 0.04, envMapIntensity: 0.62, flatShading: false }),
+            { isBank: true }
+        );
+        this.riverMaterial = WaterShaderSystem.getRiverMaterial();
 
         this.targetFujiColor = new THREE.Color(0x3b4d6b);
         this.targetSnowColor = new THREE.Color(0xf4f6f9);
@@ -167,8 +183,8 @@ export class BackdropManager {
     }
 
     createSculptedMassif(p, seed) {
-        const radSegs = p.isFuji ? 18 : 10;
-        const heightSegs = p.isFuji ? 6 : 4;
+        const radSegs = p.isFuji ? 22 : 12;
+        const heightSegs = p.isFuji ? 7 : 5;
         const topRadius = p.isFuji ? p.r * 0.16 : p.r * 0.04;
         const geo = new THREE.CylinderGeometry(topRadius, p.r, p.h, radSegs, heightSegs, true);
         const pos = geo.attributes.position;
@@ -235,36 +251,6 @@ export class BackdropManager {
             peakMesh.receiveShadow = true;
             peakMesh.userData = { isBackdrop: true, ignoreRaycast: true };
             this.group.add(peakMesh);
-
-            if (p.isFuji || p.snow) {
-                const snowH = p.isFuji ? p.h * 0.42 : p.h * 0.34;
-                const snowGeo = new THREE.CylinderGeometry(
-                    p.isFuji ? p.r * 0.165 : p.r * 0.05,
-                    p.isFuji ? p.r * 0.43 : p.r * 0.36,
-                    snowH, p.isFuji ? 18 : 8, p.isFuji ? 4 : 2, true
-                );
-                const sPos = snowGeo.attributes.position;
-                if (sPos && typeof sPos.getX === 'function') {
-                    for (let i = 0; i < sPos.count; i++) {
-                        const vx = sPos.getX(i), vy = sPos.getY(i), vz = sPos.getZ(i);
-                        const t = Math.max(0, Math.min(1, (vy + snowH / 2) / snowH));
-                        const angle = Math.atan2(vz, vx), baseRad = Math.hypot(vx, vz);
-                        if (baseRad > 0.001) {
-                            const globalT = (p.isFuji ? 0.58 : 0.66) + t * (p.isFuji ? 0.42 : 0.34);
-                            const curvePow = p.isFuji ? Math.pow(1 - globalT * 0.82, 1.75) : Math.pow(1 - globalT * 0.90, 1.25);
-                            const scale = (p.r * curvePow + 0.38) / baseRad;
-                            sPos.setX(i, vx * scale + (p.isFuji ? 0 : Math.sin(seed * 3.1) * globalT * 3.2));
-                            sPos.setZ(i, vz * scale + (p.isFuji ? 0 : Math.cos(seed * 2.7) * globalT * 3.2));
-                            if (t < 0.28) sPos.setY(i, vy + Math.cos(angle * (p.isFuji ? 7 : 5) + seed) * (p.isFuji ? 2.4 : 1.6));
-                        }
-                    }
-                }
-                snowGeo.computeVertexNormals();
-                const snowMesh = new THREE.Mesh(snowGeo, this.snowMaterial);
-                snowMesh.position.set(p.x, (p.h / 2) - 1.5 + p.h * (p.isFuji ? 0.29 : 0.33), p.z);
-                snowMesh.userData = { isBackdrop: true, ignoreRaycast: true };
-                this.group.add(snowMesh);
-            }
         });
     }
 
@@ -273,21 +259,25 @@ export class BackdropManager {
         const points = this.riverCurve.getPoints(36);
         const buildStrip = (width, yOffset, material) => {
             const ribbonGeo = new THREE.BufferGeometry();
-            const vertices = [], indices = [];
+            const vertices = [], uvs = [], indices = [];
+            const denom = Math.max(1, points.length - 1);
             for (let i = 0; i < points.length; i++) {
                 const p = points[i];
+                const t = i / denom;
                 const tangent = (i < points.length - 1) ? points[i + 1].clone().sub(p).normalize() : p.clone().sub(points[i - 1]).normalize();
                 const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).normalize();
                 vertices.push(
                     p.x + normal.x * (width / 2), p.y + yOffset, p.z + normal.z * (width / 2),
                     p.x - normal.x * (width / 2), p.y + yOffset, p.z - normal.z * (width / 2)
                 );
+                uvs.push(0, t * 6.0, 1, t * 6.0);
                 if (i < points.length - 1) {
                     const b = i * 2;
                     indices.push(b, b + 1, b + 2, b + 1, b + 3, b + 2);
                 }
             }
             ribbonGeo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+            ribbonGeo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
             ribbonGeo.setIndex(indices);
             ribbonGeo.computeVertexNormals();
             const mesh = new THREE.Mesh(ribbonGeo, material);
@@ -329,10 +319,14 @@ export class BackdropManager {
 
     update(delta = 0.016, isStorm = false) {
         const s = Math.min(1.0, delta * 2.2);
-        const lerpC = (c, t) => (typeof c.lerp === 'function') ? c.lerp(t, s) : c.setHex(t.getHex());
-        lerpC(this.fujiBodyMaterial.color, this.targetFujiColor);
-        lerpC(this.snowMaterial.color, this.targetSnowColor);
-        lerpC(this.riverMaterial.color, this.targetRiverColor);
+        const lerpC = (c, t) => {
+            if (!c || !t) return;
+            if (typeof c.lerp === 'function') c.lerp(t, s);
+            else if (typeof c.setHex === 'function' && typeof t.getHex === 'function') c.setHex(t.getHex());
+        };
+        lerpC(this.fujiBodyMaterial?.color, this.targetFujiColor);
+        lerpC(this.snowMaterial?.color, this.targetSnowColor);
+        if (this.riverMaterial?.color) lerpC(this.riverMaterial.color, this.targetRiverColor);
         if (this.skyDome) this.skyDome.update(delta, isStorm);
     }
 }

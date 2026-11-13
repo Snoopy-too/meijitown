@@ -2,10 +2,73 @@
 // Phase 3 /artisan: Multi-Tone Per-Instance Woodblock Canopies, Cloud-Pruned Matsu, Sakura & Cascading Yanagi Willows (< 240 lines)
 
 import * as THREE from 'three';
+import { PBRTextureGenerator } from './pbrTextureGenerator.js';
+import { WeatheringShaderSystem } from './weatheringShader.js';
 
 const PINE_TONES = [0x1e3f20, 0x254b28, 0x2e5930, 0x19361c, 0x346136];
 const SAKURA_SHADES = [0xffffff, 0xf5e1e4, 0xe8ccd0, 0xfcf0f2, 0xdec0c4, 0xf0d5d8];
 const WILLOW_TONES = [0x4c7032, 0x567a3a, 0x638a43, 0x42632b, 0x6d944c];
+
+/**
+ * Builds a 4-card multi-angled botanical cluster BufferGeometry (3 crossed vertical
+ * planes at 0/60/120 deg + tilted horizontal crown cap) with spherical normals so
+ * instanced trees show lush organic leaf/blossom silhouettes instead of facets.
+ */
+function createFoliageClusterGeo(rx = 0.42, ry = 0.28, includeHorizontalCap = true) {
+    const geo = new THREE.BufferGeometry();
+    const positions = [];
+    const normals = [];
+    const uvs = [];
+    const indices = [];
+
+    const addQuad = (corners, nx, ny, nz) => {
+        const base = positions.length / 3;
+        for (let i = 0; i < 4; i++) {
+            const p = corners[i];
+            positions.push(p[0], p[1], p[2]);
+            // Blend outward spherical normal with upward hemisphere so ambient fills crevices softly
+            const len = Math.hypot(p[0], p[1] + ry * 0.45, p[2]) || 1;
+            const snx = (p[0] / len) * 0.6 + nx * 0.15;
+            const sny = ((p[1] + ry * 0.45) / len) * 0.7 + ny * 0.25 + 0.3;
+            const snz = (p[2] / len) * 0.6 + nz * 0.15;
+            const nLen = Math.hypot(snx, sny, snz) || 1;
+            normals.push(snx / nLen, sny / nLen, snz / nLen);
+        }
+        uvs.push(0, 0, 1, 0, 1, 1, 0, 1);
+        indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+    };
+
+    for (let k = 0; k < 3; k++) {
+        const a = (k * Math.PI) / 3;
+        const c = Math.cos(a) * rx;
+        const s = Math.sin(a) * rx;
+        const nx = -Math.sin(a);
+        const nz = Math.cos(a);
+        addQuad([
+            [-c, -ry, -s],
+            [c, -ry, s],
+            [c, ry, s],
+            [-c, ry, -s]
+        ], nx, 0.2, nz);
+    }
+
+    if (includeHorizontalCap) {
+        const cr = rx * 0.92;
+        const cy = ry * 0.28;
+        addQuad([
+            [-cr, cy - 0.04, -cr],
+            [cr, cy + 0.04, -cr],
+            [cr, cy + 0.04, cr],
+            [-cr, cy - 0.04, cr]
+        ], 0, 1, 0);
+    }
+
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    geo.setIndex(indices);
+    return geo;
+}
 
 export class InstancingManager {
     constructor(scene, modelCache) {
@@ -18,38 +81,77 @@ export class InstancingManager {
         this.batches = new Map();
         this.counts = new Map();
         this.seasonalMaterial = null;
+        this._sakuraTex = PBRTextureGenerator.getFoliageTexture('sakura');
 
         this.initMaterials();
         this.initMeshes();
     }
 
     initMaterials() {
+        const woodPBR = PBRTextureGenerator.getWoodWallSet();
+        const pineTex = PBRTextureGenerator.getFoliageTexture('pine');
+        const willowTex = PBRTextureGenerator.getFoliageTexture('willow');
+
+        const makeLeafMat = (tex, swayAmp, speedMult) => {
+            const opts = {
+                color: 0xffffff,
+                roughness: 0.72,
+                metalness: 0.02,
+                envMapIntensity: 0.65,
+                flatShading: false
+            };
+            if (tex) {
+                opts.map = tex;
+                opts.alphaTest = 0.34;
+                opts.side = THREE.DoubleSide;
+            }
+            const mat = new THREE.MeshStandardMaterial(opts);
+            return WeatheringShaderSystem.enhanceFoliageMaterial(mat, { swayAmplitude: swayAmp, speedMultiplier: speedMult });
+        };
+
         this.materials = {
-            pineTrunk: new THREE.MeshStandardMaterial({ color: 0x3b281c, roughness: 0.90 }),
-            pineFoliage: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.80, flatShading: true }),
-            sakuraTrunk: new THREE.MeshStandardMaterial({ color: 0x453124, roughness: 0.88 }),
-            willowTrunk: new THREE.MeshStandardMaterial({ color: 0x3b2a1d, roughness: 0.88 }),
-            willowFoliage: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.78, flatShading: true }),
+            pineTrunk: new THREE.MeshStandardMaterial({ color: 0x3b281c, roughness: 0.88, envMapIntensity: 0.55, ...(woodPBR.normalMap ? { normalMap: woodPBR.normalMap } : {}) }),
+            pineFoliage: makeLeafMat(pineTex, 0.024, 0.85),
+            sakuraTrunk: new THREE.MeshStandardMaterial({ color: 0x453124, roughness: 0.86, envMapIntensity: 0.55, ...(woodPBR.normalMap ? { normalMap: woodPBR.normalMap } : {}) }),
+            willowTrunk: new THREE.MeshStandardMaterial({ color: 0x3b2a1d, roughness: 0.86, envMapIntensity: 0.55, ...(woodPBR.normalMap ? { normalMap: woodPBR.normalMap } : {}) }),
+            willowFoliage: makeLeafMat(willowTex, 0.062, 1.15),
         };
     }
 
     setSeasonalMaterial(mat) {
         if (mat) {
-            mat.flatShading = true;
+            mat.flatShading = false;
+            mat.roughness = 0.74;
+            mat.envMapIntensity = 0.66;
+            if (this._sakuraTex) {
+                mat.map = this._sakuraTex;
+                mat.alphaTest = 0.34;
+                mat.side = THREE.DoubleSide;
+            }
+            WeatheringShaderSystem.enhanceFoliageMaterial(mat, { swayAmplitude: 0.042, speedMultiplier: 1.0 });
+            mat.needsUpdate = true;
         }
         this.seasonalMaterial = mat;
-        if (this.batches.has('sakuraFoliage')) {
-            this.batches.get('sakuraFoliage').material = mat;
+        const batch = this.batches.get('sakuraFoliage');
+        if (batch) {
+            batch.material = mat;
         }
     }
 
-    createInstancedMesh(key, geometry, material, count = this.maxInstances) {
+    createInstancedMesh(key, geometry, material, count = this.maxInstances, depthTex = null) {
         const mesh = new THREE.InstancedMesh(geometry, material, count);
         if (mesh.instanceMatrix && typeof mesh.instanceMatrix.setUsage === 'function') {
             mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
         }
         mesh.castShadow = true;
         mesh.receiveShadow = true;
+        if (depthTex && typeof THREE.MeshDepthMaterial === 'function') {
+            mesh.customDepthMaterial = new THREE.MeshDepthMaterial({
+                depthPacking: THREE.RGBADepthPacking,
+                map: depthTex,
+                alphaTest: 0.34
+            });
+        }
         mesh.count = 0;
         mesh.visible = false;
         this.scene.add(mesh);
@@ -59,33 +161,38 @@ export class InstancingManager {
     }
 
     initMeshes() {
-        // 1. Japanese Black Pine (Kuro-matsu): gnarled trunk & flattened cloud-pruned foliage pads
-        const pineTrunkGeo = new THREE.CylinderGeometry(0.045, 0.10, 0.85, 7);
+        // 1. Japanese Black Pine (Kuro-matsu): gnarled trunk & layered needle-spray foliage cards
+        const pineTrunkGeo = new THREE.CylinderGeometry(0.045, 0.10, 0.85, 8);
         this.createInstancedMesh('pineTrunk', pineTrunkGeo, this.materials.pineTrunk);
 
-        const pinePadGeo = new THREE.DodecahedronGeometry(0.38, 1);
-        pinePadGeo.scale(1.25, 0.36, 1.15);
-        pinePadGeo.computeVertexNormals();
-        this.createInstancedMesh('pineFoliage', pinePadGeo, this.materials.pineFoliage);
+        const pinePadGeo = createFoliageClusterGeo(0.48, 0.18, true);
+        this.createInstancedMesh('pineFoliage', pinePadGeo, this.materials.pineFoliage, this.maxInstances, PBRTextureGenerator.getFoliageTexture('pine'));
 
-        // 2. Sakura / Momiji Deciduous Trees: forked trunk & flattened layered canopy clouds
-        const sakuraTrunkGeo = new THREE.CylinderGeometry(0.05, 0.11, 0.82, 7);
+        // 2. Sakura / Momiji Deciduous Trees: forked trunk & airy lacy blossom/leaf sprays
+        const sakuraTrunkGeo = new THREE.CylinderGeometry(0.05, 0.11, 0.82, 8);
         this.createInstancedMesh('sakuraTrunk', sakuraTrunkGeo, this.materials.sakuraTrunk);
 
-        const sakuraCloudGeo = new THREE.DodecahedronGeometry(0.36, 1);
-        sakuraCloudGeo.scale(1.20, 0.52, 1.15);
-        sakuraCloudGeo.computeVertexNormals();
-        const sakuraMat = this.seasonalMaterial || new THREE.MeshStandardMaterial({ color: 0xf4c2c2, roughness: 0.8, flatShading: true });
-        this.createInstancedMesh('sakuraFoliage', sakuraCloudGeo, sakuraMat);
+        const sakuraCloudGeo = createFoliageClusterGeo(0.45, 0.25, true);
+        let sakuraMat = this.seasonalMaterial;
+        if (!sakuraMat) {
+            const fallbackOpts = { color: 0xf4c2c2, roughness: 0.74, flatShading: false, envMapIntensity: 0.66 };
+            if (this._sakuraTex) {
+                fallbackOpts.map = this._sakuraTex;
+                fallbackOpts.alphaTest = 0.34;
+                fallbackOpts.side = THREE.DoubleSide;
+            }
+            sakuraMat = WeatheringShaderSystem.enhanceFoliageMaterial(new THREE.MeshStandardMaterial(fallbackOpts), { swayAmplitude: 0.042 });
+        } else {
+            this.setSeasonalMaterial(sakuraMat);
+        }
+        this.createInstancedMesh('sakuraFoliage', sakuraCloudGeo, sakuraMat, this.maxInstances, this._sakuraTex);
 
-        // 3. Weeping Willows (Yanagi): arched boughs, upper crown & cascading frond curtains
-        const willowTrunkGeo = new THREE.CylinderGeometry(0.055, 0.11, 0.88, 7);
+        // 3. Weeping Willows (Yanagi): arched boughs, upper crown & swaying frond curtains
+        const willowTrunkGeo = new THREE.CylinderGeometry(0.055, 0.11, 0.88, 8);
         this.createInstancedMesh('willowTrunk', willowTrunkGeo, this.materials.willowTrunk);
 
-        const willowFoliageGeo = new THREE.DodecahedronGeometry(0.40, 1);
-        willowFoliageGeo.scale(1.12, 0.55, 1.12);
-        willowFoliageGeo.computeVertexNormals();
-        this.createInstancedMesh('willowFoliage', willowFoliageGeo, this.materials.willowFoliage);
+        const willowFoliageGeo = createFoliageClusterGeo(0.46, 0.28, true);
+        this.createInstancedMesh('willowFoliage', willowFoliageGeo, this.materials.willowFoliage, this.maxInstances, PBRTextureGenerator.getFoliageTexture('willow'));
     }
 
     beginBatch() {

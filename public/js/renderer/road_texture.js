@@ -3,6 +3,7 @@
 
 import * as THREE from 'three';
 import { CONFIG } from '../config.js';
+import { PBRTextureGenerator } from './pbrTextureGenerator.js';
 
 let cachedNormalTexture = null;
 let cachedDirtNormalTexture = null;
@@ -107,35 +108,60 @@ export class RoadTextureManager {
 
     static getStoneRoadMaterial() {
         if (!cachedStoneRoadMat) {
-            cachedStoneRoadMat = new THREE.MeshStandardMaterial({
-                color: CONFIG.COLORS.STONE_ROAD || 0x8e8b82,
-                roughness: CONFIG.COLORS.STONE_ROAD_ROUGHNESS || 0.85,
+            const pbr = PBRTextureGenerator.getFlagstoneSet();
+            const opts = {
+                color: pbr.map ? 0xffffff : (CONFIG.COLORS.STONE_ROAD || 0x8e8b82),
+                roughness: CONFIG.COLORS.STONE_ROAD_ROUGHNESS || 0.84,
                 metalness: 0.05,
-                normalMap: RoadTextureManager.getFlagstoneNormalMap(),
-                normalScale: new THREE.Vector2(0.65, 0.65),
-            });
+                envMapIntensity: 0.85,
+                normalMap: pbr.normalMap || RoadTextureManager.getFlagstoneNormalMap(),
+                normalScale: new THREE.Vector2(0.72, 0.72),
+            };
+            if (pbr.map) opts.map = pbr.map;
+            if (pbr.roughnessMap) opts.roughnessMap = pbr.roughnessMap;
+            cachedStoneRoadMat = new THREE.MeshStandardMaterial(opts);
+            cachedStoneRoadMat.userData = { isSharedLibraryMaterial: true };
         }
         return cachedStoneRoadMat;
     }
 
     static getStoneKerbMaterial() {
         if (!cachedStoneKerbMat) {
-            cachedStoneKerbMat = new THREE.MeshStandardMaterial({
-                color: CONFIG.COLORS.STONE_ROAD_BORDER || 0x6e6b65,
-                roughness: 0.85,
-                metalness: 0.05,
-            });
+            const stone = PBRTextureGenerator.getStoneSet();
+            const opts = {
+                color: stone.map ? 0xd2cec4 : (CONFIG.COLORS.STONE_ROAD_BORDER || 0x6e6b65),
+                roughness: 0.78,
+                metalness: 0.06,
+                envMapIntensity: 0.78,
+            };
+            if (stone.map) opts.map = stone.map;
+            if (stone.normalMap) {
+                opts.normalMap = stone.normalMap;
+                opts.normalScale = new THREE.Vector2(0.45, 0.45);
+            }
+            if (stone.roughnessMap) opts.roughnessMap = stone.roughnessMap;
+            cachedStoneKerbMat = new THREE.MeshStandardMaterial(opts);
+            cachedStoneKerbMat.userData = { isSharedLibraryMaterial: true };
         }
         return cachedStoneKerbMat;
     }
 
     static getStoneShoulderMaterial() {
         if (!cachedStoneShoulderMat) {
-            cachedStoneShoulderMat = new THREE.MeshStandardMaterial({
-                color: CONFIG.COLORS.STONE_ROAD_SHOULDER || 0x6e6b65,
-                roughness: 0.85,
-                metalness: 0.05,
-            });
+            const dirt = PBRTextureGenerator.getDirtRoadSet();
+            const opts = {
+                color: dirt.map ? 0xafa696 : (CONFIG.COLORS.STONE_ROAD_SHOULDER || 0x6e6b65),
+                roughness: 0.90,
+                metalness: 0.03,
+                envMapIntensity: 0.58,
+            };
+            if (dirt.map) opts.map = dirt.map;
+            if (dirt.normalMap) {
+                opts.normalMap = dirt.normalMap;
+                opts.normalScale = new THREE.Vector2(0.32, 0.32);
+            }
+            cachedStoneShoulderMat = new THREE.MeshStandardMaterial(opts);
+            cachedStoneShoulderMat.userData = { isSharedLibraryMaterial: true };
         }
         return cachedStoneShoulderMat;
     }
@@ -190,40 +216,74 @@ export class RoadTextureManager {
 
     static getDirtRoadMaterial() {
         if (!cachedDirtRoadMat) {
-            const normalMap = RoadTextureManager.getDirtNormalMap();
+            const dirt = PBRTextureGenerator.getDirtRoadSet();
+            const normalMap = dirt.normalMap || RoadTextureManager.getDirtNormalMap();
             const opts = {
-                color: CONFIG.COLORS.ROAD || 0x7c6348,
+                color: dirt.map ? 0xffffff : (CONFIG.COLORS.ROAD || 0x7c6348),
                 roughness: 0.90,
                 metalness: 0.02,
+                envMapIntensity: 0.60,
             };
+            if (dirt.map) opts.map = dirt.map;
+            if (dirt.roughnessMap) opts.roughnessMap = dirt.roughnessMap;
             if (normalMap) {
                 opts.normalMap = normalMap;
-                opts.normalScale = new THREE.Vector2(0.45, 0.45);
+                opts.normalScale = new THREE.Vector2(0.55, 0.55);
             }
             cachedDirtRoadMat = new THREE.MeshStandardMaterial(opts);
+            cachedDirtRoadMat.userData = { isSharedLibraryMaterial: true };
         }
         return cachedDirtRoadMat;
     }
 
     static getDirtShoulderMaterial() {
         if (!cachedDirtShoulderMat) {
-            cachedDirtShoulderMat = new THREE.MeshStandardMaterial({
-                color: CONFIG.COLORS.ROAD_SHOULDER || 0x6e5840,
+            const dirt = PBRTextureGenerator.getDirtRoadSet();
+            const opts = {
+                color: dirt.map ? 0xc2b096 : (CONFIG.COLORS.ROAD_SHOULDER || 0x6e5840),
                 roughness: 0.94,
                 metalness: 0.01,
-            });
+                envMapIntensity: 0.52,
+            };
+            if (dirt.map) opts.map = dirt.map;
+            cachedDirtShoulderMat = new THREE.MeshStandardMaterial(opts);
+            cachedDirtShoulderMat.userData = { isSharedLibraryMaterial: true };
         }
         return cachedDirtShoulderMat;
     }
 
     static getGutterChannelMaterial() {
         if (!cachedGutterWaterMat) {
-            cachedGutterWaterMat = new THREE.MeshStandardMaterial({
-                color: 0x262d2b,
-                roughness: 0.32,
-                metalness: 0.18,
-            });
+            const stone = PBRTextureGenerator.getStoneSet();
+            const opts = {
+                color: 0x263230,
+                roughness: 0.24,
+                metalness: 0.22,
+                envMapIntensity: 1.25,
+            };
+            if (stone.normalMap) {
+                opts.normalMap = stone.normalMap;
+                opts.normalScale = new THREE.Vector2(0.28, 0.28);
+            }
+            cachedGutterWaterMat = new THREE.MeshStandardMaterial(opts);
+            cachedGutterWaterMat.userData = { isSharedLibraryMaterial: true };
         }
         return cachedGutterWaterMat;
+    }
+
+    static disposeAll() {
+        for (const mat of [cachedStoneRoadMat, cachedStoneKerbMat, cachedStoneShoulderMat, cachedDirtRoadMat, cachedDirtShoulderMat, cachedGutterWaterMat]) {
+            mat?.dispose?.();
+        }
+        cachedNormalTexture?.dispose?.();
+        cachedDirtNormalTexture?.dispose?.();
+        cachedNormalTexture = null;
+        cachedDirtNormalTexture = null;
+        cachedStoneRoadMat = null;
+        cachedStoneKerbMat = null;
+        cachedStoneShoulderMat = null;
+        cachedDirtRoadMat = null;
+        cachedDirtShoulderMat = null;
+        cachedGutterWaterMat = null;
     }
 }

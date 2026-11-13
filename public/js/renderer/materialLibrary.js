@@ -2,6 +2,8 @@
 // Phase 1 Architecture: Shared materials, O(1) day/night emissive updates, procedural CanvasTextures & safe GPU disposal
 
 import * as THREE from 'three';
+import { PBRTextureGenerator } from './pbrTextureGenerator.js';
+import { WeatheringShaderSystem } from './weatheringShader.js';
 
 export class MaterialLibrary {
     static _initialized = false;
@@ -115,77 +117,119 @@ export class MaterialLibrary {
             meadowTex.repeat.set(24, 24);
         }
 
+        const kawaraPBR = PBRTextureGenerator.getKawaraSet();
+        const brickPBR = PBRTextureGenerator.getBrickSet();
+        const plasterPBR = PBRTextureGenerator.getPlasterSet();
+        const namakoPBR = PBRTextureGenerator.getNamakoSet();
+        const woodPBR = PBRTextureGenerator.getWoodWallSet();
+        const stonePBR = PBRTextureGenerator.getStoneSet();
+        const washiPBR = PBRTextureGenerator.getWashiSet();
+        const meadowPBRMap = PBRTextureGenerator.getMeadowMap();
+
+        const pbrOpts = (set, fallbackMap, nx = 0.45, ny = 0.45) => {
+            const out = { map: set.map || fallbackMap };
+            if (set.normalMap) {
+                out.normalMap = set.normalMap;
+                out.normalScale = new THREE.Vector2(nx, ny);
+            }
+            if (set.roughnessMap) {
+                out.roughnessMap = set.roughnessMap;
+            }
+            return out;
+        };
+
+        const GlassMatClass = THREE.MeshPhysicalMaterial || THREE.MeshStandardMaterial;
+
         this._materials = {
-            woodDark: new THREE.MeshStandardMaterial({ name: 'M_Wood', color: 0x422f22, roughness: 0.82, metalness: 0.05 }),
-            woodMedium: new THREE.MeshStandardMaterial({ name: 'M_Cedar', color: 0xffffff, map: woodWallTex, roughness: 0.80, metalness: 0.05 }),
-            woodLight: new THREE.MeshStandardMaterial({ name: 'M_LightWood', color: 0x9e7e52, roughness: 0.75, metalness: 0.05 }),
-            bamboo: new THREE.MeshStandardMaterial({ name: 'M_Bamboo', color: 0xa8945e, roughness: 0.72, metalness: 0.05 }),
-            reedScreen: new THREE.MeshStandardMaterial({ name: 'M_ReedScreen', color: 0xc2a874, roughness: 0.86, metalness: 0.0 }),
-            hempMat: new THREE.MeshStandardMaterial({ name: 'M_Matting', color: 0x948260, roughness: 0.90, metalness: 0.0 }),
-            strawTawara: new THREE.MeshStandardMaterial({ name: 'M_Straw', color: 0xc4a862, roughness: 0.88, metalness: 0.0 }),
-            meadowGround: new THREE.MeshStandardMaterial({ name: 'M_Meadow', color: 0xffffff, map: meadowTex, roughness: 0.94, metalness: 0.0 }),
+            woodDark: new THREE.MeshStandardMaterial({ name: 'M_Wood', color: 0x422f22, roughness: 0.78, metalness: 0.05, envMapIntensity: 0.62, ...pbrOpts({ map: null, normalMap: woodPBR.normalMap, roughnessMap: woodPBR.roughnessMap }, null, 0.35, 0.35) }),
+            woodMedium: new THREE.MeshStandardMaterial({ name: 'M_Cedar', color: 0xffffff, roughness: 0.78, metalness: 0.05, envMapIntensity: 0.62, ...pbrOpts(woodPBR, woodWallTex, 0.48, 0.48) }),
+            woodLight: new THREE.MeshStandardMaterial({ name: 'M_LightWood', color: 0x9e7e52, roughness: 0.74, metalness: 0.05, envMapIntensity: 0.65 }),
+            bamboo: new THREE.MeshStandardMaterial({ name: 'M_Bamboo', color: 0xa8945e, roughness: 0.66, metalness: 0.05, envMapIntensity: 0.68 }),
+            reedScreen: new THREE.MeshStandardMaterial({ name: 'M_ReedScreen', color: 0xc2a874, roughness: 0.86, metalness: 0.0, envMapIntensity: 0.55 }),
+            hempMat: new THREE.MeshStandardMaterial({ name: 'M_Matting', color: 0x948260, roughness: 0.90, metalness: 0.0, envMapIntensity: 0.52 }),
+            strawTawara: new THREE.MeshStandardMaterial({ name: 'M_Straw', color: 0xc4a862, roughness: 0.88, metalness: 0.0, envMapIntensity: 0.55 }),
+            meadowGround: new THREE.MeshStandardMaterial({ name: 'M_Meadow', color: 0xffffff, map: meadowPBRMap || meadowTex, roughness: 0.94, metalness: 0.0, envMapIntensity: 0.55 }),
 
-            plasterWhite: new THREE.MeshStandardMaterial({ name: 'M_Plaster', color: 0xffffff, map: plasterTex, roughness: 0.85, metalness: 0.02 }),
-            plasterWarm: new THREE.MeshStandardMaterial({ name: 'M_WarmPlaster', color: 0xebe1cf, map: plasterTex, roughness: 0.84, metalness: 0.02 }),
-            plasterBlack: new THREE.MeshStandardMaterial({ name: 'M_BlackPlaster', color: 0x262930, roughness: 0.68, metalness: 0.08 }),
-            namakoWall: new THREE.MeshStandardMaterial({ name: 'M_Namako', color: 0xffffff, map: namakoTex, roughness: 0.75, metalness: 0.05 }),
+            plasterWhite: new THREE.MeshStandardMaterial({ name: 'M_Plaster', color: 0xffffff, roughness: 0.85, metalness: 0.02, envMapIntensity: 0.62, ...pbrOpts(plasterPBR, plasterTex, 0.32, 0.32) }),
+            plasterWarm: new THREE.MeshStandardMaterial({ name: 'M_WarmPlaster', color: 0xebe1cf, roughness: 0.84, metalness: 0.02, envMapIntensity: 0.62, ...pbrOpts(plasterPBR, plasterTex, 0.32, 0.32) }),
+            plasterBlack: new THREE.MeshStandardMaterial({ name: 'M_BlackPlaster', color: 0x262930, roughness: 0.64, metalness: 0.08, envMapIntensity: 0.78 }),
+            namakoWall: new THREE.MeshStandardMaterial({ name: 'M_Namako', color: 0xffffff, roughness: 0.72, metalness: 0.06, envMapIntensity: 0.74, ...pbrOpts(namakoPBR, namakoTex, 0.55, 0.55) }),
 
-            kawaraRoof: new THREE.MeshStandardMaterial({ name: 'M_KawaraRoof', color: 0xffffff, map: kawaraTex, roughness: 0.54, metalness: 0.18 }),
-            copperRoof: new THREE.MeshStandardMaterial({ name: 'M_CopperRoof', color: 0x3b6e66, roughness: 0.48, metalness: 0.38 }),
-            slateRoof: new THREE.MeshStandardMaterial({ name: 'M_SlateRoof', color: 0x434d59, map: kawaraTex, roughness: 0.58, metalness: 0.15 }),
+            kawaraRoof: new THREE.MeshStandardMaterial({ name: 'M_KawaraRoof', color: 0xffffff, roughness: 0.52, metalness: 0.18, envMapIntensity: 1.05, ...pbrOpts(kawaraPBR, kawaraTex, 0.72, 0.72) }),
+            copperRoof: new THREE.MeshStandardMaterial({ name: 'M_CopperRoof', color: 0x3b6e66, roughness: 0.44, metalness: 0.42, envMapIntensity: 1.25 }),
+            slateRoof: new THREE.MeshStandardMaterial({ name: 'M_SlateRoof', color: 0x434d59, roughness: 0.56, metalness: 0.16, envMapIntensity: 0.98, ...pbrOpts(kawaraPBR, kawaraTex, 0.62, 0.62) }),
 
-            redBrick: new THREE.MeshStandardMaterial({ name: 'M_Brick', color: 0xffffff, map: brickTex, roughness: 0.82, metalness: 0.05 }),
-            stoneGranite: new THREE.MeshStandardMaterial({ name: 'M_Stone', color: 0x78736a, roughness: 0.88, metalness: 0.05 }),
-            stoneTrim: new THREE.MeshStandardMaterial({ name: 'M_StoneTrim', color: 0xe2dcd0, roughness: 0.76, metalness: 0.05 }),
-            gravel: new THREE.MeshStandardMaterial({ name: 'M_Gravel', color: 0x827d74, roughness: 0.94, metalness: 0.0 }),
+            redBrick: new THREE.MeshStandardMaterial({ name: 'M_Brick', color: 0xffffff, roughness: 0.82, metalness: 0.05, envMapIntensity: 0.65, ...pbrOpts(brickPBR, brickTex, 0.64, 0.64) }),
+            stoneGranite: new THREE.MeshStandardMaterial({ name: 'M_Stone', color: 0xffffff, roughness: 0.84, metalness: 0.06, envMapIntensity: 0.68, ...pbrOpts(stonePBR, null, 0.60, 0.60) }),
+            stoneTrim: new THREE.MeshStandardMaterial({ name: 'M_StoneTrim', color: 0xe2dcd0, roughness: 0.72, metalness: 0.06, envMapIntensity: 0.72, ...pbrOpts({ map: null, normalMap: stonePBR.normalMap, roughnessMap: stonePBR.roughnessMap }, null, 0.32, 0.32) }),
+            gravel: new THREE.MeshStandardMaterial({ name: 'M_Gravel', color: 0x827d74, roughness: 0.94, metalness: 0.0, envMapIntensity: 0.50 }),
 
-            norenIndigo: new THREE.MeshStandardMaterial({ name: 'M_Noren', color: 0x1c3554, roughness: 0.75, metalness: 0.0 }),
-            toriiVermilion: new THREE.MeshStandardMaterial({ name: 'M_Torii', color: 0xb52818, roughness: 0.55, metalness: 0.1 }),
-            crimsonBanner: new THREE.MeshStandardMaterial({ name: 'M_Crimson', color: 0xb33927, roughness: 0.65, metalness: 0.05 }),
+            norenIndigo: new THREE.MeshStandardMaterial({ name: 'M_Noren', color: 0x1c3554, roughness: 0.78, metalness: 0.0, envMapIntensity: 0.52 }),
+            toriiVermilion: new THREE.MeshStandardMaterial({ name: 'M_Torii', color: 0xb52818, roughness: 0.46, metalness: 0.12, envMapIntensity: 0.88 }),
+            crimsonBanner: new THREE.MeshStandardMaterial({ name: 'M_Crimson', color: 0xb33927, roughness: 0.68, metalness: 0.04, envMapIntensity: 0.56 }),
 
-            darkIron: new THREE.MeshStandardMaterial({ name: 'M_DarkIron', color: 0x1f2226, roughness: 0.4, metalness: 0.75 }),
-            bronze: new THREE.MeshStandardMaterial({ name: 'M_Bronze', color: 0x9c7432, roughness: 0.38, metalness: 0.72 }),
-            goldLeaf: new THREE.MeshStandardMaterial({ name: 'M_Gold', color: 0xd4af37, roughness: 0.28, metalness: 0.85 }),
-            waterSurface: new THREE.MeshStandardMaterial({ name: 'M_Water', color: 0x2b546b, roughness: 0.15, metalness: 0.25, transparent: true, opacity: 0.88 }),
+            darkIron: new THREE.MeshStandardMaterial({ name: 'M_DarkIron', color: 0x22262b, roughness: 0.36, metalness: 0.82, envMapIntensity: 1.4 }),
+            bronze: new THREE.MeshStandardMaterial({ name: 'M_Bronze', color: 0x9c7432, roughness: 0.34, metalness: 0.78, envMapIntensity: 1.5 }),
+            goldLeaf: new THREE.MeshStandardMaterial({ name: 'M_Gold', color: 0xd4af37, roughness: 0.24, metalness: 0.88, envMapIntensity: 1.65 }),
+            waterSurface: new THREE.MeshStandardMaterial({ name: 'M_Water', color: 0x2b546b, roughness: 0.12, metalness: 0.25, transparent: true, opacity: 0.88, envMapIntensity: 1.35 }),
+
+            hearthFire: new THREE.MeshStandardMaterial({
+                name: 'M_HearthFire',
+                color: 0xff6e1a,
+                roughness: 0.55,
+                metalness: 0.0,
+                emissive: new THREE.Color(0xff4a00),
+                emissiveIntensity: 1.85
+            }),
 
             // Shared Emissive Materials (updated in O(1) time by SceneLighting)
             shojiWindow: new THREE.MeshStandardMaterial({
                 name: 'M_ShojiWindow',
                 color: 0xf5ecd8,
-                roughness: 0.65,
-                metalness: 0.05,
+                roughness: 0.68,
+                metalness: 0.04,
+                envMapIntensity: 0.62,
                 emissive: new THREE.Color(0x000000),
-                emissiveIntensity: 0.0
+                emissiveIntensity: 0.0,
+                ...pbrOpts(washiPBR, null, 0.22, 0.22)
             }),
-            glassWindow: new THREE.MeshStandardMaterial({
+            glassWindow: new GlassMatClass({
                 name: 'M_GlassWindow',
-                color: 0x628294,
-                roughness: 0.22,
-                metalness: 0.38,
+                color: 0x284152,
+                roughness: 0.06,
+                metalness: 0.12,
+                clearcoat: 1.0,
+                clearcoatRoughness: 0.05,
+                ior: 1.52,
+                reflectivity: 0.92,
+                envMapIntensity: 1.85,
                 emissive: new THREE.Color(0x000000),
                 emissiveIntensity: 0.0
             }),
             redLantern: new THREE.MeshStandardMaterial({
                 name: 'M_RedLantern',
                 color: 0xd9301c,
-                roughness: 0.45,
-                metalness: 0.05,
+                roughness: 0.42,
+                metalness: 0.04,
+                envMapIntensity: 0.72,
                 emissive: new THREE.Color(0x661206),
                 emissiveIntensity: 0.25
             }),
             gasLantern: new THREE.MeshStandardMaterial({
                 name: 'M_GasLantern',
                 color: 0xffeedd,
-                roughness: 0.5,
+                roughness: 0.45,
                 metalness: 0.05,
+                envMapIntensity: 0.85,
                 emissive: new THREE.Color(0x000000),
                 emissiveIntensity: 0.0
             }),
             electricArcLantern: new THREE.MeshStandardMaterial({
                 name: 'M_ElectricArcLantern',
                 color: 0xeef8ff,
-                roughness: 0.3,
-                metalness: 0.1,
+                roughness: 0.26,
+                metalness: 0.12,
+                envMapIntensity: 1.05,
                 emissive: new THREE.Color(0x000000),
                 emissiveIntensity: 0.0
             })
@@ -194,6 +238,15 @@ export class MaterialLibrary {
         for (const mat of Object.values(this._materials)) {
             mat.userData = { isSharedLibraryMaterial: true };
         }
+
+        for (const key of ['woodDark', 'woodMedium', 'woodLight', 'plasterWhite', 'plasterWarm', 'plasterBlack', 'namakoWall', 'redBrick', 'stoneGranite', 'stoneTrim', 'toriiVermilion']) {
+            WeatheringShaderSystem.enhanceBuildingMaterial(this._materials[key], { isRoof: false, aoHeight: 0.42, variation: 0.075 });
+        }
+        for (const key of ['kawaraRoof', 'copperRoof', 'slateRoof']) {
+            WeatheringShaderSystem.enhanceBuildingMaterial(this._materials[key], { isRoof: true, variation: 0.065 });
+        }
+        WeatheringShaderSystem.enhanceGlassMaterial(this._materials.glassWindow);
+        WeatheringShaderSystem.enhanceShojiMaterial(this._materials.shojiWindow);
 
         this._initialized = true;
         return this._materials;
@@ -303,10 +356,33 @@ export class MaterialLibrary {
                 for (const m of mats) {
                     if (m && !m.userData?.isSharedLibraryMaterial) {
                         if (m.map && !m.map.userData?.isSharedLibraryTexture) m.map.dispose();
+                        if (m.normalMap && !m.normalMap.userData?.isSharedLibraryTexture) m.normalMap.dispose();
+                        if (m.roughnessMap && !m.roughnessMap.userData?.isSharedLibraryTexture) m.roughnessMap.dispose();
                         m.dispose();
                     }
                 }
             }
         });
+    }
+
+    static disposeAll() {
+        if (this._materials) {
+            for (const mat of Object.values(this._materials)) {
+                mat?.dispose?.();
+            }
+            this._materials = null;
+        }
+        if (this._textures) {
+            for (const tex of this._textures.values()) {
+                tex?.dispose?.();
+            }
+            this._textures.clear();
+        }
+        if (this._threatSprites) {
+            for (const tex of this._threatSprites.values()) {
+                tex?.dispose?.();
+            }
+            this._threatSprites.clear();
+        }
     }
 }

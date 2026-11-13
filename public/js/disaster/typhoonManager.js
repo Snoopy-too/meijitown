@@ -190,31 +190,63 @@ export class TyphoonManager {
         return 'vulnerable';
     }
 
-    // 7. High-Intensity Driving Rain & Sky Darkening FX
+    // 7. High-Intensity Driving Rain Streaks & Sky Darkening FX
     initRainFX() {
         if (!this.scene) return;
         this.removeRainFX();
 
-        const dropCount = 450;
-        const geo = new THREE.BufferGeometry();
-        const positions = new Float32Array(dropCount * 3);
+        const dropCount = 420;
         const totalSize = (CONFIG.GRID_WIDTH || 20) * (CONFIG.TILE_SIZE || 2.0);
+        const useStreaks = typeof THREE.LineSegments === 'function' && typeof THREE.LineBasicMaterial === 'function';
 
-        for (let i = 0; i < dropCount; i++) {
-            positions[i * 3] = Math.random() * totalSize;
-            positions[i * 3 + 1] = 0.5 + Math.random() * 12.0;
-            positions[i * 3 + 2] = Math.random() * totalSize;
+        if (useStreaks) {
+            const geo = new THREE.BufferGeometry();
+            const positions = new Float32Array(dropCount * 6);
+            const colors = new Float32Array(dropCount * 6);
+
+            for (let i = 0; i < dropCount; i++) {
+                const x = Math.random() * totalSize;
+                const y = 0.5 + Math.random() * 13.0;
+                const z = Math.random() * totalSize;
+                const len = 0.45 + Math.random() * 0.35;
+
+                // Head (lower droplet tip, brighter silver) & wind-slanted tail
+                const i6 = i * 6;
+                positions[i6] = x;
+                positions[i6 + 1] = y;
+                positions[i6 + 2] = z;
+                positions[i6 + 3] = x - len * 0.22;
+                positions[i6 + 4] = y + len;
+                positions[i6 + 5] = z;
+
+                // Subtle vertical gradient from misty top tail to bright raindrop tip
+                colors[i6] = 0.72;     colors[i6 + 1] = 0.84;     colors[i6 + 2] = 0.94;
+                colors[i6 + 3] = 0.38; colors[i6 + 4] = 0.48;     colors[i6 + 5] = 0.56;
+            }
+            geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+            const mat = new THREE.LineBasicMaterial({
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.48,
+                depthWrite: false
+            });
+            this.rainSystem = new THREE.LineSegments(geo, mat);
+            this.rainSystem.userData = { isStreakRain: true };
+        } else {
+            const geo = new THREE.BufferGeometry();
+            const positions = new Float32Array(dropCount * 3);
+            for (let i = 0; i < dropCount; i++) {
+                positions[i * 3] = Math.random() * totalSize;
+                positions[i * 3 + 1] = 0.5 + Math.random() * 12.0;
+                positions[i * 3 + 2] = Math.random() * totalSize;
+            }
+            geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            const mat = new THREE.PointsMaterial({ color: 0x95afc0, size: 0.14, transparent: true, opacity: 0.85 });
+            this.rainSystem = new THREE.Points(geo, mat);
         }
-        geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 
-        const mat = new THREE.PointsMaterial({
-            color: 0x95afc0,
-            size: 0.14,
-            transparent: true,
-            opacity: 0.85
-        });
-
-        this.rainSystem = new THREE.Points(geo, mat);
         this.scene.add(this.rainSystem);
 
         if (this.scene.userData?.lighting?.setStormOverride) {
@@ -227,17 +259,40 @@ export class TyphoonManager {
     }
 
     updateRain(delta = 0.016) {
-        if (!this.rainSystem) return;
+        if (!this.rainSystem || !this.rainSystem.geometry || !this.rainSystem.geometry.attributes) return;
         const pos = this.rainSystem.geometry.attributes.position;
+        if (!pos || !pos.array) return;
         const arr = pos.array;
         const totalSize = (CONFIG.GRID_WIDTH || 20) * (CONFIG.TILE_SIZE || 2.0);
 
-        for (let i = 0; i < arr.length; i += 3) {
-            arr[i + 1] -= 18.0 * delta; // Fall downward
-            arr[i] += 4.0 * delta;      // Driving horizontal wind slant
-            if (arr[i + 1] < 0.1) {
-                arr[i + 1] = 12.0;
-                arr[i] = Math.random() * totalSize;
+        if (this.rainSystem.userData?.isStreakRain) {
+            for (let i = 0; i < arr.length; i += 6) {
+                const dy = -19.5 * delta;
+                const dx = 4.4 * delta;
+                arr[i] += dx;
+                arr[i + 1] += dy;
+                arr[i + 3] += dx;
+                arr[i + 4] += dy;
+                if (arr[i + 1] < 0.05) {
+                    const rx = Math.random() * totalSize;
+                    const ry = 12.5 + Math.random() * 2.0;
+                    const rz = Math.random() * totalSize;
+                    arr[i] = rx;
+                    arr[i + 1] = ry;
+                    arr[i + 2] = rz;
+                    arr[i + 3] = rx - 0.14;
+                    arr[i + 4] = ry + 0.62;
+                    arr[i + 5] = rz;
+                }
+            }
+        } else {
+            for (let i = 0; i < arr.length; i += 3) {
+                arr[i + 1] -= 18.0 * delta;
+                arr[i] += 4.0 * delta;
+                if (arr[i + 1] < 0.1) {
+                    arr[i + 1] = 12.0;
+                    arr[i] = Math.random() * totalSize;
+                }
             }
         }
         pos.needsUpdate = true;

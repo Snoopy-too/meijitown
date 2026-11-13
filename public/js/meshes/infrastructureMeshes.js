@@ -98,11 +98,11 @@ export class InfrastructureMeshes {
         const brassMat = new THREE.MeshStandardMaterial({ color: 0xc2a24a, metalness: 0.82, roughness: 0.26 });
 
         // 1. Centerline Mainline Through-Track (z = 0, exact 0.44m gauge & y = 0.065 rail height matching RailAutoTiler)
-        const ballastBaseMat = new THREE.MeshLambertMaterial({ color: 0x3d3a36 });
-        const ballastCrownMat = new THREE.MeshLambertMaterial({ color: 0x4c4843 });
-        const tieMat = new THREE.MeshLambertMaterial({ color: 0x362518 });
-        const plateMat = new THREE.MeshStandardMaterial({ color: 0x26282c, metalness: 0.75, roughness: 0.40 });
-        const railMat = new THREE.MeshStandardMaterial({ color: 0x43474d, metalness: 0.72, roughness: 0.30 });
+        const ballastBaseMat = new THREE.MeshStandardMaterial({ color: 0x3d3a36, roughness: 0.94, metalness: 0.04, envMapIntensity: 0.55 });
+        const ballastCrownMat = new THREE.MeshStandardMaterial({ color: 0x4c4843, roughness: 0.90, metalness: 0.05, envMapIntensity: 0.58 });
+        const tieMat = MaterialLibrary.get('woodDark');
+        const plateMat = new THREE.MeshStandardMaterial({ color: 0x26282c, metalness: 0.78, roughness: 0.36, envMapIntensity: 1.25 });
+        const railMat = new THREE.MeshStandardMaterial({ color: 0x4b5158, metalness: 0.82, roughness: 0.24, envMapIntensity: 1.45 });
 
         Kit.addPart(group, new THREE.BoxGeometry(s * 1.01, 0.018, 1.22), ballastBaseMat, [0, 0.009, 0], false, null, true);
         Kit.addPart(group, new THREE.BoxGeometry(s * 1.01, 0.018, 0.96), ballastCrownMat, [0, 0.022, 0], false, null, true);

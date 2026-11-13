@@ -3,6 +3,7 @@
 
 import * as THREE from 'three';
 import { CONFIG } from '../config.js';
+import { PBRTextureGenerator } from './pbrTextureGenerator.js';
 
 export class TrainTrafficManager {
     constructor(scene, gridModel, getTileWorldPosFn, modelCache = null) {
@@ -21,13 +22,13 @@ export class TrainTrafficManager {
     // Procedural authentic 1872 Shimbashi-Yokohama 2-4-0 steam locomotive & Meiji coach
     createProceduralTrainMesh() {
         const group = new THREE.Group();
-        const ironMat = new THREE.MeshLambertMaterial({ color: 0x222426 });
-        const darkIron = new THREE.MeshLambertMaterial({ color: 0x141618 });
-        const brassMat = new THREE.MeshStandardMaterial({ color: 0xb89230, metalness: 0.85, roughness: 0.28 });
-        const coachMat = new THREE.MeshLambertMaterial({ color: 0x1d3822 });
-        const creamMat = new THREE.MeshLambertMaterial({ color: 0xede0c8 });
-        const roofMat = new THREE.MeshLambertMaterial({ color: 0x3d2b1f });
-        const lampMat = new THREE.MeshStandardMaterial({ color: 0xfff0aa, emissive: new THREE.Color(0xffbb44), emissiveIntensity: 0.9 });
+        const ironMat = new THREE.MeshStandardMaterial({ color: 0x222426, metalness: 0.78, roughness: 0.36, envMapIntensity: 1.3 });
+        const darkIron = new THREE.MeshStandardMaterial({ color: 0x141618, metalness: 0.72, roughness: 0.42, envMapIntensity: 1.2 });
+        const brassMat = new THREE.MeshStandardMaterial({ color: 0xb89230, metalness: 0.88, roughness: 0.24, envMapIntensity: 1.55 });
+        const coachMat = new THREE.MeshStandardMaterial({ color: 0x1d3822, roughness: 0.42, metalness: 0.14, envMapIntensity: 0.95 });
+        const creamMat = new THREE.MeshStandardMaterial({ color: 0xede0c8, roughness: 0.56, metalness: 0.05, envMapIntensity: 0.75 });
+        const roofMat = new THREE.MeshStandardMaterial({ color: 0x3d2b1f, roughness: 0.76, metalness: 0.08, envMapIntensity: 0.65 });
+        const lampMat = new THREE.MeshStandardMaterial({ color: 0xfff0aa, emissive: new THREE.Color(0xffbb44), emissiveIntensity: 1.15, roughness: 0.25 });
 
         // 1. Locomotive (facing -Z as forward)
         const locoGroup = new THREE.Group();
@@ -302,22 +303,38 @@ export class TrainTrafficManager {
         });
     }
 
-    // Small low-poly white steam puff from smokestack
+    // Soft billboard steam puff from locomotive smokestack
     emitSteamPuff(train) {
         const rotY = train.mesh.rotation.y;
-        // Smokestack is at local z = -0.75, y = 0.50 atop the boiler
         const stackX = train.mesh.position.x - 0.75 * Math.sin(rotY);
         const stackZ = train.mesh.position.z - 0.75 * Math.cos(rotY);
         const stackY = train.mesh.position.y + 0.52;
 
-        const geo = new THREE.BoxGeometry(0.10, 0.10, 0.10);
-        const mat = new THREE.MeshLambertMaterial({
-            color: 0xffffff,
-            transparent: true,
-            opacity: 0.70,
-            depthWrite: false
-        });
-        const puff = new THREE.Mesh(geo, mat);
+        const smokeTex = PBRTextureGenerator.getParticleTexture('smoke');
+        let puff;
+        let baseScale = 1.0;
+        if (smokeTex && typeof THREE.Sprite === 'function' && typeof THREE.SpriteMaterial === 'function') {
+            const mat = new THREE.SpriteMaterial({
+                map: smokeTex,
+                color: 0xf4f7fc,
+                transparent: true,
+                opacity: 0.68,
+                depthWrite: false
+            });
+            puff = new THREE.Sprite(mat);
+            baseScale = 0.22;
+            puff.scale.set(baseScale, baseScale, 1);
+        } else {
+            const geo = new THREE.SphereGeometry(0.08, 6, 5);
+            const mat = new THREE.MeshStandardMaterial({
+                color: 0xffffff,
+                roughness: 0.9,
+                transparent: true,
+                opacity: 0.68,
+                depthWrite: false
+            });
+            puff = new THREE.Mesh(geo, mat);
+        }
         puff.position.set(
             stackX + (Math.random() - 0.5) * 0.06,
             stackY,
@@ -327,11 +344,12 @@ export class TrainTrafficManager {
 
         this.steamPuffs.push({
             mesh: puff,
+            baseScale,
             age: 0,
-            maxAge: 1.1,
-            driftX: (Math.random() - 0.5) * 0.15,
-            driftZ: (Math.random() - 0.5) * 0.15,
-            upSpeed: 0.35 + Math.random() * 0.20
+            maxAge: 1.25,
+            driftX: (Math.random() - 0.5) * 0.16,
+            driftZ: (Math.random() - 0.5) * 0.16,
+            upSpeed: 0.36 + Math.random() * 0.22
         });
     }
 
@@ -371,8 +389,9 @@ export class TrainTrafficManager {
                 p.mesh.position.y += p.upSpeed * effectiveDelta;
                 p.mesh.position.x += p.driftX * effectiveDelta;
                 p.mesh.position.z += p.driftZ * effectiveDelta;
-                p.mesh.scale.setScalar(1.0 + ratio * 1.5);
-                p.mesh.material.opacity = Math.max(0, 0.70 * (1 - ratio));
+                const sScale = (p.baseScale || 1.0) * (1.0 + ratio * 1.85);
+                p.mesh.scale.set(sScale, sScale, sScale);
+                p.mesh.material.opacity = Math.max(0, 0.68 * (1 - ratio));
             }
         }
 

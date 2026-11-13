@@ -60,14 +60,14 @@ export class ProceduralMeshes {
         group.position.set(pos ? pos.x : (x + 0.5) * CONFIG.TILE_SIZE, 0, pos ? pos.z : (y + 0.5) * CONFIG.TILE_SIZE);
 
         if ((x + y) % 3 === 0) {
-            Kit.addPart(group, new THREE.CylinderGeometry(0.06, 0.10, 0.7, 5), MaterialLibrary.get('woodMedium'), [0, 0.35, 0], true);
-            Kit.addPart(group, new THREE.DodecahedronGeometry(0.52, 0), seasonalFoliageMaterial, [0, 0.95, 0], true, null, true);
+            Kit.addPart(group, new THREE.CylinderGeometry(0.06, 0.10, 0.7, 7), MaterialLibrary.get('woodMedium'), [0, 0.35, 0], true);
+            Kit.addPart(group, new THREE.SphereGeometry(0.48, 10, 7), seasonalFoliageMaterial, [0, 0.95, 0], true, null, true);
         } else {
-            Kit.addPart(group, new THREE.CylinderGeometry(0.05, 0.09, 0.65, 5), MaterialLibrary.get('woodDark'), [0, 0.325, 0], true);
-            const pineMat = new THREE.MeshLambertMaterial({ color: 0x2e4a28 });
-            Kit.addPart(group, new THREE.ConeGeometry(0.55, 0.45, 5), pineMat, [0, 0.55, 0], true);
-            Kit.addPart(group, new THREE.ConeGeometry(0.40, 0.40, 5), pineMat, [0, 0.85, 0], true);
-            Kit.addPart(group, new THREE.ConeGeometry(0.25, 0.35, 5), pineMat, [0, 1.12, 0], true);
+            Kit.addPart(group, new THREE.CylinderGeometry(0.05, 0.09, 0.65, 7), MaterialLibrary.get('woodDark'), [0, 0.325, 0], true);
+            const pineMat = new THREE.MeshStandardMaterial({ color: 0x2e4a28, roughness: 0.78, metalness: 0.02, envMapIntensity: 0.62 });
+            Kit.addPart(group, new THREE.ConeGeometry(0.55, 0.45, 9), pineMat, [0, 0.55, 0], true);
+            Kit.addPart(group, new THREE.ConeGeometry(0.40, 0.40, 9), pineMat, [0, 0.85, 0], true);
+            Kit.addPart(group, new THREE.ConeGeometry(0.25, 0.35, 9), pineMat, [0, 1.12, 0], true);
         }
         return group;
     }

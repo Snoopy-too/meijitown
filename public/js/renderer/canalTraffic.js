@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { CONFIG } from '../config.js';
 import { CanalMesh } from './canal_mesh.js';
+import { PBRTextureGenerator } from './pbrTextureGenerator.js';
 
 export class CanalTrafficManager {
     constructor(scene, gridModel, getTileWorldPosFn, modelCache = null) {
@@ -30,7 +31,10 @@ export class CanalTrafficManager {
         const bambooMat = new THREE.MeshStandardMaterial({ color: 0xc8aa64, roughness: 0.74, metalness: 0.02 });
         const strawMat = new THREE.MeshStandardMaterial({ color: 0xbfa366, roughness: 0.86, metalness: 0.0 });
         const ironMat = new THREE.MeshStandardMaterial({ color: 0x24272b, roughness: 0.45, metalness: 0.72 });
-        const wakeMat = new THREE.MeshBasicMaterial({ color: 0xdff6fa, transparent: true, opacity: 0.42 });
+        const wakeTex = PBRTextureGenerator.getParticleTexture('wake');
+        const wakeMat = wakeTex
+            ? new THREE.MeshBasicMaterial({ map: wakeTex, color: 0xe6f8fc, transparent: true, opacity: 0.65, depthWrite: false })
+            : new THREE.MeshBasicMaterial({ color: 0xdff6fa, transparent: true, opacity: 0.42, depthWrite: false });
 
         // 1. Flat-bottomed Swept Timber Hull & Ribbed Thwarts
         const hull = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.055, 0.92), hullMat);
@@ -138,15 +142,13 @@ export class CanalTrafficManager {
         boatmanGroup.add(polePivot);
         group.add(boatmanGroup);
 
-        // 5. V-Shaped Trailing Water Wake Ribbons
-        const wakeL = new THREE.Mesh(new THREE.BoxGeometry(0.028, 0.004, 0.42), wakeMat);
-        wakeL.position.set(-0.17, 0.012, -0.62);
-        wakeL.rotation.y = -0.24;
-        group.add(wakeL);
-        const wakeR = new THREE.Mesh(new THREE.BoxGeometry(0.028, 0.004, 0.42), wakeMat);
-        wakeR.position.set(0.17, 0.012, -0.62);
-        wakeR.rotation.y = 0.24;
-        group.add(wakeR);
+        // 5. Feathered Soft V-Wake Trails behind barge hull
+        const wakeGeo = new THREE.PlaneGeometry(0.54, 0.72);
+        wakeGeo.rotateX(-Math.PI / 2);
+        const wakeMesh = new THREE.Mesh(wakeGeo, wakeMat);
+        wakeMesh.position.set(0, 0.012, -0.74);
+        wakeMesh.renderOrder = 2;
+        group.add(wakeMesh);
 
         group.userData = { polePivot };
         return group;

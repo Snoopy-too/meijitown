@@ -10,12 +10,55 @@ export class CloudManager {
         this.group.name = 'cloud_canopy';
 
         this.clouds = [];
-        this.material = new THREE.MeshLambertMaterial({
+        this.material = new THREE.MeshStandardMaterial({
             color: 0xf7f4ed,
-            flatShading: true,
+            roughness: 0.96,
+            metalness: 0.0,
+            envMapIntensity: 0.58,
+            flatShading: false,
             transparent: true,
-            opacity: 0.88
+            opacity: 0.86,
+            depthWrite: false
         });
+        if (typeof THREE.ShaderMaterial === 'function') {
+            this.material.customProgramCacheKey = () => 'meiji_soft_cloud_v1';
+            this.material.onBeforeCompile = (shader) => {
+                shader.vertexShader = shader.vertexShader
+                    .replace(
+                        '#include <common>',
+                        `#include <common>
+                        varying vec3 vCloudLocalPos;
+                        varying vec3 vCloudViewNormal;`
+                    )
+                    .replace(
+                        '#include <begin_vertex>',
+                        `#include <begin_vertex>
+                        vCloudLocalPos = position;
+                        vCloudViewNormal = normalize(normalMatrix * objectNormal);`
+                    );
+                shader.fragmentShader = shader.fragmentShader
+                    .replace(
+                        '#include <common>',
+                        `#include <common>
+                        varying vec3 vCloudLocalPos;
+                        varying vec3 vCloudViewNormal;`
+                    )
+                    .replace(
+                        '#include <color_fragment>',
+                        `#include <color_fragment>
+                        // Volumetric height gradient: luminous silver crest, softly shaded blue-grey base
+                        float hNorm = clamp(vCloudLocalPos.y * 0.55 + 0.55, 0.0, 1.0);
+                        diffuseColor.rgb *= mix(0.74, 1.12, smoothstep(0.1, 0.92, hNorm));`
+                    )
+                    .replace(
+                        '#include <dithering_fragment>',
+                        `#include <dithering_fragment>
+                        // Soft grazing-edge cloud billow fade so spheres merge organically without hard rims
+                        float edgeFade = pow(clamp(abs(normalize(vCloudViewNormal).z) * 0.78 + 0.22, 0.0, 1.0), 1.4);
+                        gl_FragColor.a *= edgeFade;`
+                    );
+            };
+        }
 
         this.currentPhase = 'DAY';
         this.isStorm = false;
@@ -30,23 +73,25 @@ export class CloudManager {
 
     createCloudCluster() {
         const cloudGroup = new THREE.Group();
-        const puffGeo = new THREE.DodecahedronGeometry(1, 0); // 12-sided low-poly polyhedron
+        const puffGeo = (typeof THREE.SphereGeometry === 'function')
+            ? new THREE.SphereGeometry(1, 14, 10)
+            : new THREE.DodecahedronGeometry(1, 0);
 
-        // 4 to 6 overlapping puffs with varied scale and position
-        const puffCount = 4 + Math.floor(Math.random() * 3);
+        // 5 to 8 overlapping soft volumetric billows with varied scale and flat bottom cumulus posture
+        const puffCount = 5 + Math.floor(Math.random() * 4);
         for (let i = 0; i < puffCount; i++) {
             const puff = new THREE.Mesh(puffGeo, this.material);
-            const scaleX = 2.8 + Math.random() * 2.2;
-            const scaleY = 1.2 + Math.random() * 0.9;
-            const scaleZ = 2.0 + Math.random() * 1.8;
+            const scaleX = 2.6 + Math.random() * 2.4;
+            const scaleY = 1.0 + Math.random() * 1.1;
+            const scaleZ = 2.0 + Math.random() * 2.0;
             puff.scale.set(scaleX, scaleY, scaleZ);
 
             puff.position.set(
-                (i - puffCount / 2) * 2.4 + (Math.random() - 0.5) * 1.5,
-                (Math.random() - 0.5) * 0.8,
-                (Math.random() - 0.5) * 2.0
+                (i - puffCount / 2) * 2.1 + (Math.random() - 0.5) * 1.6,
+                (Math.random() - 0.35) * 0.9,
+                (Math.random() - 0.5) * 2.2
             );
-            puff.rotation.set(Math.random() * 0.3, Math.random() * Math.PI, 0);
+            puff.rotation.set(0, Math.random() * Math.PI, 0);
             puff.userData = { isBackdrop: true, ignoreRaycast: true };
             cloudGroup.add(puff);
         }

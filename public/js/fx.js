@@ -3,6 +3,7 @@
 
 import * as THREE from 'three';
 import { SOUND, AudioManager, audioManager } from './audioManager.js';
+import { PBRTextureGenerator } from './renderer/pbrTextureGenerator.js';
 
 export { SOUND, AudioManager as SoundSynthesizer, AudioManager, audioManager };
 
@@ -13,19 +14,37 @@ export class ParticleManager {
         this.fireEmitters = new Map(); // key -> group
     }
 
+    _makeSoftSprite(kind, colorHex, baseScale, opacity = 0.8, additive = false) {
+        const tex = PBRTextureGenerator.getParticleTexture(kind);
+        if (tex && typeof THREE.Sprite === 'function' && typeof THREE.SpriteMaterial === 'function') {
+            const mat = new THREE.SpriteMaterial({
+                map: tex,
+                color: colorHex,
+                transparent: true,
+                opacity,
+                depthWrite: false,
+                ...(additive ? { blending: THREE.AdditiveBlending } : {})
+            });
+            const sprite = new THREE.Sprite(mat);
+            sprite.scale.set(baseScale, baseScale, 1);
+            return sprite;
+        }
+        return null;
+    }
+
     // Spawns Machi-Hikeshi firefighting water spray/droplets
     spawnWaterSplash(worldX, worldZ) {
         const count = 20;
-        const geo = new THREE.BoxGeometry(0.09, 0.09, 0.09);
-        const colors = [0x5bc0de, 0xffffff, 0x8be9fd, 0xd0f4f7];
+        const geo = new THREE.BoxGeometry(0.08, 0.08, 0.08);
+        const colors = [0x6fd4ec, 0xffffff, 0x99eeff, 0xd8f8fc];
 
         for (let i = 0; i < count; i++) {
-            const mat = new THREE.MeshLambertMaterial({
-                color: colors[i % colors.length],
-                transparent: true,
-                opacity: 0.9
-            });
-            const mesh = new THREE.Mesh(geo, mat);
+            const c = colors[i % colors.length];
+            let mesh = this._makeSoftSprite('spark', c, 0.16, 0.9, false);
+            if (!mesh) {
+                const mat = new THREE.MeshStandardMaterial({ color: c, roughness: 0.2, transparent: true, opacity: 0.9 });
+                mesh = new THREE.Mesh(geo, mat);
+            }
             mesh.position.set(
                 worldX + (Math.random() - 0.5) * 0.6,
                 0.8 + Math.random() * 0.4,
@@ -43,6 +62,7 @@ export class ParticleManager {
             this.scene.add(mesh);
             this.particles.push({
                 mesh,
+                baseScale: mesh.isSprite ? 0.16 : 1.0,
                 velocity,
                 life: 0.55,
                 maxLife: 0.55,
@@ -55,15 +75,14 @@ export class ParticleManager {
     spawnWaterSteam(worldX, worldZ) {
         this.spawnWaterSplash(worldX, worldZ);
         const count = 12;
-        const geo = new THREE.DodecahedronGeometry(0.18, 0);
+        const geo = new THREE.SphereGeometry(0.16, 6, 5);
 
         for (let i = 0; i < count; i++) {
-            const mat = new THREE.MeshLambertMaterial({
-                color: 0xf5f8fa,
-                transparent: true,
-                opacity: 0.75
-            });
-            const mesh = new THREE.Mesh(geo, mat);
+            let mesh = this._makeSoftSprite('smoke', 0xf5f8fa, 0.42, 0.72, false);
+            if (!mesh) {
+                const mat = new THREE.MeshStandardMaterial({ color: 0xf5f8fa, roughness: 0.95, transparent: true, opacity: 0.75 });
+                mesh = new THREE.Mesh(geo, mat);
+            }
             mesh.position.set(
                 worldX + (Math.random() - 0.5) * 0.5,
                 0.6 + Math.random() * 0.4,
@@ -88,16 +107,16 @@ export class ParticleManager {
     // Spawns bursting demolition dust/wood chips
     spawnDemolishPuff(worldX, worldZ) {
         const count = 16;
-        const geo = new THREE.BoxGeometry(0.12, 0.12, 0.12);
+        const geo = new THREE.BoxGeometry(0.11, 0.11, 0.11);
         const colors = [0x8a7050, 0xd4c8b8, 0x5a4632, 0x6e6255];
 
         for (let i = 0; i < count; i++) {
-            const mat = new THREE.MeshLambertMaterial({
-                color: colors[i % colors.length],
-                transparent: true,
-                opacity: 0.95
-            });
-            const mesh = new THREE.Mesh(geo, mat);
+            const c = colors[i % colors.length];
+            let mesh = (i % 3 === 0) ? this._makeSoftSprite('smoke', c, 0.34, 0.78, false) : null;
+            if (!mesh) {
+                const mat = new THREE.MeshStandardMaterial({ color: c, roughness: 0.9, transparent: true, opacity: 0.95 });
+                mesh = new THREE.Mesh(geo, mat);
+            }
             mesh.position.set(
                 worldX + (Math.random() - 0.5) * 0.8,
                 0.3 + Math.random() * 0.5,
@@ -142,28 +161,37 @@ export class ParticleManager {
         emberBed.position.set(0, 0.22, 0);
         group.add(emberBed);
 
-        // Multi-tiered upward-licking organic flame tongues (NO upside-down cones!)
+        // Multi-tiered soft billowing additive fire sprites (no hard cone silhouettes!)
         const flames = [];
         const tongueConfigs = [
-            { x: 0.00, y: 0.55, z: 0.00, r: 0.26, h: 0.95, color: 0xff3b00, speed: 4.2, phase: 0.0 },
-            { x: -0.22, y: 0.48, z: 0.16, r: 0.20, h: 0.78, color: 0xff5500, speed: 5.1, phase: 1.3 },
-            { x: 0.24, y: 0.50, z: -0.14, r: 0.21, h: 0.82, color: 0xff4500, speed: 4.7, phase: 2.5 },
-            { x: -0.14, y: 0.46, z: -0.22, r: 0.18, h: 0.70, color: 0xff6a00, speed: 5.6, phase: 3.8 },
-            { x: 0.15, y: 0.52, z: 0.20, r: 0.19, h: 0.74, color: 0xff7700, speed: 4.9, phase: 4.9 },
-            // Inner bright golden-amber & white-hot cores
-            { x: 0.02, y: 0.58, z: 0.02, r: 0.16, h: 0.80, color: 0xffaa00, speed: 6.2, phase: 0.7 },
-            { x: -0.10, y: 0.52, z: 0.08, r: 0.13, h: 0.65, color: 0xffcc22, speed: 6.8, phase: 2.1 },
-            { x: 0.00, y: 0.45, z: 0.00, r: 0.11, h: 0.52, color: 0xfff0aa, speed: 7.5, phase: 1.1 }
+            { x: 0.00, y: 0.65, z: 0.00, r: 0.34, h: 1.05, color: 0xff4500, speed: 4.2, phase: 0.0 },
+            { x: -0.22, y: 0.56, z: 0.16, r: 0.26, h: 0.85, color: 0xff6200, speed: 5.1, phase: 1.3 },
+            { x: 0.24, y: 0.58, z: -0.14, r: 0.28, h: 0.90, color: 0xff5200, speed: 4.7, phase: 2.5 },
+            { x: -0.14, y: 0.54, z: -0.22, r: 0.24, h: 0.78, color: 0xff7818, speed: 5.6, phase: 3.8 },
+            { x: 0.15, y: 0.60, z: 0.20, r: 0.25, h: 0.82, color: 0xff8424, speed: 4.9, phase: 4.9 },
+            // Inner bright golden-amber & white-hot luminous cores
+            { x: 0.02, y: 0.64, z: 0.02, r: 0.22, h: 0.82, color: 0xffb328, speed: 6.2, phase: 0.7 },
+            { x: -0.10, y: 0.58, z: 0.08, r: 0.18, h: 0.68, color: 0xffd54a, speed: 6.8, phase: 2.1 },
+            { x: 0.00, y: 0.52, z: 0.00, r: 0.16, h: 0.58, color: 0xfff3bc, speed: 7.5, phase: 1.1 }
         ];
 
         for (const cfg of tongueConfigs) {
-            const tGeo = new THREE.ConeGeometry(cfg.r, cfg.h, 7, 2);
-            const tMat = new THREE.MeshBasicMaterial({
-                color: cfg.color,
-                transparent: true,
-                opacity: 0.90
-            });
-            const mesh = new THREE.Mesh(tGeo, tMat);
+            let mesh = this._makeSoftSprite('flame', cfg.color, 1.0, 0.92, true);
+            if (mesh) {
+                mesh.scale.set(cfg.r * 2.5, cfg.h * 1.15, 1.0);
+                cfg.baseScaleX = cfg.r * 2.5;
+                cfg.baseScaleY = cfg.h * 1.15;
+            } else {
+                const tGeo = new THREE.ConeGeometry(cfg.r, cfg.h, 7, 2);
+                const tMat = new THREE.MeshBasicMaterial({
+                    color: cfg.color,
+                    transparent: true,
+                    opacity: 0.90
+                });
+                mesh = new THREE.Mesh(tGeo, tMat);
+                cfg.baseScaleX = 1.0;
+                cfg.baseScaleY = 1.0;
+            }
             mesh.position.set(cfg.x, cfg.y, cfg.z);
             mesh.userData = cfg;
             group.add(mesh);
@@ -180,6 +208,12 @@ export class ParticleManager {
         if (!this.fireEmitters.has(key)) return;
         const entry = this.fireEmitters.get(key);
         this.scene.remove(entry.group);
+        if (entry.group?.traverse) {
+            entry.group.traverse((c) => {
+                c.geometry?.dispose?.();
+                c.material?.dispose?.();
+            });
+        }
         this.fireEmitters.delete(key);
     }
 
@@ -192,31 +226,38 @@ export class ParticleManager {
             p.mesh.position.addScaledVector(p.velocity, delta);
 
             if (p.isSmoke) {
-                p.mesh.scale.multiplyScalar(1 + delta * 1.15);
-                p.mesh.rotation.y += delta * 0.8;
-                p.mesh.material.opacity = Math.max(0, (p.life / p.maxLife) * 0.65);
+                if (typeof p.mesh.scale?.multiplyScalar === 'function') {
+                    p.mesh.scale.multiplyScalar(1 + delta * 1.12);
+                }
+                if (!p.mesh.isSprite) {
+                    p.mesh.rotation.y += delta * 0.8;
+                }
+                p.mesh.material.opacity = Math.max(0, (p.life / p.maxLife) * (p.initialOpacity || 0.65));
             } else if (p.isEmber) {
                 p.mesh.position.x += Math.sin(p.life * 10) * delta * 0.4;
                 p.mesh.material.opacity = Math.max(0, p.life / p.maxLife);
             } else if (p.isFoliage) {
                 p.mesh.position.x += Math.sin(p.life * 2.4 + p.seed) * delta * 0.5 + delta * 0.35;
                 p.mesh.position.z += Math.cos(p.life * 1.9 + p.seed) * delta * 0.4 + delta * 0.25;
-                p.mesh.rotation.x += delta * 1.8;
-                p.mesh.rotation.y += delta * 1.4;
-                p.mesh.rotation.z += delta * 1.6;
+                if (!p.mesh.isSprite) {
+                    p.mesh.rotation.x += delta * 1.8;
+                    p.mesh.rotation.y += delta * 1.4;
+                    p.mesh.rotation.z += delta * 1.6;
+                }
                 p.mesh.material.opacity = Math.min(0.9, (p.life / p.maxLife) * 1.4);
                 if (p.mesh.position.y <= 0.04) p.life = 0;
             } else {
                 p.velocity.y -= 9.8 * delta;
-                const progress = p.life / p.maxLife;
-                p.mesh.material.opacity = Math.max(0, progress);
-                p.mesh.scale.setScalar(Math.max(0.01, progress));
+                const progress = Math.max(0, p.life / p.maxLife);
+                p.mesh.material.opacity = progress;
+                const bScale = p.baseScale || 1.0;
+                p.mesh.scale.set(bScale * Math.max(0.05, progress), bScale * Math.max(0.05, progress), bScale);
             }
 
             if (p.life <= 0) {
                 this.scene.remove(p.mesh);
-                p.mesh.geometry.dispose();
-                p.mesh.material.dispose();
+                if (p.mesh.geometry) p.mesh.geometry.dispose();
+                if (p.mesh.material) p.mesh.material.dispose();
                 this.particles.splice(i, 1);
             }
         }
@@ -231,10 +272,20 @@ export class ParticleManager {
                     const cfg = f.userData;
                     const wave = Math.sin(time * cfg.speed + cfg.phase);
                     const cosWave = Math.cos(time * (cfg.speed * 0.85) + cfg.phase);
-                    f.scale.set(1.0 + cosWave * 0.18, 0.85 + (wave * 0.5 + 0.5) * 0.45, 1.0 - cosWave * 0.15);
-                    f.rotation.z = wave * 0.18;
-                    f.rotation.x = cosWave * 0.16;
-                    f.rotation.y += delta * 1.5;
+                    const bx = cfg.baseScaleX || 1.0;
+                    const by = cfg.baseScaleY || 1.0;
+                    f.scale.set(
+                        bx * (1.0 + cosWave * 0.16),
+                        by * (0.86 + (wave * 0.5 + 0.5) * 0.36),
+                        bx * (1.0 - cosWave * 0.14)
+                    );
+                    if (!f.isSprite) {
+                        f.rotation.z = wave * 0.18;
+                        f.rotation.x = cosWave * 0.16;
+                        f.rotation.y += delta * 1.5;
+                    } else {
+                        f.position.x = cfg.x + wave * 0.04;
+                    }
                 }
             }
         }
@@ -243,18 +294,18 @@ export class ParticleManager {
         this.smokeTimer = (this.smokeTimer || 0) + delta;
         if (this.smokeTimer > 0.08 && this.fireEmitters.size > 0) {
             this.smokeTimer = 0;
-            const smokeGeo = new THREE.DodecahedronGeometry(0.16, 0);
+            const smokeGeo = new THREE.SphereGeometry(0.14, 6, 5);
             const emberSparkGeo = new THREE.BoxGeometry(0.045, 0.045, 0.045);
             for (const [_, entry] of this.fireEmitters.entries()) {
                 const wx = entry.group.position.x;
                 const wz = entry.group.position.z;
 
-                const smokeMat = new THREE.MeshLambertMaterial({
-                    color: Math.random() > 0.35 ? 0x262220 : 0x3d3530,
-                    transparent: true,
-                    opacity: 0.65
-                });
-                const smokeMesh = new THREE.Mesh(smokeGeo, smokeMat);
+                const smokeColor = Math.random() > 0.35 ? 0x262220 : 0x3d3530;
+                let smokeMesh = this._makeSoftSprite('smoke', smokeColor, 0.44, 0.62, false);
+                if (!smokeMesh) {
+                    const smokeMat = new THREE.MeshStandardMaterial({ color: smokeColor, roughness: 0.95, transparent: true, opacity: 0.65 });
+                    smokeMesh = new THREE.Mesh(smokeGeo, smokeMat);
+                }
                 smokeMesh.position.set(
                     wx + (Math.random() - 0.5) * 0.45,
                     0.95 + Math.random() * 0.35,
@@ -263,6 +314,7 @@ export class ParticleManager {
                 this.scene.add(smokeMesh);
                 this.particles.push({
                     mesh: smokeMesh,
+                    initialOpacity: 0.62,
                     velocity: new THREE.Vector3(
                         (Math.random() - 0.35) * 0.35,
                         1.25 + Math.random() * 0.75,
@@ -275,12 +327,12 @@ export class ParticleManager {
 
                 // Rising orange/gold ember sparks
                 if (Math.random() < 0.65) {
-                    const sparkMat = new THREE.MeshBasicMaterial({
-                        color: Math.random() > 0.5 ? 0xffaa00 : 0xff4500,
-                        transparent: true,
-                        opacity: 0.95
-                    });
-                    const sparkMesh = new THREE.Mesh(emberSparkGeo, sparkMat);
+                    const sparkCol = Math.random() > 0.5 ? 0xffaa22 : 0xff5212;
+                    let sparkMesh = this._makeSoftSprite('spark', sparkCol, 0.14, 0.95, true);
+                    if (!sparkMesh) {
+                        const sparkMat = new THREE.MeshBasicMaterial({ color: sparkCol, transparent: true, opacity: 0.95 });
+                        sparkMesh = new THREE.Mesh(emberSparkGeo, sparkMat);
+                    }
                     sparkMesh.position.set(
                         wx + (Math.random() - 0.5) * 0.5,
                         0.55 + Math.random() * 0.4,
@@ -322,24 +374,25 @@ export class ParticleManager {
                             wp.copy(meshGroup.position);
                             wp.y += (child.userData.stackHeight || 1.8);
                         }
-                        const puffGeo = new THREE.DodecahedronGeometry(0.12, 0);
-                        const puffMat = new THREE.MeshLambertMaterial({
-                            color: Math.random() > 0.4 ? 0x4a4745 : 0xd8dbde,
-                            transparent: true,
-                            opacity: 0.55
-                        });
-                        const puffMesh = new THREE.Mesh(puffGeo, puffMat);
+                        const stackColor = Math.random() > 0.4 ? 0x524e4b : 0xdce0e4;
+                        let puffMesh = this._makeSoftSprite('smoke', stackColor, 0.34, 0.52, false);
+                        if (!puffMesh) {
+                            const puffGeo = new THREE.SphereGeometry(0.11, 6, 5);
+                            const puffMat = new THREE.MeshStandardMaterial({ color: stackColor, roughness: 0.95, transparent: true, opacity: 0.55 });
+                            puffMesh = new THREE.Mesh(puffGeo, puffMat);
+                        }
                         puffMesh.position.set(wp.x + (Math.random() - 0.5) * 0.1, wp.y + 0.08, wp.z + (Math.random() - 0.5) * 0.1);
                         this.scene.add(puffMesh);
                         this.particles.push({
                             mesh: puffMesh,
+                            initialOpacity: 0.52,
                             velocity: new THREE.Vector3(
                                 (Math.random() - 0.35) * 0.25 + 0.15,
                                 0.95 + Math.random() * 0.45,
                                 (Math.random() - 0.5) * 0.25
                             ),
-                            life: 1.6,
-                            maxLife: 1.6,
+                            life: 1.65,
+                            maxLife: 1.65,
                             isSmoke: true
                         });
                     }
@@ -357,22 +410,29 @@ export class ParticleManager {
 
             if (isSpring || isAutumn || isWinter) {
                 let pColor = 0xf7c4cb;
-                let pGeo = null;
+                let fMesh = null;
                 if (isSpring) {
                     const springColors = [0xf7c4cb, 0xffe6ea, 0xf2b6c1, 0xffffff];
                     pColor = springColors[Math.floor(Math.random() * springColors.length)];
-                    pGeo = new THREE.BoxGeometry(0.065, 0.015, 0.045);
+                    const pGeo = new THREE.PlaneGeometry(0.06, 0.04);
+                    const fMat = new THREE.MeshBasicMaterial({ color: pColor, side: THREE.DoubleSide, transparent: true, opacity: 0.85 });
+                    fMesh = new THREE.Mesh(pGeo, fMat);
                 } else if (isAutumn) {
                     const autumnColors = [0xd94e28, 0xc0392b, 0xe67e22, 0xb83b26];
                     pColor = autumnColors[Math.floor(Math.random() * autumnColors.length)];
-                    pGeo = new THREE.DodecahedronGeometry(0.045, 0);
+                    const pGeo = new THREE.PlaneGeometry(0.065, 0.055);
+                    const fMat = new THREE.MeshBasicMaterial({ color: pColor, side: THREE.DoubleSide, transparent: true, opacity: 0.88 });
+                    fMesh = new THREE.Mesh(pGeo, fMat);
                 } else {
                     pColor = 0xf4f7fa;
-                    pGeo = new THREE.BoxGeometry(0.035, 0.035, 0.035);
+                    fMesh = this._makeSoftSprite('spark', pColor, 0.11, 0.82, false);
+                    if (!fMesh) {
+                        const pGeo = new THREE.SphereGeometry(0.03, 5, 4);
+                        const fMat = new THREE.MeshBasicMaterial({ color: pColor, transparent: true, opacity: 0.85 });
+                        fMesh = new THREE.Mesh(pGeo, fMat);
+                    }
                 }
 
-                const fMat = new THREE.MeshBasicMaterial({ color: pColor, transparent: true, opacity: 0.85 });
-                const fMesh = new THREE.Mesh(pGeo, fMat);
                 fMesh.position.set(
                     Math.random() * 70,
                     10.0 + Math.random() * 6.0,

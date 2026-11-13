@@ -3,6 +3,8 @@
 
 import * as THREE from 'three';
 import { CONFIG } from '../config.js';
+import { WaterShaderSystem } from './waterShader.js';
+import { PBRTextureGenerator } from './pbrTextureGenerator.js';
 
 export class CanalMesh {
     static BED_LEVEL = -0.18;
@@ -127,20 +129,7 @@ export class CanalMesh {
 
     static getWaterMaterial() {
         if (!this._waterMaterial) {
-            const normalMap = this.getWaterNormalMap();
-            const opts = {
-                color: 0x1d6878,       // Deep Meiji canal indigo-turquoise (Aoi-mizu)
-                emissive: 0x06232b,    // Subtle subsurface depth scattering
-                roughness: 0.07,       // Crisp Fresnel-like specular water sheen
-                metalness: 0.22,
-                transparent: true,
-                opacity: 0.89,
-            };
-            if (normalMap) {
-                opts.normalMap = normalMap;
-                opts.normalScale = new THREE.Vector2(0.34, 0.34);
-            }
-            this._waterMaterial = new THREE.MeshStandardMaterial(opts);
+            this._waterMaterial = WaterShaderSystem.getCanalMaterial();
         }
         return this._waterMaterial;
     }
@@ -154,15 +143,34 @@ export class CanalMesh {
 
     static getStoneMaterial() {
         if (!this._stoneMaterial) {
-            const normalMap = this.getIshigakiNormalMap();
-            const opts = { color: 0x5c5750, roughness: 0.84, metalness: 0.06 };
+            const pbr = PBRTextureGenerator.getIshigakiSet();
+            const normalMap = pbr.normalMap || this.getIshigakiNormalMap();
+            const opts = {
+                color: pbr.map ? 0xffffff : 0x5c5750,
+                roughness: 0.80,
+                metalness: 0.06,
+                envMapIntensity: 0.72
+            };
+            if (pbr.map) opts.map = pbr.map;
+            if (pbr.roughnessMap) opts.roughnessMap = pbr.roughnessMap;
             if (normalMap) {
                 opts.normalMap = normalMap;
-                opts.normalScale = new THREE.Vector2(0.55, 0.55);
+                opts.normalScale = new THREE.Vector2(0.75, 0.75);
             }
             this._stoneMaterial = new THREE.MeshStandardMaterial(opts);
+            this._stoneMaterial.userData = { isSharedLibraryMaterial: true };
         }
         return this._stoneMaterial;
+    }
+
+    static disposeAll() {
+        this._stoneMaterial?.dispose?.();
+        this._bedMaterial?.dispose?.();
+        this._waterNormalMap?.dispose?.();
+        this._stoneMaterial = null;
+        this._waterMaterial = null;
+        this._bedMaterial = null;
+        this._waterNormalMap = null;
     }
 
     static getCopingMaterial() {
@@ -255,22 +263,14 @@ export class CanalMesh {
             group.add(cobble);
         }
 
-        // 2. Recessed Reflective Water Surface (y = -0.06)
-        const waterGeo = new THREE.PlaneGeometry(s * 1.004, s * 1.004);
+        // 2. Recessed Reflective Water Surface (y = -0.06) using photorealistic GLSL WaterShaderSystem
+        const waterGeo = new THREE.PlaneGeometry(s * 1.004, s * 1.004, 8, 8);
         waterGeo.rotateX(-Math.PI / 2);
         const waterMesh = new THREE.Mesh(waterGeo, this.getWaterMaterial());
         waterMesh.position.y = waterY;
         waterMesh.renderOrder = 1;
         waterMesh.receiveShadow = true;
         group.add(waterMesh);
-
-        // Subtle water surface current filaments
-        const rippleMat = this.getRippleMaterial();
-        for (const [rx, rz, rw, rl] of [[-0.18, -0.14, 0.42, 0.024], [0.20, 0.16, 0.34, 0.020], [-0.04, 0.24, 0.26, 0.018]]) {
-            const rip = new THREE.Mesh(new THREE.BoxGeometry(s * rw, 0.002, rl), rippleMat);
-            rip.position.set(s * rx, waterY + 0.002, s * rz);
-            group.add(rip);
-        }
 
         // 3. Battered Ishigaki Stone Embankment Walls descending from street level (+0.11m) into the canal bed (-0.18m)
         const neighbors = [

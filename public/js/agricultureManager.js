@@ -5,6 +5,9 @@ import * as THREE from 'three';
 import { CONFIG } from './config.js';
 import { SOUND } from './fx.js';
 import { MaterialLibrary } from './renderer/materialLibrary.js';
+import { PBRTextureGenerator } from './renderer/pbrTextureGenerator.js';
+import { WaterShaderSystem } from './renderer/waterShader.js';
+import { WeatheringShaderSystem } from './renderer/weatheringShader.js';
 
 export class AgricultureManager {
     constructor(gridModel, stateManager) {
@@ -111,13 +114,34 @@ export class AgricultureManager {
             : (currentMonth >= 9 && currentMonth <= 11) ? 'autumn' : 'winter';
 
         // 1. Earthen Dikes (Aze 畦) - Clay embankments dividing paddy into 4 flooded quadrants
-        const dikeMat = new THREE.MeshLambertMaterial({ color: 0x5a4834 });
+        const dirtPBR = PBRTextureGenerator.getDirtRoadSet();
+        if (!AgricultureManager._paddyMats) {
+            AgricultureManager._paddyMats = {
+                dike: new THREE.MeshStandardMaterial({ color: dirtPBR.map ? 0xbaa385 : 0x5a4834, roughness: 0.92, envMapIntensity: 0.52, ...(dirtPBR.map ? { map: dirtPBR.map } : {}), ...(dirtPBR.normalMap ? { normalMap: dirtPBR.normalMap } : {}) }),
+                dryMud: new THREE.MeshStandardMaterial({ color: 0x4e4539, roughness: 0.88, envMapIntensity: 0.55 }),
+                shoot: WeatheringShaderSystem.enhanceFoliageMaterial(new THREE.MeshStandardMaterial({ color: 0x58a838, roughness: 0.72, envMapIntensity: 0.65 }), { swayAmplitude: 0.018 }),
+                summerFieldIrr: new THREE.MeshStandardMaterial({ color: 0x2e7d32, roughness: 0.78, envMapIntensity: 0.60 }),
+                summerFieldDry: new THREE.MeshStandardMaterial({ color: 0x556b2f, roughness: 0.84, envMapIntensity: 0.55 }),
+                summerStalk: WeatheringShaderSystem.enhanceFoliageMaterial(new THREE.MeshStandardMaterial({ color: 0x3d9638, roughness: 0.70, envMapIntensity: 0.64 }), { swayAmplitude: 0.025 }),
+                autumnFieldIrr: new THREE.MeshStandardMaterial({ color: 0xcca022, roughness: 0.78, envMapIntensity: 0.62 }),
+                autumnFieldDry: new THREE.MeshStandardMaterial({ color: 0x8a7238, roughness: 0.86, envMapIntensity: 0.54 }),
+                autumnHead: WeatheringShaderSystem.enhanceFoliageMaterial(new THREE.MeshStandardMaterial({ color: 0xe2b428, roughness: 0.70, envMapIntensity: 0.68 }), { swayAmplitude: 0.022 }),
+                stubble: new THREE.MeshStandardMaterial({ color: 0x6e6353, roughness: 0.94, envMapIntensity: 0.50 }),
+                cutStraw: new THREE.MeshStandardMaterial({ color: 0x8a7e6d, roughness: 0.90, envMapIntensity: 0.52 })
+            };
+            for (const m of Object.values(AgricultureManager._paddyMats)) {
+                m.userData = { ...(m.userData || {}), isSharedLibraryMaterial: true };
+            }
+        }
+        const pMats = AgricultureManager._paddyMats;
+        const dikeMat = pMats.dike;
         const dikeH = 0.08;
         const dikeW = 0.12;
 
         // Outer perimeter dikes
         const nDike = new THREE.Mesh(new THREE.BoxGeometry(s * 0.96, dikeH, dikeW), dikeMat);
         nDike.position.set(0, dikeH / 2, -s * 0.44);
+        nDike.receiveShadow = true;
         group.add(nDike);
 
         const sDike = nDike.clone();
@@ -126,6 +150,7 @@ export class AgricultureManager {
 
         const eDike = new THREE.Mesh(new THREE.BoxGeometry(dikeW, dikeH, s * 0.88), dikeMat);
         eDike.position.set(-s * 0.44, dikeH / 2, 0);
+        eDike.receiveShadow = true;
         group.add(eDike);
 
         const wDike = eDike.clone();
@@ -160,18 +185,18 @@ export class AgricultureManager {
         ];
 
         if (season === 'spring') {
-            // Flooded sky-reflecting water plane with young rice shoots
-            const waterColor = isIrrigated ? 0x6892b0 : 0x4e4539;
-            const waterMat = new THREE.MeshLambertMaterial({ color: waterColor, transparent: true, opacity: 0.88 });
+            // Flooded sky-reflecting water plane using WaterShaderSystem
+            const waterMat = isIrrigated ? WaterShaderSystem.getPaddyMaterial() : pMats.dryMud;
             const waterGeo = new THREE.PlaneGeometry(qSize, qSize);
             waterGeo.rotateX(-Math.PI / 2);
 
-            const shootMat = new THREE.MeshLambertMaterial({ color: 0x58a838 });
-            const shootGeo = new THREE.ConeGeometry(0.035, 0.11, 4);
+            const shootMat = pMats.shoot;
+            const shootGeo = new THREE.ConeGeometry(0.035, 0.11, 5);
 
             for (const [qx, qz] of qOffsets) {
                 const waterMesh = new THREE.Mesh(waterGeo, waterMat);
                 waterMesh.position.set(qx, 0.035, qz);
+                waterMesh.receiveShadow = true;
                 group.add(waterMesh);
 
                 // Grid of seedling shoots in neat rows
@@ -184,11 +209,11 @@ export class AgricultureManager {
                 }
             }
         } else if (season === 'summer') {
-            // Dense, vibrant lush emerald green stalks
-            const fieldMat = new THREE.MeshLambertMaterial({ color: isIrrigated ? 0x2e7d32 : 0x556b2f });
+            // Dense, vibrant lush emerald green stalks with gentle wind sway
+            const fieldMat = isIrrigated ? pMats.summerFieldIrr : pMats.summerFieldDry;
             const fieldGeo = new THREE.BoxGeometry(qSize, 0.20, qSize);
-            const stalkMat = new THREE.MeshLambertMaterial({ color: 0x3d9638 });
-            const stalkGeo = new THREE.ConeGeometry(0.065, 0.18, 5);
+            const stalkMat = pMats.summerStalk;
+            const stalkGeo = new THREE.ConeGeometry(0.065, 0.18, 6);
 
             for (const [qx, qz] of qOffsets) {
                 const fieldMesh = new THREE.Mesh(fieldGeo, fieldMat);
@@ -206,10 +231,10 @@ export class AgricultureManager {
             }
         } else if (season === 'autumn') {
             // Golden heavy ripe rice heads (Inaho) & center Kakashi scarecrow
-            const goldMat = new THREE.MeshLambertMaterial({ color: isIrrigated ? 0xcca022 : 0x8a7238 });
+            const goldMat = isIrrigated ? pMats.autumnFieldIrr : pMats.autumnFieldDry;
             const fieldGeo = new THREE.BoxGeometry(qSize, 0.22, qSize);
-            const headMat = new THREE.MeshLambertMaterial({ color: 0xe2b428 });
-            const headGeo = new THREE.DodecahedronGeometry(0.075, 0);
+            const headMat = pMats.autumnHead;
+            const headGeo = new THREE.SphereGeometry(0.072, 6, 5);
 
             for (const [qx, qz] of qOffsets) {
                 const fieldMesh = new THREE.Mesh(fieldGeo, goldMat);
@@ -229,24 +254,21 @@ export class AgricultureManager {
             // Miniature Kakashi (scarecrow) on the center bund crossroads
             const bambooMat = MaterialLibrary.get('bamboo');
             const strawMat = MaterialLibrary.get('strawTawara');
-            // Bamboo vertical post
             const post = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.44, 4), bambooMat);
             post.position.set(0, 0.24, 0);
             group.add(post);
-            // Straw crossarm sleeves
             const arms = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.03, 0.03), strawMat);
             arms.position.set(0, 0.34, 0);
             group.add(arms);
-            // Conical straw hat (Sugegasa)
-            const hat = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.05, 6), strawMat);
+            const hat = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.05, 8), strawMat);
             hat.position.set(0, 0.47, 0);
             group.add(hat);
         } else {
             // Winter: Dry cut stubble earth & furrowed rows
-            const stubbleMat = new THREE.MeshLambertMaterial({ color: 0x6e6353 });
+            const stubbleMat = pMats.stubble;
             const stubbleGeo = new THREE.BoxGeometry(qSize, 0.05, qSize);
-            const cutMat = new THREE.MeshLambertMaterial({ color: 0x8a7e6d });
-            const cutGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.06, 4);
+            const cutMat = pMats.cutStraw;
+            const cutGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.06, 5);
 
             for (const [qx, qz] of qOffsets) {
                 const stubbleMesh = new THREE.Mesh(stubbleGeo, stubbleMat);

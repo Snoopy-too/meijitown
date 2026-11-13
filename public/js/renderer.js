@@ -23,6 +23,14 @@ import { AgricultureManager } from './agricultureManager.js';
 import { BackdropManager } from './renderer/backdropManager.js';
 import { CloudManager } from './renderer/cloudManager.js';
 import { MaterialLibrary } from './renderer/materialLibrary.js';
+import { RoadTextureManager } from './renderer/road_texture.js';
+import { RailAutoTiler } from './renderer/railAutoTiler.js';
+import { PBRTextureGenerator } from './renderer/pbrTextureGenerator.js';
+import { EnvironmentIBL } from './renderer/environmentIBL.js';
+import { PostProcessingPipeline } from './renderer/postProcessing.js';
+import { WaterShaderSystem } from './renderer/waterShader.js';
+import { TerrainShaderSystem } from './renderer/terrainShader.js';
+import { WeatheringShaderSystem } from './renderer/weatheringShader.js';
 
 export class WorldRenderer {
     constructor(containerElement, gridModel, rootElement = null) {
@@ -42,6 +50,29 @@ export class WorldRenderer {
         this.initScene();
         this.cameraManager = new CameraManager(this.container, this.renderer.domElement);
         this.lighting = SceneLighting.initLights(this.scene);
+        this.envIBL = new EnvironmentIBL(this.renderer, this.scene);
+        this.envIBL.setPhase('DAY', false, this.lighting.currentSunOffset);
+
+        const initW = (this.container && this.container.clientWidth > 0) ? this.container.clientWidth : (typeof window !== 'undefined' ? window.innerWidth : 1280);
+        const initH = (this.container && this.container.clientHeight > 0) ? this.container.clientHeight : (typeof window !== 'undefined' ? window.innerHeight : 720);
+        const initPR = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, 2) : 1;
+        this.postProcessing = new PostProcessingPipeline(this.renderer, this.scene, this.camera, {
+            width: initW,
+            height: initH,
+            pixelRatio: initPR,
+            preset: 'ultra',
+            tiltShiftEnabled: true
+        });
+        this.postProcessing.init();
+        this._lastEnvSyncKey = 'DAY_0';
+
+        if (typeof window !== 'undefined') {
+            window.meijiGraphics = {
+                setPreset: (preset) => this.setGraphicsPreset(preset),
+                setTiltShift: (enabled) => this.setTiltShift(enabled)
+            };
+        }
+
         this.raycast = new RaycastManager(this.scene);
         this.ghostCursor = new GhostCursorManager(this.scene);
         this.backdrop = BackdropManager.init(this.scene);
@@ -102,6 +133,11 @@ export class WorldRenderer {
         if (THREE.SRGBColorSpace) {
             this.renderer.outputColorSpace = THREE.SRGBColorSpace;
         }
+        const maxAniso = (this.renderer.capabilities && typeof this.renderer.capabilities.getMaxAnisotropy === 'function')
+            ? Math.min(16, this.renderer.capabilities.getMaxAnisotropy())
+            : 8;
+        PBRTextureGenerator.setMaxAnisotropy(maxAniso);
+
         this.renderer.shadowMap.enabled = true;
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         if (this.container && typeof this.container.appendChild === 'function') {
@@ -114,6 +150,12 @@ export class WorldRenderer {
             this.resizeObserver = new ResizeObserver(() => {
                 if (this.cameraManager) {
                     this.cameraManager.handleResize(this.renderer);
+                }
+                if (this.postProcessing && this.container) {
+                    const rw = this.container.clientWidth > 0 ? this.container.clientWidth : (typeof window !== 'undefined' ? window.innerWidth : 1280);
+                    const rh = this.container.clientHeight > 0 ? this.container.clientHeight : (typeof window !== 'undefined' ? window.innerHeight : 720);
+                    const rpr = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, 2) : 1;
+                    this.postProcessing.resize(rw, rh, rpr);
                 }
             });
             this.resizeObserver.observe(this.container);
@@ -128,7 +170,7 @@ export class WorldRenderer {
 
         const groundGeo = new THREE.PlaneGeometry(totalSizeX, totalSizeZ, segsX, segsZ);
         groundGeo.rotateX(-Math.PI / 2);
-        const groundMat = this.backdrop?.skirtMaterial || MaterialLibrary.get('meadowGround').clone();
+        const groundMat = this.backdrop?.skirtMaterial || TerrainShaderSystem.enhanceGroundMaterial(MaterialLibrary.get('meadowGround').clone());
         this.groundMesh = new THREE.Mesh(
             groundGeo,
             groundMat
@@ -306,6 +348,34 @@ export class WorldRenderer {
         if (this.lighting && typeof this.lighting.updateMonth === 'function') this.lighting.updateMonth(month);
         if (this.clouds && typeof this.clouds.updateDayNight === 'function') this.clouds.updateDayNight(month);
         if (this.backdrop && typeof this.backdrop.updateDayNight === 'function') this.backdrop.updateDayNight(month);
+        this._syncEnvironmentPhase(!!this.simulation?.typhoon?.isStormActive);
+    }
+
+    setGraphicsPreset(preset = 'ultra') {
+        if (this.postProcessing) {
+            this.postProcessing.setPreset(preset);
+        }
+    }
+
+    setTiltShift(enabled = true) {
+        if (this.postProcessing) {
+            this.postProcessing.setTiltShift(enabled);
+        }
+    }
+
+    _syncEnvironmentPhase(isStorm = false) {
+        if (!this.lighting) return;
+        const phaseKey = this.lighting.currentPhaseKey || 'DAY';
+        const syncKey = `${phaseKey}_${isStorm ? 1 : 0}`;
+        if (this._lastEnvSyncKey === syncKey) return;
+        this._lastEnvSyncKey = syncKey;
+
+        if (this.envIBL) {
+            this.envIBL.setPhase(phaseKey, isStorm, this.lighting.targetSunPos || this.lighting.currentSunOffset);
+        }
+        if (this.postProcessing) {
+            this.postProcessing.setPhase(phaseKey, isStorm);
+        }
     }
 
     getTileWorldPos(x, y) {
@@ -565,16 +635,48 @@ export class WorldRenderer {
         if (this.simulation?.typhoon) this.simulation.typhoon.updateRain(delta);
         if (this.fx) this.fx.update(delta, speedMult, this.tileMeshes, this.state?.currentMonth || 1);
         const isStorm = !!this.simulation?.typhoon?.isStormActive;
-        if (this.lighting && typeof this.lighting.update === 'function') this.lighting.update(delta);
+        const camTarget = this.cameraManager?.controls?.target || null;
+        const camDist = (camTarget && this.camera?.position && typeof this.camera.position.distanceTo === 'function')
+            ? this.camera.position.distanceTo(camTarget)
+            : 42;
+
+        if (this.lighting && typeof this.lighting.update === 'function') {
+            this.lighting.update(delta, camTarget, camDist);
+        }
+        this._syncEnvironmentPhase(isStorm);
+
+        const lightingState = this.lighting && typeof this.lighting.getLightingState === 'function'
+            ? this.lighting.getLightingState()
+            : null;
+        const waterDelta = delta * (isSimRunning ? Math.max(0.5, speedMult * 0.6) : 0.3);
+        WaterShaderSystem.update(waterDelta, lightingState, isStorm);
+        TerrainShaderSystem.update(lightingState, this.state?.currentMonth || 4);
+        WeatheringShaderSystem.update(delta, isStorm, lightingState ? lightingState.emissiveIntensity : 0.0);
+
         if (this.backdrop && typeof this.backdrop.update === 'function') this.backdrop.update(delta, isStorm);
         if (this.clouds) this.clouds.update(delta, isSimRunning ? speedMult : 1, isStorm);
-        this.renderer.render(this.scene, this.camera);
+
+        if (this.postProcessing) {
+            this.postProcessing.render();
+        } else {
+            this.renderer.render(this.scene, this.camera);
+        }
     }
 
     destroy() {
         this.isDestroyed = true;
         if (this.animFrameId) { cancelAnimationFrame(this.animFrameId); this.animFrameId = null; }
         if (this.resizeObserver) { this.resizeObserver.disconnect(); this.resizeObserver = null; }
+        if (this.postProcessing) { this.postProcessing.dispose(); this.postProcessing = null; }
+        if (this.envIBL) { this.envIBL.dispose(); this.envIBL = null; }
+        WaterShaderSystem.disposeAll();
+        MaterialLibrary.disposeAll();
+        RoadTextureManager.disposeAll();
+        CanalMesh.disposeAll();
+        ParksSystem._cached = null;
+        RailAutoTiler._railMats = null;
+        AgricultureManager._paddyMats = null;
+        PBRTextureGenerator.disposeAll();
         if (this.backdrop?.group) this.scene.remove(this.backdrop.group);
         if (this.clouds?.group) this.scene.remove(this.clouds.group);
         if (this.renderer?.domElement?.parentNode) this.renderer.domElement.parentNode.removeChild(this.renderer.domElement);
