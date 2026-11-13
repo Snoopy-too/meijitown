@@ -89,7 +89,10 @@ export class WorldRenderer {
         this.fx = new ParticleManager(this.scene);
         this.traffic = new TrafficManager(this.scene, this.grid, this.getTileWorldPos.bind(this), this.fx);
         this.canalTraffic = new CanalTrafficManager(this.scene, this.grid, this.getTileWorldPos.bind(this), this.modelCache);
-        this.trainTraffic = new TrainTrafficManager(this.scene, this.grid, this.getTileWorldPos.bind(this), this.modelCache);
+        this.trainTraffic = new TrainTrafficManager(this.scene, this.grid, this.getTileWorldPos.bind(this), this.modelCache, {
+            traffic: this.traffic,
+            getFacingAngle: this.getFacingAngleForTile.bind(this)
+        });
         this.overlay = new OverlaySystem(this.scene, this.grid, null, this.root);
 
         this.bindEvents();
@@ -667,6 +670,7 @@ export class WorldRenderer {
         this.isDestroyed = true;
         if (this.animFrameId) { cancelAnimationFrame(this.animFrameId); this.animFrameId = null; }
         if (this.resizeObserver) { this.resizeObserver.disconnect(); this.resizeObserver = null; }
+        this.trainTraffic?.dispose();
         if (this.postProcessing) { this.postProcessing.dispose(); this.postProcessing = null; }
         if (this.envIBL) { this.envIBL.dispose(); this.envIBL = null; }
         WaterShaderSystem.disposeAll();

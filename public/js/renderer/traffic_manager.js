@@ -63,6 +63,10 @@ export class TrafficManager {
             return { y: archY, pitch };
         }
 
+        if (tile.type === CONFIG.TYPES.RAIL && tile.hasCrossing) {
+            return { y: (tile.roadTier === 2) ? 0.075 : 0.066, pitch: 0 };
+        }
+
         const roadSurfaceY = (tile.roadTier === 2) ? 0.068 : 0.058;
         return { y: roadSurfaceY, pitch: 0 };
     }

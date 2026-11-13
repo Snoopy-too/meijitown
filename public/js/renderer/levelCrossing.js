@@ -1,34 +1,67 @@
 // Project Meiji - Road-Rail Level Crossing Mesh Builder (levelCrossing.js)
-// ponytail: authentic timber decking inlaid between rails & black-yellow striped fumikiri warning posts
+// Continuous stone/dirt road aprons & curbs through railway tracks, flush timber flangeway planks & fumikiri warning posts
 
 import * as THREE from 'three';
 import { CONFIG } from '../config.js';
 import { PBRTextureGenerator } from './pbrTextureGenerator.js';
+import { RoadTextureManager } from './road_texture.js';
+
+function isRailLink(t) {
+    return Boolean(t && (t.type === CONFIG.TYPES.RAIL ||
+        (t.type === CONFIG.TYPES.SERVICE && t.serviceType === CONFIG.SERVICES.TRAIN_DEPOT)));
+}
+
+function isRoadNeighbor(t) {
+    return Boolean(t && (t.type === CONFIG.TYPES.ROAD ||
+        (t.type === CONFIG.TYPES.CANAL && t.hasBridge) ||
+        (t.type === CONFIG.TYPES.RAIL && t.hasCrossing)));
+}
 
 export class LevelCrossingMesh {
+    static getSharedMats() {
+        if (LevelCrossingMesh._mats) return LevelCrossingMesh._mats;
+        const woodPBR = PBRTextureGenerator.getWoodWallSet();
+        const tag = (mat) => {
+            mat.userData = { ...(mat.userData || {}), isSharedLibraryMaterial: true };
+            return mat;
+        };
+        LevelCrossingMesh._mats = {
+            timberDeck: tag(new THREE.MeshStandardMaterial({
+                color: 0x6e5238, roughness: 0.80, metalness: 0.04, envMapIntensity: 0.62,
+                ...(woodPBR.normalMap ? { normalMap: woodPBR.normalMap } : {})
+            })),
+            timberRamp: tag(new THREE.MeshStandardMaterial({
+                color: 0x4e3a28, roughness: 0.84, metalness: 0.04, envMapIntensity: 0.58,
+                ...(woodPBR.normalMap ? { normalMap: woodPBR.normalMap } : {})
+            })),
+            warnYellow: tag(new THREE.MeshStandardMaterial({ color: 0xdfb418, roughness: 0.46, metalness: 0.08, envMapIntensity: 0.78 })),
+            warnBlack: tag(new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.58, metalness: 0.10, envMapIntensity: 0.72 }))
+        };
+        return LevelCrossingMesh._mats;
+    }
+
     static createLevelCrossingMesh(tile, grid, modelCache = null) {
         const group = new THREE.Group();
         const s = CONFIG.TILE_SIZE;
 
-        // Determine track orientation
         let connectsNS = false;
         let connectsEW = false;
+        let north = null;
+        let south = null;
+        let east = null;
+        let west = null;
 
         if (grid) {
-            const north = grid.getTile(tile.x, tile.y - 1);
-            const south = grid.getTile(tile.x, tile.y + 1);
-            const east = grid.getTile(tile.x + 1, tile.y);
-            const west = grid.getTile(tile.x - 1, tile.y);
-
-            const isRail = t => t && (t.type === CONFIG.TYPES.RAIL || (t.type === CONFIG.TYPES.SERVICE && t.serviceType === CONFIG.SERVICES.TRAIN_DEPOT));
-            connectsNS = isRail(north) || isRail(south);
-            connectsEW = isRail(east) || isRail(west);
+            north = grid.getTile(tile.x, tile.y - 1);
+            south = grid.getTile(tile.x, tile.y + 1);
+            east = grid.getTile(tile.x + 1, tile.y);
+            west = grid.getTile(tile.x - 1, tile.y);
+            connectsNS = isRailLink(north) || isRailLink(south);
+            connectsEW = isRailLink(east) || isRailLink(west);
         }
 
-        // Default: Track runs North-South unless strictly East-West
         const isRailNS = connectsNS || !connectsEW;
 
-        // 1. Try Loading Pre-rendered Blender Asset
         if (modelCache && modelCache.has('crossing')) {
             const crossingObj = modelCache.get('crossing').clone();
             crossingObj.traverse(child => {
@@ -37,88 +70,130 @@ export class LevelCrossingMesh {
                     child.receiveShadow = true;
                 }
             });
-
-            // If rail is East-West, rotate crossing by 90 degrees
-            if (!isRailNS) {
-                crossingObj.rotation.y = Math.PI / 2;
-            }
+            if (!isRailNS) crossingObj.rotation.y = Math.PI / 2;
             group.add(crossingObj);
             return group;
         }
 
-        // 2. Procedural Fallback Level Crossing
+        // Resolve perpendicular road sides aligned with crossingGroup local X axis (-X and +X)
+        const negSideTile = isRailNS ? west : south;
+        const posSideTile = isRailNS ? east : north;
+        const baseTier = tile.roadTier || 1;
+        const negRoadTier = isRoadNeighbor(negSideTile) ? (negSideTile.roadTier || 1) : 0;
+        const posRoadTier = isRoadNeighbor(posSideTile) ? (posSideTile.roadTier || 1) : 0;
+        const centerTier = Math.max(baseTier, negRoadTier || 1, posRoadTier || 1);
+        const negTier = negRoadTier ? Math.max(baseTier, negRoadTier) : centerTier;
+        const posTier = posRoadTier ? Math.max(baseTier, posRoadTier) : centerTier;
+
         const crossingGroup = new THREE.Group();
+        const trackWidth = s * 0.58;
+        const shoulderWidth = s * 0.82;
+        const mats = LevelCrossingMesh.getSharedMats();
 
-        // Wooden Plank Decking Materials (PBR)
-        const woodPBR = PBRTextureGenerator.getWoodWallSet();
-        const timberDeckMat = new THREE.MeshStandardMaterial({ color: 0x6e5238, roughness: 0.80, metalness: 0.04, envMapIntensity: 0.62, ...(woodPBR.normalMap ? { normalMap: woodPBR.normalMap } : {}) });
-        const timberRampMat = new THREE.MeshStandardMaterial({ color: 0x4a3725, roughness: 0.84, metalness: 0.04, envMapIntensity: 0.58, ...(woodPBR.normalMap ? { normalMap: woodPBR.normalMap } : {}) });
-        const warnYellowMat = new THREE.MeshStandardMaterial({ color: 0xdfb418, roughness: 0.46, metalness: 0.08, envMapIntensity: 0.78 });
-        const warnBlackMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.58, metalness: 0.10, envMapIntensity: 0.72 });
+        const stoneRoadMat = RoadTextureManager.getStoneRoadMaterial();
+        const stoneShoulderMat = RoadTextureManager.getStoneShoulderMaterial();
+        const stoneKerbMat = RoadTextureManager.getStoneKerbMaterial();
+        const gutterMat = RoadTextureManager.getGutterChannelMaterial();
+        const dirtRoadMat = RoadTextureManager.getDirtRoadMaterial();
+        const dirtShoulderMat = RoadTextureManager.getDirtShoulderMaterial();
 
-        // Center timber planks flush with iron rails (between rails, gauge = 0.44)
-        const centerPlanks = new THREE.Mesh(
-            new THREE.BoxGeometry(0.36, 0.045, s * 0.58),
-            timberDeckMat
-        );
-        centerPlanks.position.set(0, 0.05, 0);
-        centerPlanks.receiveShadow = true;
-        crossingGroup.add(centerPlanks);
+        const addBox = (w, h, d, mat, x, y, z, shadow = false) => {
+            const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+            m.position.set(x, y, z);
+            m.castShadow = shadow;
+            m.receiveShadow = true;
+            crossingGroup.add(m);
+            return m;
+        };
 
-        // Outer timber approach ramps (flanking outside left & right rails)
-        const leftRamp = new THREE.Mesh(
-            new THREE.BoxGeometry(0.26, 0.038, s * 0.58),
-            timberRampMat
-        );
-        leftRamp.position.set(-0.35, 0.045, 0);
-        leftRamp.receiveShadow = true;
-        crossingGroup.add(leftRamp);
-
-        const rightRamp = new THREE.Mesh(
-            new THREE.BoxGeometry(0.26, 0.038, s * 0.58),
-            timberRampMat
-        );
-        rightRamp.position.set(0.35, 0.045, 0);
-        rightRamp.receiveShadow = true;
-        crossingGroup.add(rightRamp);
-
-        // 2 Wooden Warning Posts (Fumikiri) with black-and-yellow crossbuck signs
-        const postOffsets = [
-            { x: 0.58, z: 0.58, rot: 0 },
-            { x: -0.58, z: -0.58, rot: Math.PI }
+        // 1. Continuous road aprons & shoulders running flush from tile borders right up to outer rail edges
+        const apronLen = 0.76; // Covers [0.245 .. 1.005]
+        const apronOffset = 0.625;
+        const halves = [
+            { sign: -1, tier: negTier },
+            { sign: 1, tier: posTier }
         ];
+        for (const half of halves) {
+            const isStone = half.tier === 2;
+            const cx = half.sign * apronOffset;
+            addBox(apronLen, 0.020, shoulderWidth, isStone ? stoneShoulderMat : dirtShoulderMat, cx, 0.015, 0);
+            addBox(
+                apronLen,
+                isStone ? 0.060 : 0.050,
+                trackWidth,
+                isStone ? stoneRoadMat : dirtRoadMat,
+                cx,
+                isStone ? 0.040 : 0.035,
+                0
+            );
+            if (isStone) {
+                const kerbLen = 0.755;
+                const kx = half.sign * 0.628;
+                addBox(kerbLen, 0.070, 0.040, stoneKerbMat, kx, 0.045, trackWidth / 2, true);
+                addBox(kerbLen, 0.070, 0.040, stoneKerbMat, kx, 0.045, -trackWidth / 2, true);
+                addBox(0.74, 0.016, 0.048, gutterMat, half.sign * 0.635, 0.022, trackWidth / 2 + 0.065);
+                addBox(0.74, 0.016, 0.048, gutterMat, half.sign * 0.635, 0.022, -(trackWidth / 2 + 0.065));
+            }
+        }
 
-        postOffsets.forEach(p => {
+        // 2. Under-rail roadbed fill across track zone [-0.25 .. +0.25] so no grass shows beneath rails
+        const centerIsStone = centerTier === 2;
+        addBox(0.50, 0.020, shoulderWidth, centerIsStone ? stoneShoulderMat : dirtShoulderMat, 0, 0.015, 0);
+        addBox(
+            0.495,
+            centerIsStone ? 0.052 : 0.044,
+            trackWidth,
+            centerIsStone ? stoneRoadMat : dirtRoadMat,
+            0,
+            centerIsStone ? 0.036 : 0.032,
+            0
+        );
+
+        // 3. Recessed timber flangeway deck planks between rails & outer cheek sills (steel rails rise above at y=0.090)
+        const plankLenZ = trackWidth - 0.04;
+        addBox(0.142, 0.026, plankLenZ, mats.timberDeck, -0.078, 0.061, 0, true);
+        addBox(0.142, 0.026, plankLenZ, mats.timberDeck, 0.078, 0.061, 0, true);
+        addBox(0.034, 0.022, plankLenZ, mats.timberRamp, -0.260, 0.061, 0);
+        addBox(0.034, 0.022, plankLenZ, mats.timberRamp, 0.260, 0.061, 0);
+
+        // 4. Striped Meiji Fumikiri Crossbuck Warning Posts on outer roadside corners
+        const postGeo = new THREE.BoxGeometry(0.045, 0.14, 0.045);
+        const bladeGeo = new THREE.BoxGeometry(0.28, 0.04, 0.02);
+        const capGeo = new THREE.BoxGeometry(0.06, 0.03, 0.06);
+
+        for (const [px, pz] of [[-0.64, -0.72], [0.64, 0.72]]) {
             const postGroup = new THREE.Group();
-            postGroup.position.set(p.x, 0, p.z);
+            postGroup.position.set(px, 0, pz);
 
-            // Upright cedar post
-            const postGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.90, 6);
-            const post = new THREE.Mesh(postGeo, timberRampMat);
-            post.position.y = 0.45;
-            post.castShadow = true;
-            postGroup.add(post);
+            for (let band = 0; band < 4; band++) {
+                const seg = new THREE.Mesh(postGeo, band % 2 === 0 ? mats.warnYellow : mats.warnBlack);
+                seg.position.y = 0.07 + band * 0.14;
+                seg.castShadow = true;
+                postGroup.add(seg);
+            }
 
-            // Crossbuck warning blades (X shape)
-            const bladeGeo = new THREE.BoxGeometry(0.32, 0.04, 0.015);
-            const bYellow = new THREE.Mesh(bladeGeo, warnYellowMat);
-            bYellow.position.y = 0.82;
-            bYellow.rotation.z = 0.70;
-            postGroup.add(bYellow);
+            const b1 = new THREE.Mesh(bladeGeo, mats.warnYellow);
+            b1.position.set(0, 0.56, 0.03);
+            b1.rotation.z = Math.PI / 4;
+            b1.castShadow = true;
+            postGroup.add(b1);
 
-            const bBlack = new THREE.Mesh(bladeGeo, warnBlackMat);
-            bBlack.position.y = 0.82;
-            bBlack.rotation.z = -0.70;
-            postGroup.add(bBlack);
+            const b2 = new THREE.Mesh(bladeGeo, mats.warnBlack);
+            b2.position.set(0, 0.56, -0.02);
+            b2.rotation.z = -Math.PI / 4;
+            b2.castShadow = true;
+            postGroup.add(b2);
 
-            postGroup.rotation.y = p.rot;
+            const cap = new THREE.Mesh(capGeo, mats.warnBlack);
+            cap.position.y = 0.64;
+            postGroup.add(cap);
+
             crossingGroup.add(postGroup);
-        });
+        }
 
         if (!isRailNS) {
             crossingGroup.rotation.y = Math.PI / 2;
         }
-
         group.add(crossingGroup);
         return group;
     }
