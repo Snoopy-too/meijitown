@@ -6,6 +6,7 @@ import { CONFIG } from '../config.js';
 import { MaterialLibrary } from '../renderer/materialLibrary.js';
 import { MeijiArchitectureKit as Kit } from './meijiArchitectureKit.js';
 import { createExhibitionPavilionMesh } from './pavilionMesh.js';
+import { createMeijiSchoolMesh } from './schoolMesh.js';
 
 export class CivicBuildingMeshes {
     // 1. Fire Watchtower (Hinomi-yagura / 火の見櫓)
@@ -271,55 +272,9 @@ export class CivicBuildingMeshes {
         return group;
     }
 
-    // 7. 2x2 Giyōfū Primary School (Shōgakkō / 小学校 — Kaichi Style)
-    static createSchoolMesh(tile, facingAngle = 0) {
-        const group = new THREE.Group();
-        const sub = new THREE.Group();
-        const s = CONFIG.TILE_SIZE;
-        const plasterMat = MaterialLibrary.get('plasterWhite');
-        const woodMat = MaterialLibrary.get('woodDark');
-        const trimMat = MaterialLibrary.get('stoneTrim');
-        const roofMat = MaterialLibrary.get('slateRoof');
-        const glassMat = MaterialLibrary.get('glassWindow');
-
-        // Symmetrical 2-story Giyōfū landmark
-        Kit.addStoneFoundation(sub, s * 1.70, s * 1.40, 0.16);
-
-        // Ground floor: White plaster with dark timber framing
-        Kit.addPart(sub, new THREE.BoxGeometry(s * 1.60, 0.88, s * 1.30), plasterMat, [0, 0.60, 0], true, null, true);
-        Kit.addCornerPillars(sub, s * 1.62, s * 1.32, 0.88, 0.60, 0, 0.10, woodMat);
-
-        // String course dividing floors
-        Kit.addPart(sub, new THREE.BoxGeometry(s * 1.64, 0.08, s * 1.34), trimMat, [0, 1.08, 0], true);
-
-        // Second floor: White plaster with timber corner pilasters
-        Kit.addPart(sub, new THREE.BoxGeometry(s * 1.56, 0.84, s * 1.26), plasterMat, [0, 1.54, 0], true, null, true);
-        Kit.addCornerPillars(sub, s * 1.58, s * 1.28, 0.84, 1.54, 0, 0.10, woodMat);
-
-        // Arched Western sash windows across facade
-        for (const wx of [-0.60 * s, -0.32 * s, 0.32 * s, 0.60 * s]) {
-            Kit.addPart(sub, new THREE.BoxGeometry(0.24, 0.44, 0.03), glassMat, [wx, 0.58, s * 0.655], false, null, false, 'Upper_Window');
-            Kit.addPart(sub, new THREE.BoxGeometry(0.24, 0.44, 0.03), glassMat, [wx, 1.52, s * 0.635], false, null, false, 'Upper_Window');
-        }
-
-        // Central entrance portico & balcony
-        Kit.addPart(sub, new THREE.BoxGeometry(0.48 * s, 0.06, 0.25 * s), trimMat, [0, 1.08, 0.72 * s], true);
-        Kit.addPart(sub, new THREE.CylinderGeometry(0.04, 0.05, 0.88, 8), plasterMat, [-0.20 * s, 0.60, 0.72 * s], true);
-        Kit.addPart(sub, new THREE.CylinderGeometry(0.04, 0.05, 0.88, 8), plasterMat, [0.20 * s, 0.60, 0.72 * s], true);
-
-        // Main hipped slate roof
-        const roofGeo = new THREE.ConeGeometry(s * 1.20, 0.75, 4);
-        roofGeo.rotateY(Math.PI / 4);
-        Kit.addPart(sub, roofGeo, roofMat, [0, 2.34, 0], true);
-
-        // Iconic octagonal rooftop belfry / clock cupola
-        Kit.addPart(sub, new THREE.CylinderGeometry(0.32, 0.34, 0.45, 8), plasterMat, [0, 2.92, 0], true);
-        Kit.addPart(sub, new THREE.ConeGeometry(0.38, 0.40, 8), roofMat, [0, 3.35, 0], true);
-        Kit.addPart(sub, new THREE.CylinderGeometry(0.015, 0.015, 0.35, 4), MaterialLibrary.get('goldLeaf'), [0, 3.65, 0]); // Spire
-
-        sub.rotation.y = facingAngle;
-        group.add(sub);
-        return group;
+    // 7. 3x2 Giyōfū Primary School (Shōgakkō / 小学校 — Rectangular Schoolhouse & Yard)
+    static createSchoolMesh(tile, facingAngle = 0, footprintW = 3, footprintH = 2) {
+        return createMeijiSchoolMesh(tile, facingAngle, footprintW, footprintH);
     }
 
     // 8. Telegraph Office (Denshin-kyoku / 電信局)

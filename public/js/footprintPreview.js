@@ -4,7 +4,7 @@
 import { CONFIG } from './config.js';
 
 export const TOOL_FOOTPRINTS = {
-    [CONFIG.TOOLS.SCHOOL]: { w: 2, h: 2 },
+    [CONFIG.TOOLS.SCHOOL]: { w: 3, h: 2 },
     [CONFIG.TOOLS.HARBOR_PIER]: { w: 2, h: 2 },
     [CONFIG.TOOLS.POWER_PLANT]: { w: 2, h: 2 },
     [CONFIG.TOOLS.WATERWORKS]: { w: 2, h: 1 },

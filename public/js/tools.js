@@ -241,7 +241,7 @@ export class ToolController {
 
         // Multi-tile ploppables check
         if (this.currentTool === CONFIG.TOOLS.SCHOOL) {
-            return (this.state.schoolSystem?.canPlaceSchool(x, y) ?? true) && this.state.treasury >= (CONFIG.COSTS.SCHOOL || 280);
+            return (this.state.schoolSystem?.canPlaceSchool(x, y, this.placementRotation) ?? true) && this.state.treasury >= (CONFIG.COSTS.SCHOOL || 280);
         }
         if (this.currentTool === CONFIG.TOOLS.HARBOR_PIER) {
             const hasTech = !this.state.milestones || this.state.milestones.currentTier >= 3 || (this.state.population && this.state.population >= 300);

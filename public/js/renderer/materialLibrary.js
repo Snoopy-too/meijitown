@@ -120,6 +120,53 @@ export class MaterialLibrary {
             return tex;
         };
 
+        const lazyCreamClapboard = () => {
+            const tex = this.getProceduralTexture('schoolClapboard', (ctx, w, h) => {
+                ctx.fillStyle = '#efe7d2';
+                ctx.fillRect(0, 0, w, h);
+                for (let y = 0; y < h; y += 8) {
+                    ctx.fillStyle = '#c4b89d';
+                    ctx.fillRect(0, y, w, 1);
+                    ctx.fillStyle = '#f8f2e4';
+                    ctx.fillRect(0, y + 1, w, 2);
+                }
+            }, 128, 128);
+            if (tex && tex.repeat) tex.repeat.set(2, 2);
+            return tex;
+        };
+
+        const lazySchoolDirt = () => {
+            const tex = this.getProceduralTexture('schoolYardDirt', (ctx, w, h) => {
+                ctx.fillStyle = '#7e6346';
+                ctx.fillRect(0, 0, w, h);
+                for (let i = 0; i < 320; i++) {
+                    const px = (i * 43 + (i % 5) * 11) % w;
+                    const py = (i * 67 + (i % 9) * 17) % h;
+                    ctx.fillStyle = (i % 3 === 0) ? '#6f5539' : ((i % 3 === 1) ? '#8d7253' : '#745a3e');
+                    ctx.fillRect(px, py, 3 + (i % 4), 2 + (i % 3));
+                }
+            }, 128, 128);
+            if (tex && tex.repeat) tex.repeat.set(4, 4);
+            return tex;
+        };
+
+        const lazySchoolPlaque = () => this.getProceduralTexture('schoolPlaque', (ctx, w, h) => {
+            ctx.fillStyle = '#181c24';
+            ctx.fillRect(0, 0, w, h);
+            ctx.fillStyle = '#c2a65a';
+            ctx.fillRect(4, 4, w - 8, 3);
+            ctx.fillRect(4, h - 7, w - 8, 3);
+            ctx.fillRect(4, 4, 3, h - 8);
+            ctx.fillRect(w - 7, 4, 3, h - 8);
+            if (typeof ctx.fillText === 'function') {
+                ctx.fillStyle = '#f2e4ba';
+                ctx.font = 'bold 28px serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('小学校', w / 2, h / 2 + 1);
+            }
+        }, 128, 64);
+
         const kawaraPBR = PBRTextureGenerator.getKawaraSet();
         const brickPBR = PBRTextureGenerator.getBrickSet('red');
         const buffBrickPBR = PBRTextureGenerator.getBrickSet('buff');
@@ -161,6 +208,9 @@ export class MaterialLibrary {
             plasterWhite: new THREE.MeshStandardMaterial({ name: 'M_Plaster', color: 0xffffff, roughness: 0.85, metalness: 0.02, envMapIntensity: 0.62, ...pbrOpts(plasterPBR, lazyPlaster, 0.32, 0.32) }),
             plasterWarm: new THREE.MeshStandardMaterial({ name: 'M_WarmPlaster', color: 0xebe1cf, roughness: 0.84, metalness: 0.02, envMapIntensity: 0.62, ...pbrOpts(plasterPBR, lazyPlaster, 0.32, 0.32) }),
             plasterUmber: new THREE.MeshStandardMaterial({ name: 'M_UmberPlaster', color: 0xcab38b, roughness: 0.88, metalness: 0.02, envMapIntensity: 0.58, ...pbrOpts(plasterPBR, lazyPlaster, 0.36, 0.36) }),
+            schoolClapboard: new THREE.MeshStandardMaterial({ name: 'M_SchoolClapboard', color: 0xffffff, map: lazyCreamClapboard(), roughness: 0.80, metalness: 0.02, envMapIntensity: 0.62, ...pbrOpts({ map: null, normalMap: woodPBR.normalMap, roughnessMap: woodPBR.roughnessMap }, null, 0.32, 0.32) }),
+            schoolPlaque: new THREE.MeshStandardMaterial({ name: 'M_SchoolPlaque', color: 0xffffff, map: lazySchoolPlaque(), roughness: 0.58, metalness: 0.08, envMapIntensity: 0.72 }),
+            schoolYardDirt: new THREE.MeshStandardMaterial({ name: 'M_SchoolYardDirt', color: 0xffffff, map: lazySchoolDirt(), roughness: 0.96, metalness: 0.0, envMapIntensity: 0.45 }),
             stuccoOchre: new THREE.MeshStandardMaterial({ name: 'M_StuccoOchre', color: 0xd8c7a6, roughness: 0.84, metalness: 0.02, envMapIntensity: 0.62, ...pbrOpts(plasterPBR, lazyPlaster, 0.34, 0.34) }),
             stuccoSage: new THREE.MeshStandardMaterial({ name: 'M_StuccoSage', color: 0xbcc2b2, roughness: 0.84, metalness: 0.02, envMapIntensity: 0.62, ...pbrOpts(plasterPBR, lazyPlaster, 0.34, 0.34) }),
             plasterBlack: new THREE.MeshStandardMaterial({ name: 'M_BlackPlaster', color: 0x262930, roughness: 0.64, metalness: 0.08, envMapIntensity: 0.78 }),
@@ -255,7 +305,7 @@ export class MaterialLibrary {
             mat.userData = { isSharedLibraryMaterial: true };
         }
 
-        for (const key of ['woodDark', 'woodMedium', 'woodCharred', 'woodLight', 'woodHinoki', 'plasterWhite', 'plasterWarm', 'plasterUmber', 'stuccoOchre', 'stuccoSage', 'plasterBlack', 'namakoWall', 'redBrick', 'buffBrick', 'clinkerBrick', 'ashlarStone', 'pavilionLimestone', 'stoneGranite', 'stoneTrim', 'toriiVermilion']) {
+        for (const key of ['woodDark', 'woodMedium', 'woodCharred', 'woodLight', 'woodHinoki', 'plasterWhite', 'plasterWarm', 'plasterUmber', 'schoolClapboard', 'stuccoOchre', 'stuccoSage', 'plasterBlack', 'namakoWall', 'redBrick', 'buffBrick', 'clinkerBrick', 'ashlarStone', 'pavilionLimestone', 'stoneGranite', 'stoneTrim', 'toriiVermilion']) {
             WeatheringShaderSystem.enhanceBuildingMaterial(this._materials[key], { isRoof: false, aoHeight: 0.42, variation: 0.075 });
         }
         for (const key of ['kawaraRoof', 'kawaraRusset', 'copperRoof', 'slateRoof']) {

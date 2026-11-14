@@ -1,7 +1,8 @@
 // Project Meiji - Primary School System & Education Engine (schoolSystem.js)
-// ponytail: 2x2 footprint placement, 8-tile radius coverage & Tier 3 modernization boosts
+// ponytail: 3x2 / 2x3 compound placement, 8-tile radius coverage & Tier 3 modernization boosts
 
 import { CONFIG } from './config.js';
+import { getFootprint, getFootprintTiles } from './footprintPreview.js';
 import { SOUND } from './fx.js';
 
 export class SchoolSystem {
@@ -10,26 +11,25 @@ export class SchoolSystem {
         this.state = stateManager;
     }
 
-    // Check if 2x2 lot is completely within grid bounds and clear of obstruction
-    canPlaceSchool(originX, originY) {
-        for (let dy = 0; dy < 2; dy++) {
-            for (let dx = 0; dx < 2; dx++) {
-                const tx = originX + dx;
-                const ty = originY + dy;
-                if (!this.grid.isValidCoord(tx, ty)) return false;
-                const tile = this.grid.getTile(tx, ty);
-                if (tile.occupied || tile.type === CONFIG.TYPES.ROAD || tile.type === CONFIG.TYPES.SERVICE || tile.type === CONFIG.TYPES.RAIL || tile.type === CONFIG.TYPES.CANAL) {
-                    return false;
-                }
+    // Check if 3x2 (or rotated 2x3) lot is within grid bounds and clear of obstruction
+    canPlaceSchool(originX, originY, rotation = 0) {
+        const tiles = getFootprintTiles(originX, originY, CONFIG.TOOLS.SCHOOL, rotation);
+        for (const { x: tx, y: ty } of tiles) {
+            if (!this.grid.isValidCoord(tx, ty)) return false;
+            const tile = this.grid.getTile(tx, ty);
+            if (!tile || tile.occupied || tile.type === CONFIG.TYPES.ROAD || tile.type === CONFIG.TYPES.SERVICE ||
+                tile.type === CONFIG.TYPES.RAIL || tile.type === CONFIG.TYPES.CANAL ||
+                tile.type === CONFIG.TYPES.PARK || tile.type === CONFIG.TYPES.AGRICULTURE) {
+                return false;
             }
         }
         return true;
     }
 
-    // Place 2x2 Primary School
+    // Place 3x2 (or rotated 2x3) Primary School compound with yard
     placeSchool(originX, originY, rotation = 0) {
-        if (!this.canPlaceSchool(originX, originY)) {
-            this.state.showToast("Cannot build Primary School: 2×2 lot obstructed or out of bounds!", true);
+        if (!this.canPlaceSchool(originX, originY, rotation)) {
+            this.state.showToast("Cannot build Primary School: 3×2 lot obstructed or out of bounds!", true);
             return false;
         }
 
@@ -39,9 +39,9 @@ export class SchoolSystem {
             return false;
         }
 
-        // Allocate the 4 tiles: (originX, originY) is origin, other 3 are child tiles
-        for (let dy = 0; dy < 2; dy++) {
-            for (let dx = 0; dx < 2; dx++) {
+        const { w, h } = getFootprint(CONFIG.TOOLS.SCHOOL, rotation);
+        for (let dy = 0; dy < h; dy++) {
+            for (let dx = 0; dx < w; dx++) {
                 const tx = originX + dx;
                 const ty = originY + dy;
                 const isOrigin = (dx === 0 && dy === 0);
@@ -50,10 +50,13 @@ export class SchoolSystem {
                 const tile = this.grid.getTile(tx, ty);
                 tile.serviceType = CONFIG.SERVICES.SCHOOL;
                 tile.isOrigin = isOrigin;
-                tile.multiSize = 2;
+                tile.multiSize = w * h;
+                tile.footprintW = w;
+                tile.footprintH = h;
                 tile.originX = originX;
                 tile.originY = originY;
                 tile.rotation = rotation;
+                tile.manualRotation = true;
                 this.grid.notifyChange(tx, ty);
             }
         }
@@ -63,20 +66,26 @@ export class SchoolSystem {
         return true;
     }
 
-    // Remove all 4 tiles of a 2x2 school if any part is bulldozed
+    // Remove all tiles of a school compound (3x2, 2x3, or legacy 2x2) if any sub-tile is bulldozed
     clearSchoolAt(x, y) {
         const tile = this.grid.getTile(x, y);
         if (!tile || tile.serviceType !== CONFIG.SERVICES.SCHOOL) return false;
 
-        const ox = tile.originX !== undefined ? tile.originX : (tile.isOrigin ? x : x);
-        const oy = tile.originY !== undefined ? tile.originY : (tile.isOrigin ? y : y);
+        const ox = tile.originX !== undefined ? tile.originX : x;
+        const oy = tile.originY !== undefined ? tile.originY : y;
+        const originTile = this.grid.getTile(ox, oy);
+        const w = originTile?.footprintW || tile.footprintW || 2;
+        const h = originTile?.footprintH || tile.footprintH || 2;
 
-        for (let dy = 0; dy < 2; dy++) {
-            for (let dx = 0; dx < 2; dx++) {
+        for (let dy = 0; dy < h; dy++) {
+            for (let dx = 0; dx < w; dx++) {
                 const tx = ox + dx;
                 const ty = oy + dy;
                 if (this.grid.isValidCoord(tx, ty)) {
-                    this.grid.clearTile(tx, ty);
+                    const sub = this.grid.getTile(tx, ty);
+                    if (sub && sub.serviceType === CONFIG.SERVICES.SCHOOL) {
+                        this.grid.clearTile(tx, ty);
+                    }
                 }
             }
         }
@@ -90,8 +99,11 @@ export class SchoolSystem {
             if (tile.type === CONFIG.TYPES.SERVICE && tile.serviceType === CONFIG.SERVICES.SCHOOL && tile.isOrigin) {
                 const boost = (this.state.telegraph && tile.isTelegraphConnected) ? (CONFIG.SIMULATION.CIVIC_TELEGRAPH_BOOST || 1.30) : 1.0;
                 const effectiveRadius = baseRadius * boost;
-                // School center is at (tile.x + 0.5, tile.y + 0.5)
-                const dist = Math.hypot((tile.x + 0.5) - x, (tile.y + 0.5) - y);
+                const w = tile.footprintW || (tile.multiSize === 6 ? ((tile.rotation % 2 === 1) ? 2 : 3) : 2);
+                const h = tile.footprintH || (tile.multiSize === 6 ? ((tile.rotation % 2 === 1) ? 3 : 2) : 2);
+                const cx = tile.x + (w - 1) / 2;
+                const cy = tile.y + (h - 1) / 2;
+                const dist = Math.hypot(cx - x, cy - y);
                 if (dist <= effectiveRadius + 0.5) {
                     return true;
                 }

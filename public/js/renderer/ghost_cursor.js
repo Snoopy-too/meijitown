@@ -155,12 +155,12 @@ export class GhostCursorManager {
             } else if (w >= 3 && h >= 3) {
                 this.ghostMesh.scale.set(2.8, 1.8, 2.8);
                 this.ghostMesh.position.set(centerPos.x, 0.95, centerPos.z);
-            } else if (w >= 2 && h >= 2) {
-                this.ghostMesh.scale.set(1.9, toolType === CONFIG.TOOLS.HARBOR_PIER ? 0.6 : 1.4, 1.9);
-                this.ghostMesh.position.set(centerPos.x, 0.65, centerPos.z);
             } else if (w >= 2 || h >= 2) {
-                this.ghostMesh.scale.set(w * 0.9, 0.8, h * 0.9);
-                this.ghostMesh.position.set(centerPos.x, 0.45, centerPos.z);
+                const base = getFootprint(toolType, 0);
+                const sy = toolType === CONFIG.TOOLS.HARBOR_PIER ? 0.6 : (toolType === CONFIG.TOOLS.POWER_PLANT ? 1.4 : (toolType === CONFIG.TOOLS.SCHOOL ? 1.15 : 0.8));
+                const py = toolType === CONFIG.TOOLS.SCHOOL ? 0.62 : ((w >= 2 && h >= 2) ? 0.65 : 0.45);
+                this.ghostMesh.scale.set(base.w * 0.9, sy, base.h * 0.9);
+                this.ghostMesh.position.set(centerPos.x, py, centerPos.z);
             } else {
                 this.ghostMesh.scale.set(0.9, 1.2, 0.9);
                 this.ghostMesh.position.set(centerPos.x, 0.55, centerPos.z);

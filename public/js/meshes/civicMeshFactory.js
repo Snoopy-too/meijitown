@@ -13,8 +13,8 @@ export class CivicMeshFactory {
         return CivicBuildingMeshes.createKobanMesh(tile, facingAngle);
     }
 
-    static createSchoolMesh(tile, facingAngle = 0) {
-        return CivicBuildingMeshes.createSchoolMesh(tile, facingAngle);
+    static createSchoolMesh(tile, facingAngle = 0, footprintW = 3, footprintH = 2) {
+        return CivicBuildingMeshes.createSchoolMesh(tile, facingAngle, footprintW, footprintH);
     }
 
     static createTelegraphOfficeMesh(tile, facingAngle = 0) {
@@ -57,12 +57,18 @@ export class CivicMeshFactory {
         if (st === CONFIG.SERVICES.TRAIN_DEPOT) return InfrastructureMeshes.createTrainDepotMesh(tile, facingAngle);
         if (st === (CONFIG.SERVICES.SUIMON || 'suimon')) return this.createSuimonMesh(tile, facingAngle);
 
-        if (st === CONFIG.SERVICES.SCHOOL || st === CONFIG.SERVICES.HARBOR_PIER) {
+        if (st === CONFIG.SERVICES.SCHOOL) {
             if (!tile.isOrigin) return null;
-            const isPier = st === CONFIG.SERVICES.HARBOR_PIER;
-            const mesh = isPier
-                ? this.createHarborPierMesh(tile, facingAngle)
-                : this.createSchoolMesh(tile, facingAngle);
+            const fw = tile.footprintW || (tile.multiSize === 6 ? ((tile.rotation % 2 === 1) ? 2 : 3) : 2);
+            const fh = tile.footprintH || (tile.multiSize === 6 ? ((tile.rotation % 2 === 1) ? 3 : 2) : 2);
+            const mesh = this.createSchoolMesh(tile, facingAngle, fw, fh);
+            mesh.position.set(((fw - 1) / 2) * s, 0, ((fh - 1) / 2) * s);
+            return mesh;
+        }
+
+        if (st === CONFIG.SERVICES.HARBOR_PIER) {
+            if (!tile.isOrigin) return null;
+            const mesh = this.createHarborPierMesh(tile, facingAngle);
             mesh.position.set(s / 2, 0, s / 2);
             return mesh;
         }

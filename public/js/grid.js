@@ -103,6 +103,8 @@ export class CityGridModel {
 
                     if (item.isOrigin !== undefined) tileObj.isOrigin = Boolean(item.isOrigin);
                     if (item.multiSize !== undefined && item.multiSize !== null) tileObj.multiSize = parseInt(item.multiSize, 10);
+                    if (item.footprintW !== undefined && item.footprintW !== null) tileObj.footprintW = parseInt(item.footprintW, 10);
+                    if (item.footprintH !== undefined && item.footprintH !== null) tileObj.footprintH = parseInt(item.footprintH, 10);
                     if (item.originX !== undefined && item.originX !== null) tileObj.originX = parseInt(item.originX, 10);
                     if (item.originY !== undefined && item.originY !== null) tileObj.originY = parseInt(item.originY, 10);
                     if (item.constructionMonths !== undefined) tileObj.constructionMonths = parseInt(item.constructionMonths || 0, 10);
@@ -118,11 +120,23 @@ export class CityGridModel {
         // Self-heal multi-tile buildings (Primary School, Harbor Pier, Power Plant, Waterworks, Pavilion)
         // in case a legacy save stripped isOrigin / originX / originY
         const multiFootprints = {
-            [CONFIG.SERVICES.SCHOOL]: { w: 2, h: 2, size: 2 },
+            [CONFIG.SERVICES.SCHOOL]: { w: 3, h: 2, size: 6 },
             [CONFIG.SERVICES.HARBOR_PIER]: { w: 2, h: 2, size: 2 },
             [CONFIG.SERVICES.POWER_PLANT]: { w: 2, h: 2, size: 2 },
             [CONFIG.SERVICES.WATERWORKS]: { w: 2, h: 1, size: 2 },
             [CONFIG.SERVICES.PAVILION]: { w: 3, h: 3, size: 3 },
+        };
+        const resolveFootprint = (x, y, t) => {
+            if (t.serviceType !== CONFIG.SERVICES.SCHOOL) return multiFootprints[t.serviceType];
+            if (t.footprintW && t.footprintH) return { w: t.footprintW, h: t.footprintH, size: t.footprintW * t.footprintH };
+            const isSameSchool = (sx, sy) => {
+                const n = this.tiles.get(this.getKey(sx, sy));
+                return n && n.serviceType === CONFIG.SERVICES.SCHOOL && !healedVisited.has(this.getKey(sx, sy)) &&
+                    (t.isOrigin === undefined || (n.originX === x && n.originY === y));
+            };
+            if (isSameSchool(x + 2, y)) return { w: 3, h: 2, size: 6 };
+            if (isSameSchool(x, y + 2)) return { w: 2, h: 3, size: 6 };
+            return { w: 2, h: 2, size: 2 };
         };
         const healedVisited = new Set();
         for (let y = 0; y < this.height; y++) {
@@ -134,7 +148,7 @@ export class CityGridModel {
 
                 // If already has explicit origin metadata, mark its footprint visited
                 if (t.isOrigin === true && t.originX !== undefined && t.originY !== undefined) {
-                    const fp = multiFootprints[t.serviceType];
+                    const fp = resolveFootprint(x, y, t);
                     for (let dy = 0; dy < fp.h; dy++) {
                         for (let dx = 0; dx < fp.w; dx++) {
                             const sub = this.tiles.get(this.getKey(x + dx, y + dy));
@@ -143,6 +157,10 @@ export class CityGridModel {
                                 sub.originX = x;
                                 sub.originY = y;
                                 sub.multiSize = fp.size;
+                                if (t.serviceType === CONFIG.SERVICES.SCHOOL) {
+                                    sub.footprintW = fp.w;
+                                    sub.footprintH = fp.h;
+                                }
                                 healedVisited.add(this.getKey(x + dx, y + dy));
                             }
                         }
@@ -151,11 +169,15 @@ export class CityGridModel {
                 }
 
                 if (t.isOrigin === undefined) {
-                    const fp = multiFootprints[t.serviceType];
+                    const fp = resolveFootprint(x, y, t);
                     t.isOrigin = true;
                     t.originX = x;
                     t.originY = y;
                     t.multiSize = fp.size;
+                    if (t.serviceType === CONFIG.SERVICES.SCHOOL) {
+                        t.footprintW = fp.w;
+                        t.footprintH = fp.h;
+                    }
                     healedVisited.add(key);
                     for (let dy = 0; dy < fp.h; dy++) {
                         for (let dx = 0; dx < fp.w; dx++) {
@@ -167,6 +189,10 @@ export class CityGridModel {
                                 sub.originX = x;
                                 sub.originY = y;
                                 sub.multiSize = fp.size;
+                                if (t.serviceType === CONFIG.SERVICES.SCHOOL) {
+                                    sub.footprintW = fp.w;
+                                    sub.footprintH = fp.h;
+                                }
                                 healedVisited.add(sk);
                             }
                         }
@@ -202,6 +228,8 @@ export class CityGridModel {
             };
             if (tile.isOrigin !== undefined) exported.isOrigin = Boolean(tile.isOrigin);
             if (tile.multiSize !== undefined && tile.multiSize !== null) exported.multiSize = tile.multiSize;
+            if (tile.footprintW !== undefined && tile.footprintW !== null) exported.footprintW = tile.footprintW;
+            if (tile.footprintH !== undefined && tile.footprintH !== null) exported.footprintH = tile.footprintH;
             if (tile.originX !== undefined && tile.originX !== null) exported.originX = tile.originX;
             if (tile.originY !== undefined && tile.originY !== null) exported.originY = tile.originY;
             if (tile.constructionMonths !== undefined) exported.constructionMonths = tile.constructionMonths;
