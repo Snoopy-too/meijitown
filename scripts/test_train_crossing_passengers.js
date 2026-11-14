@@ -305,4 +305,128 @@ assert(train4.passengerOrigins.length < originsBeforeC, 'Disembarking passengers
 assert(alightingC[0].waypoints.length >= 3, 'Disembarking passengers at Station C must walk onto connected town roads');
 
 console.log('  ✓ Road-connected station walking, boarding disappearance, isolated depot exclusion & alighting verified.');
+
+// ---------------------------------------------------------------------------
+// 5. Return-Trip Turnaround: Engine Always Leads & Faces Travel Direction
+// ---------------------------------------------------------------------------
+console.log('5. Testing return-trip turnaround (engine leading & facing forward both ways, branch U-turns, loop closure)...');
+
+function assertConsistLeadsAndFacesForward(train, prevLoco, prevCoach, label, strictStraight = false) {
+    const minDot = strictStraight ? 0.99 : 0.75;
+    const minLead = strictStraight ? 0.95 : 0.35;
+    const dx = train.mesh.position.x - prevLoco.x;
+    const dz = train.mesh.position.z - prevLoco.z;
+    const moveDist = Math.hypot(dx, dz);
+    const sep = Math.hypot(
+        train.mesh.position.x - train.coachMesh.position.x,
+        train.mesh.position.z - train.coachMesh.position.z
+    );
+    assert(sep > 0.65 && sep <= train.carSpacing + 0.05, `${label}: consist separation collapsed or stretched (${sep.toFixed(3)})`);
+    if (moveDist > 0.005) {
+        const vx = dx / moveDist;
+        const vz = dz / moveDist;
+        // Locomotive nose is local -Z; rotated by rotY gives (-sin(rotY), -cos(rotY))
+        const rotY = train.mesh.rotation.y;
+        const noseX = -Math.sin(rotY);
+        const noseZ = -Math.cos(rotY);
+        const headingDot = vx * noseX + vz * noseZ;
+        assert(headingDot > minDot, `${label}: locomotive facing backward! dot=${headingDot.toFixed(3)}`);
+
+        const leadProj = (train.mesh.position.x - train.coachMesh.position.x) * vx +
+            (train.mesh.position.z - train.coachMesh.position.z) * vz;
+        assert(leadProj > minLead, `${label}: engine side is trailing behind coach! leadProj=${leadProj.toFixed(3)}`);
+    }
+    const cdx = train.coachMesh.position.x - prevCoach.x;
+    const cdz = train.coachMesh.position.z - prevCoach.z;
+    const cMove = Math.hypot(cdx, cdz);
+    if (cMove > 0.005 && cMove < 0.5) {
+        const cRotY = train.coachMesh.rotation.y;
+        const cNoseX = -Math.sin(cRotY);
+        const cNoseZ = -Math.cos(cRotY);
+        const coachDot = (cdx / cMove) * cNoseX + (cdz / cMove) * cNoseZ;
+        assert(coachDot > minDot, `${label}: coach facing wrong direction! coachDot=${coachDot.toFixed(3)}`);
+    }
+}
+
+// 5a. Linear point-to-point route with terminus depots at both ends
+const grid5 = new CityGridModel(16, 16);
+placeDepot(grid5, 2, 6);
+for (let x = 3; x <= 7; x++) {
+    grid5.setTile(x, 6, CONFIG.TYPES.RAIL, null, 1, true, CONFIG.STAGES.BUILT);
+}
+placeDepot(grid5, 8, 6);
+
+const tt5 = new TrainTrafficManager(createMockScene(), grid5, getTileWorldPos);
+tt5.spawnTrain();
+const train5 = tt5.trains[0];
+let sawOutbound = false;
+let sawReturn = false;
+let sawSecondOutbound = false;
+let arrivedAtStartDepot = false;
+
+for (let i = 0; i < 600; i++) {
+    const prevLoco = { x: train5.mesh.position.x, z: train5.mesh.position.z };
+    const prevCoach = { x: train5.coachMesh.position.x, z: train5.coachMesh.position.z };
+    const wasForward = train5.forward;
+    tt5.update(0.05, 1.0);
+    const dx = train5.mesh.position.x - prevLoco.x;
+    // Skip the single turnaround step when comparing frame-to-frame displacement
+    if (train5.forward === wasForward && train5.dwellTimer <= 0 && Math.abs(dx) < 0.5) {
+        assertConsistLeadsAndFacesForward(train5, prevLoco, prevCoach, `Linear frame ${i} (forward=${train5.forward})`, true);
+    }
+    if (train5.forward && !sawReturn && Math.abs(dx) > 0.01) sawOutbound = true;
+    if (!train5.forward && Math.abs(dx) > 0.01) sawReturn = true;
+    if (sawReturn && train5.lastDepotKey === '2,6') arrivedAtStartDepot = true;
+    if (sawReturn && train5.forward && Math.abs(dx) > 0.01) sawSecondOutbound = true;
+}
+assert(sawOutbound, 'Train must complete outbound journey');
+assert(sawReturn, 'Train must execute return journey');
+assert(arrivedAtStartDepot, 'Returning train must reach and dwell at start terminus depot (2,6)');
+assert(sawSecondOutbound, 'Train must turn back around at start terminus for second outbound trip');
+
+// 5b. Branching T-junction U-turn turnaround (no coach collision / trailing engine at branch dead-ends)
+const gridBranch = new CityGridModel(14, 14);
+for (let x = 2; x <= 7; x++) gridBranch.setTile(x, 5, CONFIG.TYPES.RAIL, null, 1, true, CONFIG.STAGES.BUILT);
+gridBranch.setTile(5, 6, CONFIG.TYPES.RAIL, null, 1, true, CONFIG.STAGES.BUILT);
+gridBranch.setTile(5, 7, CONFIG.TYPES.RAIL, null, 1, true, CONFIG.STAGES.BUILT);
+const ttBranch = new TrainTrafficManager(createMockScene(), gridBranch, getTileWorldPos);
+ttBranch.spawnTrain();
+const branchTrain = ttBranch.trains[0];
+let branchReversed = false;
+for (let i = 0; i < 500; i++) {
+    const prevLoco = { x: branchTrain.mesh.position.x, z: branchTrain.mesh.position.z };
+    const prevCoach = { x: branchTrain.coachMesh.position.x, z: branchTrain.coachMesh.position.z };
+    const wasForward = branchTrain.forward;
+    ttBranch.update(0.05, 1.0);
+    assert(isValidRailOrDepotAtWorld(gridBranch, branchTrain.mesh.position.x, branchTrain.mesh.position.z), `Branch frame ${i}: loco left track`);
+    assert(isValidRailOrDepotAtWorld(gridBranch, branchTrain.coachMesh.position.x, branchTrain.coachMesh.position.z), `Branch frame ${i}: coach left track`);
+    const step = Math.hypot(branchTrain.mesh.position.x - prevLoco.x, branchTrain.mesh.position.z - prevLoco.z);
+    if (branchTrain.forward === wasForward && step < 0.5) {
+        assertConsistLeadsAndFacesForward(branchTrain, prevLoco, prevCoach, `Branch frame ${i} (forward=${branchTrain.forward})`);
+    }
+    if (!branchTrain.forward) branchReversed = true;
+}
+assert(branchReversed, 'Branch train must traverse branches and reverse cleanly');
+
+// 5c. Closing a returning linear track into a loop must re-enable forward loop traversal
+const gridLoopClose = new CityGridModel(14, 14);
+for (let x = 3; x <= 7; x++) gridLoopClose.setTile(x, 4, CONFIG.TYPES.RAIL, null, 1, true, CONFIG.STAGES.BUILT);
+const ttLoopClose = new TrainTrafficManager(createMockScene(), gridLoopClose, getTileWorldPos);
+ttLoopClose.spawnTrain();
+const loopTrain = ttLoopClose.trains[0];
+for (let i = 0; i < 120 && loopTrain.forward; i++) ttLoopClose.update(0.05, 1.0);
+assert.strictEqual(loopTrain.forward, false, 'Precondition: train must be on return leg before closing loop');
+for (let x = 3; x <= 7; x++) gridLoopClose.setTile(x, 6, CONFIG.TYPES.RAIL, null, 1, true, CONFIG.STAGES.BUILT);
+gridLoopClose.setTile(3, 5, CONFIG.TYPES.RAIL, null, 1, true, CONFIG.STAGES.BUILT);
+gridLoopClose.setTile(7, 5, CONFIG.TYPES.RAIL, null, 1, true, CONFIG.STAGES.BUILT);
+ttLoopClose.update(0.05, 1.0);
+assert.strictEqual(loopTrain.isLoop, true, 'Track must be recognized as closed loop');
+assert.strictEqual(loopTrain.forward, true, 'Loop train must normalize forward=true');
+for (let i = 0; i < 120; i++) {
+    const prevLoco = { x: loopTrain.mesh.position.x, z: loopTrain.mesh.position.z };
+    const prevCoach = { x: loopTrain.coachMesh.position.x, z: loopTrain.coachMesh.position.z };
+    ttLoopClose.update(0.05, 1.0);
+    assertConsistLeadsAndFacesForward(loopTrain, prevLoco, prevCoach, `Closed loop frame ${i}`);
+}
+console.log('  ✓ Outbound, return-trip, branch U-turn & loop-closure turnarounds keep engine leading and facing forward.');
 console.log('\n🎉 ALL TRAIN, CROSSING & STATION PASSENGER TESTS PASSED!');

@@ -166,16 +166,19 @@ export function buildRailRouteData(networkTiles, grid, getTileWorldPos) {
     const { tiles, isLoop } = orderedInfo;
     const n = tiles.length;
     const waypoints = [];
-    const pushWp = (x, z, depot, depotCoord) => {
+    const pushWp = (x, z, depot, depotCoord, uTurn = false) => {
         const last = waypoints[waypoints.length - 1];
         if (last && Math.hypot(last.x - x, last.z - z) < 0.005) {
             if (depot) {
                 last.isDepot = true;
                 last.depotCoord = depotCoord;
             }
+            if (uTurn) {
+                last.isUTurn = true;
+            }
             return;
         }
-        waypoints.push({ x, y: 0.065, z, isDepot: depot, depotCoord: depot ? depotCoord : null });
+        waypoints.push({ x, y: 0.065, z, isDepot: depot, depotCoord: depot ? depotCoord : null, isUTurn: uTurn });
     };
 
     for (let i = 0; i < n; i++) {
@@ -197,7 +200,7 @@ export function buildRailRouteData(networkTiles, grid, getTileWorldPos) {
         const isUTurn = dirIn.x === -dirOut.x && dirIn.y === -dirOut.y;
 
         if (isStraight || isUTurn || (Math.abs(dirIn.x) + Math.abs(dirIn.y) !== 1) || (Math.abs(dirOut.x) + Math.abs(dirOut.y) !== 1)) {
-            pushWp(center.x, center.z, depot, depotCoord);
+            pushWp(center.x, center.z, depot, depotCoord, isUTurn);
         } else {
             const off = 0.52;
             const p0 = { x: center.x - dirIn.x * off, z: center.z - dirIn.y * off };
@@ -220,7 +223,7 @@ export function buildRailRouteData(networkTiles, grid, getTileWorldPos) {
     };
 }
 
-export function sampleRouteAtDistance(metrics, s) {
+export function sampleRouteAtDistance(metrics, s, biasForward = false) {
     const { waypoints, isLoop, segCount, cumDist, segLens, totalLen } = metrics;
     if (totalLen <= 0.001) {
         const w0 = waypoints[0];
@@ -228,7 +231,7 @@ export function sampleRouteAtDistance(metrics, s) {
     }
     const d = isLoop ? ((s % totalLen) + totalLen) % totalLen : Math.max(0, Math.min(totalLen, s));
     let idx = 0;
-    while (idx < segCount - 1 && cumDist[idx + 1] < d) idx++;
+    while (idx < segCount - 1 && (biasForward ? cumDist[idx + 1] <= d : cumDist[idx + 1] < d)) idx++;
     const len = segLens[idx];
     const t = len > 0.0001 ? Math.max(0, Math.min(1, (d - cumDist[idx]) / len)) : 0;
     const a = waypoints[idx];

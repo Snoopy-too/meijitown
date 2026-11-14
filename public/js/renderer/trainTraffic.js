@@ -97,6 +97,10 @@ export class TrainTrafficManager {
         return bestNet;
     }
 
+    getEffectiveSpacing(train, metrics = train.routeMetrics) {
+        return train.isLoop ? train.carSpacing : Math.min(train.carSpacing, metrics.totalLen * 0.45);
+    }
+
     getTrainDistance(train) {
         const metrics = train.routeMetrics;
         if (train.forward || train.isLoop) {
@@ -109,24 +113,54 @@ export class TrainTrafficManager {
         return metrics.cumDist[wpIdx] - prevLen * train.progress;
     }
 
+    setTrainRouteDistance(train, targetDist) {
+        const metrics = train.routeMetrics;
+        const maxD = metrics.totalLen;
+        const clamped = train.isLoop ? ((targetDist % maxD) + maxD) % maxD : Math.max(0, Math.min(maxD, targetDist));
+        const useForward = train.forward || train.isLoop;
+        const sample = sampleRouteAtDistance(metrics, clamped, useForward);
+        if (useForward) {
+            if (sample.progress >= 1 - 1e-6 && sample.wpIdx + 1 <= metrics.segCount) {
+                train.waypointIndex = train.isLoop ? (sample.wpIdx + 1) % train.waypoints.length : sample.wpIdx + 1;
+                train.progress = 0;
+            } else {
+                train.waypointIndex = sample.wpIdx;
+                train.progress = sample.progress;
+            }
+        } else if (sample.progress <= 1e-6) {
+            train.waypointIndex = sample.wpIdx;
+            train.progress = 0;
+        } else {
+            train.waypointIndex = Math.min(train.waypoints.length - 1, sample.wpIdx + 1);
+            train.progress = 1 - sample.progress;
+        }
+    }
+
+    reverseTrainAtTerminus(train) {
+        const metrics = train.routeMetrics;
+        const effSpacing = this.getEffectiveSpacing(train, metrics);
+        const endWp = train.waypoints[train.waypointIndex];
+        if (!endWp?.isDepot) {
+            train.lastDepotKey = null;
+        }
+        train.forward = !train.forward;
+        const targetDist = train.forward
+            ? effSpacing
+            : Math.max(0, metrics.totalLen - effSpacing);
+        this.setTrainRouteDistance(train, targetDist);
+        this.positionTrainConsist(train, 0);
+    }
+
     applyRouteToTrain(train, routeData, sLoco) {
         train.waypoints = routeData.waypoints;
         train.isLoop = routeData.isLoop;
+        if (routeData.isLoop) train.forward = true;
         train.routeMetrics = routeData.metrics;
         train.networkSignature = routeData.networkSignature;
         train.networkTileKeys = routeData.networkTileKeys;
         train.networkSize = routeData.networkTileKeys.size;
 
-        const maxD = routeData.metrics.totalLen;
-        const clamped = routeData.isLoop ? ((sLoco % maxD) + maxD) % maxD : Math.max(0, Math.min(maxD, sLoco));
-        const sample = sampleRouteAtDistance(routeData.metrics, clamped);
-        if (train.forward || routeData.isLoop) {
-            train.waypointIndex = sample.wpIdx;
-            train.progress = sample.progress;
-        } else {
-            train.waypointIndex = Math.min(routeData.waypoints.length - 1, sample.wpIdx + 1);
-            train.progress = 1 - sample.progress;
-        }
+        this.setTrainRouteDistance(train, sLoco);
         this.positionTrainConsist(train, 0);
     }
 
@@ -149,15 +183,23 @@ export class TrainTrafficManager {
                 continue;
             }
 
+            const hint = (routeData.isLoop || train.forward)
+                ? train.lastMoveDir
+                : { x: -train.lastMoveDir.x, z: -train.lastMoveDir.z };
             const proj = projectPositionOntoRoute(
                 train.mesh.position.x,
                 train.mesh.position.z,
                 routeData.metrics,
-                train.lastMoveDir
+                hint
             );
-            const effSpacing = Math.min(train.carSpacing, routeData.metrics.totalLen * 0.45);
+            const effSpacing = routeData.isLoop ? train.carSpacing : Math.min(train.carSpacing, routeData.metrics.totalLen * 0.45);
             if (proj.dist <= CONFIG.TILE_SIZE * 0.48) {
-                const targetDist = routeData.isLoop ? proj.s : Math.max(effSpacing, proj.s);
+                let targetDist = proj.s;
+                if (!routeData.isLoop) {
+                    targetDist = train.forward
+                        ? Math.max(effSpacing, proj.s)
+                        : Math.min(routeData.metrics.totalLen - effSpacing, proj.s);
+                }
                 this.applyRouteToTrain(train, routeData, targetDist);
             } else {
                 // Rail directly underneath train was removed -> relocate cleanly onto rebuilt track
@@ -211,20 +253,27 @@ export class TrainTrafficManager {
 
     positionTrainConsist(train, distMoved = 0) {
         const metrics = train.routeMetrics;
+        const travelSign = (train.isLoop || train.forward) ? 1 : -1;
         const sLoco = this.getTrainDistance(train);
-        const locoPose = sampleRouteAtDistance(metrics, sLoco);
+        const locoPose = sampleRouteAtDistance(metrics, sLoco, travelSign < 0);
         train.mesh.position.set(locoPose.x, locoPose.y, locoPose.z);
-        if (Math.hypot(locoPose.dirX, locoPose.dirZ) > 0.001) {
-            train.mesh.rotation.y = Math.atan2(locoPose.dirX, locoPose.dirZ) + Math.PI;
-            train.lastMoveDir = { x: locoPose.dirX, z: locoPose.dirZ };
+        const lDirX = locoPose.dirX * travelSign;
+        const lDirZ = locoPose.dirZ * travelSign;
+        if (Math.hypot(lDirX, lDirZ) > 0.001) {
+            train.mesh.rotation.y = Math.atan2(lDirX, lDirZ) + Math.PI;
+            train.lastMoveDir = { x: lDirX, z: lDirZ };
         }
 
-        const effSpacing = train.isLoop ? train.carSpacing : Math.min(train.carSpacing, metrics.totalLen * 0.45);
-        const sCoach = train.isLoop ? sLoco - effSpacing : Math.max(0, sLoco - effSpacing);
-        const coachPose = sampleRouteAtDistance(metrics, sCoach);
+        const effSpacing = this.getEffectiveSpacing(train, metrics);
+        const sCoach = train.isLoop
+            ? sLoco - effSpacing
+            : (train.forward ? Math.max(0, sLoco - effSpacing) : Math.min(metrics.totalLen, sLoco + effSpacing));
+        const coachPose = sampleRouteAtDistance(metrics, sCoach, travelSign > 0);
         train.coachMesh.position.set(coachPose.x, coachPose.y, coachPose.z);
-        if (Math.hypot(coachPose.dirX, coachPose.dirZ) > 0.001) {
-            train.coachMesh.rotation.y = Math.atan2(coachPose.dirX, coachPose.dirZ) + Math.PI;
+        const cDirX = coachPose.dirX * travelSign;
+        const cDirZ = coachPose.dirZ * travelSign;
+        if (Math.hypot(cDirX, cDirZ) > 0.001) {
+            train.coachMesh.rotation.y = Math.atan2(cDirX, cDirZ) + Math.PI;
         }
 
         TrainMeshes.updateTrainVisuals(train.mesh, train.coachMesh, distMoved, train.passengerCount);
@@ -310,7 +359,18 @@ export class TrainTrafficManager {
             const metrics = train.routeMetrics;
             const nextIdx = train.forward ? train.waypointIndex + 1 : train.waypointIndex - 1;
             if (!train.isLoop && ((train.forward && nextIdx >= wps.length) || (!train.forward && nextIdx < 0))) {
-                train.forward = !train.forward;
+                this.reverseTrainAtTerminus(train);
+                continue;
+            }
+
+            if (!train.isLoop && train.progress === 0 && wps[train.waypointIndex]?.isUTurn) {
+                const effSpacing = this.getEffectiveSpacing(train, metrics);
+                const sTurn = metrics.cumDist[train.waypointIndex];
+                const nextDist = train.forward
+                    ? Math.min(metrics.totalLen, sTurn + effSpacing)
+                    : Math.max(0, sTurn - effSpacing);
+                this.setTrainRouteDistance(train, nextDist);
+                this.positionTrainConsist(train, 0);
                 continue;
             }
 
@@ -333,14 +393,7 @@ export class TrainTrafficManager {
                 this.emitSteamPuff(train);
             }
 
-            const effSpacing = train.isLoop ? train.carSpacing : Math.min(train.carSpacing, metrics.totalLen * 0.45);
-            if (!train.isLoop && !train.forward && this.getTrainDistance(train) <= effSpacing) {
-                const clamp = sampleRouteAtDistance(metrics, effSpacing);
-                train.waypointIndex = clamp.wpIdx;
-                train.progress = clamp.progress;
-                train.forward = true;
-                if (wps[0].isDepot) this.triggerDepotArrival(train, wps[0].depotCoord);
-            } else if (train.progress >= 1.0) {
+            if (train.progress >= 1.0) {
                 train.waypointIndex = wrapNext;
                 train.progress = 0;
                 if (to.isDepot) {
@@ -350,7 +403,7 @@ export class TrainTrafficManager {
                 }
             }
 
-            this.positionTrainConsist(train, train.forward ? signedMove : -signedMove);
+            this.positionTrainConsist(train, signedMove);
         }
     }
 
