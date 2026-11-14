@@ -406,12 +406,14 @@ export class SurveyorScope {
             if (isRotatable) {
                 this.dom.rotateRow.style.display = 'flex';
                 let rotIdx = 0;
-                if (typeof tile.rotation === 'number') {
+                if (tile.manualRotation && typeof tile.rotation === 'number') {
                     rotIdx = ((tile.rotation % 4) + 4) % 4;
                 } else if (this.state && this.state.renderer) {
                     rotIdx = ((Math.round(this.state.renderer.getFacingAngleForTile(x, y) / (Math.PI / 2)) % 4) + 4) % 4;
+                } else if (typeof tile.rotation === 'number') {
+                    rotIdx = ((tile.rotation % 4) + 4) % 4;
                 }
-                const dirs = [i18n.t('dir.north'), i18n.t('dir.east'), i18n.t('dir.south'), i18n.t('dir.west')];
+                const dirs = [i18n.t('dir.south'), i18n.t('dir.east'), i18n.t('dir.north'), i18n.t('dir.west')];
                 if (this.dom.facing) this.dom.facing.textContent = dirs[rotIdx];
             } else {
                 this.dom.rotateRow.style.display = 'none';

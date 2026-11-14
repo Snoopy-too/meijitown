@@ -471,55 +471,92 @@ export class WorldRenderer {
     }
 
     getFacingAngleForTile(x, y) {
-        const tile = this.grid.getTile(x, y);
+        const rawTile = this.grid.getTile(x, y);
+        const bx = (rawTile && rawTile.isOrigin === false && typeof rawTile.originX === 'number') ? rawTile.originX : x;
+        const by = (rawTile && rawTile.isOrigin === false && typeof rawTile.originY === 'number') ? rawTile.originY : y;
+        const tile = (bx === x && by === y) ? rawTile : (this.grid.getTile(bx, by) || rawTile);
+
         if (tile && tile.manualRotation) {
             return ((tile.rotation || 0) % 4) * (Math.PI / 2);
         }
 
+        const isRoadTile = (tx, ty) => {
+            const t = this.grid.getTile(tx, ty);
+            return Boolean(t && !t.submerged && (t.type === CONFIG.TYPES.ROAD || (t.type === CONFIG.TYPES.CANAL && t.hasBridge) || (t.type === CONFIG.TYPES.RAIL && t.hasCrossing)));
+        };
+
         // Train Depot: prioritize snapping centerline through-track to adjacent RAIL / TRAIN_DEPOT tiles first
         if (tile && tile.type === CONFIG.TYPES.SERVICE && tile.serviceType === CONFIG.SERVICES.TRAIN_DEPOT) {
             const isRailLink = (dx, dy) => {
-                const t = this.grid.getTile(x + dx, y + dy);
+                const t = this.grid.getTile(bx + dx, by + dy);
                 return Boolean(t && (t.type === CONFIG.TYPES.RAIL || (t.type === CONFIG.TYPES.SERVICE && t.serviceType === CONFIG.SERVICES.TRAIN_DEPOT)));
             };
-            const isRoadLink = (dx, dy) => {
-                const t = this.grid.getTile(x + dx, y + dy);
-                return Boolean(t && (t.type === CONFIG.TYPES.ROAD || (t.type === CONFIG.TYPES.CANAL && t.hasBridge)));
-            };
-
             const railNS = isRailLink(0, -1) || isRailLink(0, 1);
             const railEW = isRailLink(-1, 0) || isRailLink(1, 0);
 
             if (railNS && !railEW) {
                 // Track runs North-South (rotation Math.PI/2 or -Math.PI/2); place station house toward adjacent road
-                return isRoadLink(1, 0) ? -Math.PI / 2 : Math.PI / 2;
+                return isRoadTile(bx + 1, by) ? -Math.PI / 2 : Math.PI / 2;
             }
             if (railEW && !railNS) {
                 // Track runs East-West (rotation 0 or Math.PI); place station house (-Z local) toward North road (0) or South road (Math.PI)
-                return isRoadLink(0, 1) ? Math.PI : 0;
+                return isRoadTile(bx, by + 1) ? Math.PI : 0;
             }
         }
 
-        if (tile && typeof tile.rotation === 'number' && tile.rotation !== 0) {
-            return (tile.rotation % 4) * (Math.PI / 2);
+        let fw = 1, fh = 1;
+        if (tile) {
+            if (tile.footprintW && tile.footprintH) {
+                fw = tile.footprintW;
+                fh = tile.footprintH;
+            } else if (tile.type === CONFIG.TYPES.SERVICE) {
+                const st = tile.serviceType;
+                if (st === CONFIG.SERVICES.SCHOOL && tile.multiSize === 6) {
+                    fw = (tile.rotation % 2 === 1) ? 2 : 3;
+                    fh = (tile.rotation % 2 === 1) ? 3 : 2;
+                } else if (st === CONFIG.SERVICES.SCHOOL || st === CONFIG.SERVICES.POWER_PLANT || st === CONFIG.SERVICES.HARBOR_PIER) {
+                    fw = 2; fh = 2;
+                } else if (st === CONFIG.SERVICES.WATERWORKS) {
+                    fw = 2; fh = 1;
+                } else if (st === CONFIG.SERVICES.PAVILION) {
+                    fw = 3; fh = 3;
+                }
+            }
         }
 
-        const fw = (tile && tile.footprintW) || 1;
-        const fh = (tile && tile.footprintH) || 1;
-        const isRoadTile = (tx, ty) => {
-            const t = this.grid.getTile(tx, ty);
-            return Boolean(t && (t.type === CONFIG.TYPES.ROAD || (t.type === CONFIG.TYPES.CANAL && t.hasBridge)));
-        };
+        const allEdges = [
+            { a: 0,           axis: 'NS', coords: Array.from({ length: fw }, (_, i) => [bx + i, by + fh]) }, // South (+Z)
+            { a: Math.PI / 2, axis: 'EW', coords: Array.from({ length: fh }, (_, i) => [bx + fw, by + i]) }, // East (+X)
+            { a: Math.PI,     axis: 'NS', coords: Array.from({ length: fw }, (_, i) => [bx + i, by - 1]) },  // North (-Z)
+            { a: -Math.PI / 2, axis: 'EW', coords: Array.from({ length: fh }, (_, i) => [bx - 1, by + i]) }, // West (-X)
+        ];
 
-        // Check all 4 edges of the building's footprint and face the edge with the most adjacent road tiles
+        // Harbor Pier front (+Z) holds waterfront pilings & crane boom; face toward adjacent canal
+        if (tile && tile.type === CONFIG.TYPES.SERVICE && tile.serviceType === CONFIG.SERVICES.HARBOR_PIER) {
+            const isCanalTile = (tx, ty) => {
+                const t = this.grid.getTile(tx, ty);
+                return Boolean(t && t.type === CONFIG.TYPES.CANAL);
+            };
+            let bestAngle = null;
+            let bestCanals = 0;
+            for (const edge of allEdges) {
+                let count = 0;
+                for (const [cx, cy] of edge.coords) if (isCanalTile(cx, cy)) count++;
+                if (count > bestCanals) {
+                    bestCanals = count;
+                    bestAngle = edge.a;
+                }
+            }
+            if (bestAngle !== null) return bestAngle;
+        }
+
+        // Non-square footprints (e.g., 3x2, 2x3, 2x1) must stay aligned with their placed grid dimensions
+        const edgeChecks = (fw > fh)
+            ? allEdges.filter(e => e.axis === 'NS')
+            : ((fh > fw) ? allEdges.filter(e => e.axis === 'EW') : allEdges);
+
         let bestAngle = null;
         let bestCount = 0;
-        const edgeChecks = [
-            { a: 0,           coords: Array.from({ length: fw }, (_, i) => [x + i, y + fh]) },     // South (+Z)
-            { a: Math.PI / 2, coords: Array.from({ length: fh }, (_, i) => [x + fw, y + i]) },     // East (+X)
-            { a: Math.PI,     coords: Array.from({ length: fw }, (_, i) => [x + i, y - 1]) },      // North (-Z)
-            { a: -Math.PI / 2, coords: Array.from({ length: fh }, (_, i) => [x - 1, y + i]) },     // West (-X)
-        ];
         for (const edge of edgeChecks) {
             let count = 0;
             for (const [cx, cy] of edge.coords) {
@@ -532,10 +569,15 @@ export class WorldRenderer {
         }
         if (bestAngle !== null) return bestAngle;
 
-        for (const [dx, dy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) {
-            if (isRoadTile(x + dx, y + dy)) return Math.atan2(dx, dy);
+        if (fw === 1 && fh === 1) {
+            for (const [dx, dy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) {
+                if (isRoadTile(bx + dx, by + dy)) return Math.atan2(dx, dy);
+            }
         }
-        return (tile?.rotation ? (tile.rotation % 4) * (Math.PI / 2) : 0);
+        if (tile && typeof tile.rotation === 'number' && tile.rotation !== 0) {
+            return (tile.rotation % 4) * (Math.PI / 2);
+        }
+        return (fh > fw) ? Math.PI / 2 : 0;
     }
 
     createServiceMesh(tile, facingAngle) {
@@ -654,7 +696,7 @@ export class WorldRenderer {
                 if (this.grid.isValidCoord(nx, ny)) {
                     const t = this.grid.getTile(nx, ny);
                     if (!t) continue;
-                    if (t.type === CONFIG.TYPES.ZONE && (t.stage === CONFIG.STAGES.BUILT || t.stage === CONFIG.STAGES.SCAFFOLDING)) {
+                    if (t.type === CONFIG.TYPES.ZONE && (t.stage === CONFIG.STAGES.BUILT || t.stage === CONFIG.STAGES.SCAFFOLDING || t.stage === CONFIG.STAGES.ON_FIRE)) {
                         const key = this.grid.getKey(nx, ny);
                         if (!refreshed.has(key)) {
                             refreshed.add(key);

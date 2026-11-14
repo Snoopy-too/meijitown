@@ -233,17 +233,24 @@ class GameStateManager {
     rotateInspectedTile() {
         if (!this.inspectedCoord) return false;
         const { x, y } = this.inspectedCoord;
-        const tile = this.grid.getTile(x, y);
-        if (!tile || tile.type === CONFIG.TYPES.EMPTY) return false;
+        const rawTile = this.grid.getTile(x, y);
+        if (!rawTile || rawTile.type === CONFIG.TYPES.EMPTY) return false;
 
-        const currentRot = typeof tile.rotation === 'number'
+        const ox = (rawTile.isOrigin === false && typeof rawTile.originX === 'number') ? rawTile.originX : x;
+        const oy = (rawTile.isOrigin === false && typeof rawTile.originY === 'number') ? rawTile.originY : y;
+        const tile = this.grid.getTile(ox, oy) || rawTile;
+
+        const currentRot = (tile.manualRotation && typeof tile.rotation === 'number')
             ? tile.rotation
-            : Math.round(this.renderer.getFacingAngleForTile(x, y) / (Math.PI / 2));
-        tile.rotation = ((currentRot + 1) % 4 + 4) % 4;
+            : Math.round(this.renderer.getFacingAngleForTile(ox, oy) / (Math.PI / 2));
+        const fw = tile.footprintW || (tile.serviceType === CONFIG.SERVICES.WATERWORKS ? 2 : 1);
+        const fh = tile.footprintH || 1;
+        const step = (fw !== fh) ? 2 : 1;
+        tile.rotation = (((currentRot + step) % 4) + 4) % 4;
         tile.manualRotation = true;
-        this.grid.notifyChange(x, y);
+        this.grid.notifyChange(ox, oy);
         this.scope.update(x, y, this.grid, this.simulation);
-        const dirs = ['South (180°)', 'East (90°)', 'North (0°)', 'West (270°)'];
+        const dirs = ['South (0°)', 'East (90°)', 'North (180°)', 'West (270°)'];
         this.showToast(`Rotated structure to ${dirs[tile.rotation]}`);
         return true;
     }

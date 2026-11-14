@@ -259,6 +259,21 @@ export class CityGridModel {
     }
 
     hasAdjacentRoad(x, y) {
+        const tile = this.getTile(x, y);
+        if (tile && tile.type === CONFIG.TYPES.SERVICE && ((tile.multiSize && tile.multiSize > 1) || tile.footprintW > 1 || tile.footprintH > 1)) {
+            const ox = typeof tile.originX === 'number' ? tile.originX : x;
+            const oy = typeof tile.originY === 'number' ? tile.originY : y;
+            const origin = this.getTile(ox, oy) || tile;
+            const st = origin.serviceType;
+            const fw = origin.footprintW || (st === CONFIG.SERVICES.PAVILION ? 3 : 2);
+            const fh = origin.footprintH || (st === CONFIG.SERVICES.WATERWORKS ? 1 : (st === CONFIG.SERVICES.PAVILION ? 3 : 2));
+            for (let dy = 0; dy < fh; dy++) {
+                for (let dx = 0; dx < fw; dx++) {
+                    if (this.getNeighbors(ox + dx, oy + dy).some(n => this.isRoadTile(n))) return true;
+                }
+            }
+            return false;
+        }
         const neighbors = this.getNeighbors(x, y);
         return neighbors.some(n => this.isRoadTile(n));
     }

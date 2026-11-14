@@ -27,7 +27,7 @@ export class SchoolSystem {
     }
 
     // Place 3x2 (or rotated 2x3) Primary School compound with yard
-    placeSchool(originX, originY, rotation = 0) {
+    placeSchool(originX, originY, rotation = 0, manualRotation = false) {
         if (!this.canPlaceSchool(originX, originY, rotation)) {
             this.state.showToast("Cannot build Primary School: 3×2 lot obstructed or out of bounds!", true);
             return false;
@@ -56,7 +56,7 @@ export class SchoolSystem {
                 tile.originX = originX;
                 tile.originY = originY;
                 tile.rotation = rotation;
-                tile.manualRotation = true;
+                tile.manualRotation = Boolean(manualRotation);
                 this.grid.notifyChange(tx, ty);
             }
         }

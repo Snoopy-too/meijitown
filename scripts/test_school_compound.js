@@ -83,7 +83,7 @@ for (let dy = 0; dy < 2; dy++) {
         assert.strictEqual(t.footprintW, 3);
         assert.strictEqual(t.footprintH, 2);
         assert.strictEqual(t.multiSize, 6);
-        assert.strictEqual(t.manualRotation, true);
+        assert.strictEqual(t.manualRotation, false);
         assert.strictEqual(t.isOrigin, dx === 0 && dy === 0);
     }
 }
@@ -97,7 +97,7 @@ for (let dy = 0; dy < 2; dy++) {
 console.log('  ✓ 3x2 / 2x3 placement, boundary check, and 6-tile demolition verified');
 
 // 3. Save/Load Round-Trip + Legacy 2x2 Compatibility
-schoolSys.placeSchool(10, 10, 1); // 2x3 rotated
+schoolSys.placeSchool(10, 10, 1, true); // 2x3 manually rotated
 const exported = grid.exportToArray();
 const reloadGrid = new CityGridModel(32, 32);
 reloadGrid.loadFromMap(exported);

@@ -236,12 +236,9 @@ export class ToolActionDispatcher {
     }
 
     handleMultiTilePloppables(tool, tileKey, x, y, isDrag) {
-        const rot = this.ctrl.placementRotation;
-        if (tool === CONFIG.TOOLS.SCHOOL && this.state.schoolSystem?.placeSchool(x, y, rot)) {
-            this.ctrl.lastPaintedTile = tileKey;
-            return true;
-        }
-        if (tool === CONFIG.TOOLS.HARBOR_PIER && this.state.tradePierManager?.placePier(x, y, rot)) {
+        const rot = this.ctrl.getEffectiveRotation ? this.ctrl.getEffectiveRotation(x, y) : this.ctrl.placementRotation;
+        const manual = Boolean(this.ctrl.hasManuallyRotated);
+        if (tool === CONFIG.TOOLS.SCHOOL && this.state.schoolSystem?.placeSchool(x, y, rot, manual)) {
             this.ctrl.lastPaintedTile = tileKey;
             return true;
         }
@@ -250,15 +247,18 @@ export class ToolActionDispatcher {
             this.ctrl.recordPlacement(tileKey, CONFIG.COSTS.RICE_PADDY || 10, `Cultivated Rice Paddy`, isDrag);
             return true;
         }
-        if (tool === CONFIG.TOOLS.POWER_PLANT && this.state.powerSystem?.placePowerPlant(x, y, rot)) {
-            this.ctrl.lastPaintedTile = tileKey;
-            return true;
-        }
-        if (tool === CONFIG.TOOLS.WATERWORKS && this.state.sanitation?.placeWaterworks(x, y, rot)) {
-            this.ctrl.lastPaintedTile = tileKey;
-            return true;
-        }
-        if (tool === CONFIG.TOOLS.PAVILION && this.state.milestones?.placePavilion(x, y, rot)) {
+        const multiBuilders = {
+            [CONFIG.TOOLS.HARBOR_PIER]: () => this.state.tradePierManager?.placePier(x, y, rot),
+            [CONFIG.TOOLS.POWER_PLANT]: () => this.state.powerSystem?.placePowerPlant(x, y, rot),
+            [CONFIG.TOOLS.WATERWORKS]: () => this.state.sanitation?.placeWaterworks(x, y, rot),
+            [CONFIG.TOOLS.PAVILION]: () => this.state.milestones?.placePavilion(x, y, rot),
+        };
+        if (multiBuilders[tool] && multiBuilders[tool]()) {
+            const originTile = this.grid.getTile(x, y);
+            if (originTile) {
+                originTile.manualRotation = manual;
+                if (manual) this.grid.notifyChange(x, y);
+            }
             this.ctrl.lastPaintedTile = tileKey;
             return true;
         }
@@ -318,7 +318,7 @@ export class ToolActionDispatcher {
                 const tile = this.grid.getTile(x, y);
                 if (tile) {
                     tile.rotation = rot;
-                    tile.manualRotation = Boolean(this.ctrl.hasManuallyRotated || rot !== 0);
+                    tile.manualRotation = Boolean(this.ctrl.hasManuallyRotated);
                 }
                 SOUND.playMalletClack();
                 if (isDrag && this.ctrl.dragBatch) this.ctrl.dragBatch.label = z.label;

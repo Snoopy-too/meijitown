@@ -6,7 +6,7 @@ import { bindKeyboardHotkeys } from './ui/keyboard_router.js';
 import { ToolActionDispatcher } from './toolActionDispatcher.js';
 import { i18n } from './i18n.js';
 import { TOOL_TIER_REQUIREMENTS } from './ui/build_drawer.js';
-import { isFootprintClear } from './footprintPreview.js';
+import { isFootprintClear, getFootprint } from './footprintPreview.js';
 
 export class ToolController {
     constructor(gridModel, renderer, stateManager, buildDrawer) {
@@ -44,28 +44,94 @@ export class ToolController {
         return this.placementRotation;
     }
 
+    _isRoadLike(tx, ty) {
+        if (!this.grid) return false;
+        const t = this.grid.getTile(tx, ty);
+        return Boolean(t && !t.submerged && (t.type === CONFIG.TYPES.ROAD || (t.type === CONFIG.TYPES.CANAL && t.hasBridge) || (t.type === CONFIG.TYPES.RAIL && t.hasCrossing)));
+    }
+
+    _countFrontEdgeTiles(x, y, w, h, rot, pred) {
+        let count = 0;
+        if (rot === 0) {
+            for (let i = 0; i < w; i++) if (pred(x + i, y + h)) count++;
+        } else if (rot === 1) {
+            for (let i = 0; i < h; i++) if (pred(x + w, y + i)) count++;
+        } else if (rot === 2) {
+            for (let i = 0; i < w; i++) if (pred(x + i, y - 1)) count++;
+        } else if (rot === 3) {
+            for (let i = 0; i < h; i++) if (pred(x - 1, y + i)) count++;
+        }
+        return count;
+    }
+
     getEffectiveRotation(x, y) {
-        if (this.hasManuallyRotated) return this.placementRotation;
-        if (this.currentTool === CONFIG.TOOLS.TRAIN_DEPOT && this.grid) {
+        if (this.hasManuallyRotated || !this.grid) return this.placementRotation;
+
+        if (this.currentTool === CONFIG.TOOLS.TRAIN_DEPOT) {
             const isRail = (dx, dy) => {
                 const t = this.grid.getTile(x + dx, y + dy);
                 return Boolean(t && (t.type === CONFIG.TYPES.RAIL || (t.type === CONFIG.TYPES.SERVICE && t.serviceType === CONFIG.SERVICES.TRAIN_DEPOT)));
             };
-            const isRoad = (dx, dy) => {
-                const t = this.grid.getTile(x + dx, y + dy);
-                return Boolean(t && (t.type === CONFIG.TYPES.ROAD || (t.type === CONFIG.TYPES.CANAL && t.hasBridge)));
-            };
             const railNS = isRail(0, -1) || isRail(0, 1);
             const railEW = isRail(-1, 0) || isRail(1, 0);
-            if (railNS && !railEW) return isRoad(1, 0) ? 3 : 1;
-            if (railEW && !railNS) return isRoad(0, 1) ? 2 : 0;
+            if (railNS && !railEW) return this._isRoadLike(x + 1, y) ? 3 : 1;
+            if (railEW && !railNS) return this._isRoadLike(x, y + 1) ? 2 : 0;
         }
-        const isZone = this.currentTool === CONFIG.TOOLS.RESIDENTIAL || this.currentTool === CONFIG.TOOLS.COMMERCIAL || this.currentTool === CONFIG.TOOLS.INDUSTRIAL;
-        if (isZone && this.grid) {
+
+        if (this.currentTool === CONFIG.TOOLS.HARBOR_PIER) {
+            let bestRot = this.placementRotation;
+            let bestScore = -1;
+            const isCanal = (cx, cy) => {
+                const t = this.grid.getTile(cx, cy);
+                return Boolean(t && t.type === CONFIG.TYPES.CANAL);
+            };
+            for (const rot of [0, 1, 2, 3]) {
+                const canals = this._countFrontEdgeTiles(x, y, 2, 2, rot, isCanal);
+                const rearRoads = this._countFrontEdgeTiles(x, y, 2, 2, (rot + 2) % 4, (cx, cy) => this._isRoadLike(cx, cy));
+                const score = canals * 10 + rearRoads;
+                if (score > bestScore && canals > 0) {
+                    bestScore = score;
+                    bestRot = rot;
+                }
+            }
+            return bestRot;
+        }
+
+        const multiTools = [CONFIG.TOOLS.SCHOOL, CONFIG.TOOLS.POWER_PLANT, CONFIG.TOOLS.WATERWORKS, CONFIG.TOOLS.PAVILION];
+        if (multiTools.includes(this.currentTool)) {
+            const candidates = this.currentTool === CONFIG.TOOLS.WATERWORKS ? [0, 2] : [0, 1, 2, 3];
+            const defaultClear = isFootprintClear(this.grid, x, y, this.currentTool, this.placementRotation);
+            let bestRot = this.placementRotation;
+            let bestScore = -1;
+            let bestHasRoad = false;
+            for (const rot of candidates) {
+                const { w, h } = getFootprint(this.currentTool, rot);
+                const clear = isFootprintClear(this.grid, x, y, this.currentTool, rot);
+                const roads = this._countFrontEdgeTiles(x, y, w, h, rot, (cx, cy) => this._isRoadLike(cx, cy));
+                const score = (clear ? 1000 : 0) + roads;
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestRot = rot;
+                    bestHasRoad = roads > 0;
+                }
+            }
+            if (bestHasRoad || (!defaultClear && isFootprintClear(this.grid, x, y, this.currentTool, bestRot))) {
+                return bestRot;
+            }
+            return this.placementRotation;
+        }
+
+        const singleTileBuildings = [
+            CONFIG.TOOLS.RESIDENTIAL, CONFIG.TOOLS.COMMERCIAL, CONFIG.TOOLS.INDUSTRIAL,
+            CONFIG.TOOLS.WATCHTOWER, CONFIG.TOOLS.FIRE_DEPOT, CONFIG.TOOLS.WELL,
+            CONFIG.TOOLS.OCHAYA, CONFIG.TOOLS.SENTO, CONFIG.TOOLS.KOBAN,
+            CONFIG.TOOLS.SHRINE_PARK, CONFIG.TOOLS.TELEGRAPH, CONFIG.TOOLS.SUIMON,
+            CONFIG.TOOLS.TRAIN_DEPOT
+        ];
+        if (singleTileBuildings.includes(this.currentTool)) {
             const dirs = [{ dx: 0, dy: 1, rot: 0 }, { dx: 1, dy: 0, rot: 1 }, { dx: 0, dy: -1, rot: 2 }, { dx: -1, dy: 0, rot: 3 }];
             for (const d of dirs) {
-                const t = this.grid.getTile(x + d.dx, y + d.dy);
-                if (t && (t.type === CONFIG.TYPES.ROAD || (t.type === CONFIG.TYPES.CANAL && t.hasBridge))) return d.rot;
+                if (this._isRoadLike(x + d.dx, y + d.dy)) return d.rot;
             }
         }
         return this.placementRotation;
@@ -207,7 +273,8 @@ export class ToolController {
         if (tierReq && currentTier < tierReq.tier) return false;
 
         const multiTools = [CONFIG.TOOLS.SCHOOL, CONFIG.TOOLS.HARBOR_PIER, CONFIG.TOOLS.POWER_PLANT, CONFIG.TOOLS.WATERWORKS, CONFIG.TOOLS.PAVILION];
-        if (multiTools.includes(this.currentTool) && !isFootprintClear(this.grid, x, y, this.currentTool, this.placementRotation)) {
+        const effectiveRot = multiTools.includes(this.currentTool) ? this.getEffectiveRotation(x, y) : this.placementRotation;
+        if (multiTools.includes(this.currentTool) && !isFootprintClear(this.grid, x, y, this.currentTool, effectiveRot)) {
             return false;
         }
 
@@ -241,7 +308,7 @@ export class ToolController {
 
         // Multi-tile ploppables check
         if (this.currentTool === CONFIG.TOOLS.SCHOOL) {
-            return (this.state.schoolSystem?.canPlaceSchool(x, y, this.placementRotation) ?? true) && this.state.treasury >= (CONFIG.COSTS.SCHOOL || 280);
+            return (this.state.schoolSystem?.canPlaceSchool(x, y, effectiveRot) ?? true) && this.state.treasury >= (CONFIG.COSTS.SCHOOL || 280);
         }
         if (this.currentTool === CONFIG.TOOLS.HARBOR_PIER) {
             const hasTech = !this.state.milestones || this.state.milestones.currentTier >= 3 || (this.state.population && this.state.population >= 300);
