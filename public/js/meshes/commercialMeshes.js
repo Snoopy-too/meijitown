@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { CONFIG } from '../config.js';
 import { MaterialLibrary } from '../renderer/materialLibrary.js';
 import { MeijiArchitectureKit as Kit } from './meijiArchitectureKit.js';
+import { getFireproofPalette } from './masonryPalette.js';
 
 export class CommercialMeshes {
     // 1. Commercial Level 1: Corner Merchant Shop (Shouten / 商店)
@@ -124,14 +125,17 @@ export class CommercialMeshes {
         return group;
     }
 
-    // 3. Commercial Level 3: Ginza Bricktown Giyōfū Arcade (擬洋風 煉瓦街)
+    // 3. Commercial Level 3: Ginza Bricktown / Ashlar / Giyōfū Arcade (擬洋風 商館)
     static createGiyofuL3Mesh(tile, facingAngle = 0) {
         const group = new THREE.Group();
         const s = CONFIG.TILE_SIZE;
         const sub = new THREE.Group();
 
-        const trimMat = MaterialLibrary.get('stoneTrim');
-        const brickMat = MaterialLibrary.get('redBrick');
+        const pal = getFireproofPalette(tile, 'commercial');
+        const trimMat = pal.trimMat;
+        const quoinMat = pal.quoinMat;
+        const lowerMat = pal.lowerWallMat;
+        const upperMat = pal.upperWallMat;
         const glassMat = MaterialLibrary.get('glassWindow');
         const roofMat = MaterialLibrary.get('kawaraRoof');
         const bronzeMat = MaterialLibrary.get('bronze');
@@ -140,8 +144,8 @@ export class CommercialMeshes {
         // 1. Granite plinth foundation
         Kit.addStoneFoundation(sub, s * 0.88, s * 0.84, 0.16);
 
-        // 2. Ground floor: Brick arcade colonnade with pilasters
-        Kit.addPart(sub, new THREE.BoxGeometry(s * 0.82, 0.72, s * 0.78), brickMat, [0, 0.52, 0], true, null, true);
+        // 2. Ground floor: Fireproof masonry arcade colonnade with pilasters
+        Kit.addPart(sub, new THREE.BoxGeometry(s * 0.82, 0.72, s * 0.78), lowerMat, [0, 0.52, 0], true, null, true);
 
         // Arched display windows with keystones
         for (const ox of [-0.26 * s, 0.26 * s]) {
@@ -152,9 +156,9 @@ export class CommercialMeshes {
             Kit.addPart(sub, arch, trimMat, [ox, 0.71, 0.395 * s]);
         }
 
-        // Brick pilasters with stone bases & capitals
+        // Pilasters with stone bases & capitals
         for (const px of [-0.40 * s, 0, 0.40 * s]) {
-            Kit.addPart(sub, new THREE.BoxGeometry(0.12, 0.72, 0.08), brickMat, [px, 0.52, 0.40 * s]);
+            Kit.addPart(sub, new THREE.BoxGeometry(0.12, 0.72, 0.08), quoinMat, [px, 0.52, 0.40 * s]);
             Kit.addPart(sub, new THREE.BoxGeometry(0.14, 0.06, 0.10), trimMat, [px, 0.89, 0.40 * s]);
         }
 
@@ -163,12 +167,12 @@ export class CommercialMeshes {
         Kit.addPart(sub, new THREE.BoxGeometry(0.65 * s, 0.06, 0.22 * s), trimMat, [0, 0.98, 0.45 * s], true);
         Kit.addPart(sub, new THREE.BoxGeometry(0.65 * s, 0.20, 0.02), ironMat, [0, 1.11, 0.56 * s]);
 
-        // 4. Second floor: Red-brick facade with corner quoins & arched windows
-        Kit.addPart(sub, new THREE.BoxGeometry(s * 0.80, 0.62, s * 0.76), brickMat, [0, 1.29, 0], true, null, true);
+        // 4. Second floor: Masonry or Giyōfū stucco facade with corner quoins & arched windows
+        Kit.addPart(sub, new THREE.BoxGeometry(s * 0.80, 0.62, s * 0.76), upperMat, [0, 1.29, 0], true, null, true);
         const quoinGeo = new THREE.BoxGeometry(0.08, 0.62, 0.08);
         for (const qx of [-s * 0.40, s * 0.40]) {
             for (const qz of [-s * 0.38, s * 0.38]) {
-                Kit.addPart(sub, quoinGeo, trimMat, [qx, 1.29, qz]);
+                Kit.addPart(sub, quoinGeo, quoinMat, [qx, 1.29, qz]);
             }
         }
 
@@ -183,27 +187,29 @@ export class CommercialMeshes {
         Kit.addGabledRoof(sub, s * 0.86, s * 0.80, 0.42, 1.70, 0, roofMat);
 
         // Classical triangular pediment
-        const pedGeo = new THREE.ConeGeometry(0.36, 0.28, 4);
-        pedGeo.rotateY(Math.PI / 4);
-        Kit.addPart(sub, pedGeo, trimMat, [0, 1.96, 0.36 * s]);
+        Kit.addTriangularPediment(sub, 0.68, 0.28, 0.18, lowerMat, trimMat, [0, 1.82, 0.38 * s]);
 
         // Brass clock face
-        Kit.addPart(sub, new THREE.CylinderGeometry(0.11, 0.11, 0.04, 12), bronzeMat, [0, 1.94, 0.42 * s], false, [Math.PI / 2, 0, 0]);
-        Kit.addPart(sub, new THREE.CylinderGeometry(0.085, 0.085, 0.05, 12), MaterialLibrary.get('plasterWhite'), [0, 1.94, 0.425 * s], false, [Math.PI / 2, 0, 0]);
+        Kit.addPart(sub, new THREE.CylinderGeometry(0.11, 0.11, 0.04, 12), bronzeMat, [0, 1.94, 0.44 * s], false, [Math.PI / 2, 0, 0]);
+        Kit.addPart(sub, new THREE.CylinderGeometry(0.085, 0.085, 0.05, 12), MaterialLibrary.get('plasterWhite'), [0, 1.94, 0.445 * s], false, [Math.PI / 2, 0, 0]);
 
         sub.rotation.y = facingAngle;
+        group.userData = { masonryVariant: pal.variantName };
         group.add(sub);
         return group;
     }
 
-    // 4. Commercial Level 4: Grand Ginza Brick Exchange (銀座 煉瓦為替座)
+    // 4. Commercial Level 4: Grand Ginza Exchange / Stone & Brick Trade Hall (銀座 為替座)
     static createGinzaCommercialL4Mesh(tile, facingAngle = 0) {
         const group = new THREE.Group();
         const s = CONFIG.TILE_SIZE;
         const sub = new THREE.Group();
 
-        const trimMat = MaterialLibrary.get('stoneTrim');
-        const brickMat = MaterialLibrary.get('redBrick');
+        const pal = getFireproofPalette(tile, 'commercial');
+        const trimMat = pal.trimMat;
+        const quoinMat = pal.quoinMat;
+        const lowerMat = pal.lowerWallMat;
+        const upperMat = pal.upperWallMat;
         const glassMat = MaterialLibrary.get('glassWindow');
         const copperMat = MaterialLibrary.get('copperRoof');
         const bronzeMat = MaterialLibrary.get('bronze');
@@ -212,8 +218,8 @@ export class CommercialMeshes {
         // 1. Dressed granite plinth
         Kit.addStoneFoundation(sub, s * 0.90, s * 0.88, 0.18);
 
-        // 2. Colonnaded ground floor with rusticated brickwork
-        Kit.addPart(sub, new THREE.BoxGeometry(s * 0.84, 0.80, s * 0.82), brickMat, [0, 0.58, 0], true, null, true);
+        // 2. Colonnaded ground floor with rusticated masonry
+        Kit.addPart(sub, new THREE.BoxGeometry(s * 0.84, 0.80, s * 0.82), lowerMat, [0, 0.58, 0], true, null, true);
 
         // 4 classical Tuscan pilasters
         for (const px of [-0.36 * s, -0.12 * s, 0.12 * s, 0.36 * s]) {
@@ -235,11 +241,11 @@ export class CommercialMeshes {
         Kit.addPart(sub, new THREE.BoxGeometry(0.78 * s, 0.06, 0.22 * s), trimMat, [0, 1.08, 0.47 * s], true);
         Kit.addPart(sub, new THREE.BoxGeometry(0.78 * s, 0.20, 0.02), ironMat, [0, 1.21, 0.58 * s]);
 
-        // 4. Second floor: Red-brick facade with stone quoins & 4 arched sash windows
-        Kit.addPart(sub, new THREE.BoxGeometry(s * 0.82, 0.74, s * 0.80), brickMat, [0, 1.45, 0], true, null, true);
+        // 4. Second floor: Masonry or Giyōfū facade with corner quoins & 4 arched sash windows
+        Kit.addPart(sub, new THREE.BoxGeometry(s * 0.82, 0.74, s * 0.80), upperMat, [0, 1.45, 0], true, null, true);
         for (const qx of [-s * 0.41, s * 0.41]) {
-            Kit.addPart(sub, new THREE.BoxGeometry(0.08, 0.74, 0.08), trimMat, [qx, 1.45, 0.40 * s]);
-            Kit.addPart(sub, new THREE.BoxGeometry(0.08, 0.74, 0.08), trimMat, [qx, 1.45, -0.40 * s]);
+            Kit.addPart(sub, new THREE.BoxGeometry(0.08, 0.74, 0.08), quoinMat, [qx, 1.45, 0.40 * s]);
+            Kit.addPart(sub, new THREE.BoxGeometry(0.08, 0.74, 0.08), quoinMat, [qx, 1.45, -0.40 * s]);
         }
         for (const wx of [-0.28 * s, -0.09 * s, 0.09 * s, 0.28 * s]) {
             Kit.addPart(sub, new THREE.BoxGeometry(0.22, 0.44, 0.03), glassMat, [wx, 1.46, 0.405 * s], false, null, false, 'Upper_Window');
@@ -250,11 +256,9 @@ export class CommercialMeshes {
         Kit.addPart(sub, new THREE.BoxGeometry(s * 0.90, 0.12, s * 0.88), trimMat, [0, 1.88, 0], true);
 
         // 6. Classical triangular pediment with clock
-        const pedGeo = new THREE.ConeGeometry(0.42, 0.32, 4);
-        pedGeo.rotateY(Math.PI / 4);
-        Kit.addPart(sub, pedGeo, trimMat, [0, 2.20, 0.38 * s]);
-        Kit.addPart(sub, new THREE.CylinderGeometry(0.12, 0.12, 0.04, 12), bronzeMat, [0, 2.18, 0.45 * s], false, [Math.PI / 2, 0, 0]);
-        Kit.addPart(sub, new THREE.CylinderGeometry(0.095, 0.095, 0.05, 12), MaterialLibrary.get('plasterWhite'), [0, 2.18, 0.455 * s], false, [Math.PI / 2, 0, 0]);
+        Kit.addTriangularPediment(sub, 0.82, 0.34, 0.18, lowerMat, trimMat, [0, 2.04, 0.40 * s]);
+        Kit.addPart(sub, new THREE.CylinderGeometry(0.12, 0.12, 0.04, 12), bronzeMat, [0, 2.18, 0.46 * s], false, [Math.PI / 2, 0, 0]);
+        Kit.addPart(sub, new THREE.CylinderGeometry(0.095, 0.095, 0.05, 12), MaterialLibrary.get('plasterWhite'), [0, 2.18, 0.465 * s], false, [Math.PI / 2, 0, 0]);
 
         // 7. Western Mansard Roof & Soaring Copper Cupola
         const mansardGeo = new THREE.ConeGeometry(s * 0.65, 0.75, 4);
@@ -267,6 +271,7 @@ export class CommercialMeshes {
         Kit.addPart(sub, new THREE.CylinderGeometry(0.015, 0.015, 0.35, 4), MaterialLibrary.get('goldLeaf'), [0, 3.32, 0]); // Spire
 
         sub.rotation.y = facingAngle;
+        group.userData = { masonryVariant: pal.variantName };
         group.add(sub);
         return group;
     }

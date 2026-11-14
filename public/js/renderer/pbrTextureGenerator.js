@@ -2,6 +2,31 @@
 // /artisan ultra: 512px Height -> Albedo + Sobel Tangent Normal + Roughness PBR sets & soft botanical/FX sprites
 
 import * as THREE from 'three';
+import { createParticleSpriteTexture, createFoliageSpriteTexture } from './pbrSprites.js';
+
+const BRICK_PALETTES = {
+    red: {
+        key: 'brick',
+        brickRgb: [148, 56, 44],
+        clinkerDark: [-28, -14, -10],
+        clinkerWarm: [16, 10, 6],
+        mortarRgb: [158, 152, 142]
+    },
+    buff: {
+        key: 'brick_buff',
+        brickRgb: [192, 158, 108],
+        clinkerDark: [-24, -22, -18],
+        clinkerWarm: [14, 12, 8],
+        mortarRgb: [164, 156, 140]
+    },
+    clinker: {
+        key: 'brick_clinker',
+        brickRgb: [104, 66, 58],
+        clinkerDark: [-26, -18, -15],
+        clinkerWarm: [18, 10, 7],
+        mortarRgb: [112, 108, 104]
+    }
+};
 
 function fract(v) { return v - Math.floor(v); }
 
@@ -216,44 +241,80 @@ export class PBRTextureGenerator {
         }, 3.6, 1, 1);
     }
 
-    static getBrickSet() {
-        // Kiln-fired Meiji red brick (Akarenga) with recessed lime mortar
-        return this.buildPBRSet('brick', 128, (u, v, out) => {
-            const rows = 10;
-            const cols = 5;
+    static getBrickSet(variant = 'red') {
+        const pal = BRICK_PALETTES[variant] || BRICK_PALETTES.red;
+        return this.buildPBRSet(pal.key, 128, (u, v, out) => {
+            const rows = 16;
+            const cols = 7;
             const rowIdx = Math.floor(v * rows);
             const rv = fract(v * rows);
             const staggeredU = fract(u * cols + (rowIdx % 2) * 0.5);
-            const colIdx = Math.floor((u * cols + (rowIdx % 2) * 0.5)) % cols;
+            const colIdx = Math.floor(u * cols + (rowIdx % 2) * 0.5) % cols;
 
-            const mortarV = 0.13;
-            const mortarU = 0.065;
+            const mortarV = 0.085;
+            const mortarU = 0.045;
             const dv = Math.min(rv, 1.0 - rv);
             const du = Math.min(staggeredU, 1.0 - staggeredU);
             const isMortar = dv < mortarV || du < mortarU;
 
-            const grain = periodicFbm(u, v, 10, 3);
-            const micro = periodicFbm(u, v, 24, 2);
+            const grain = periodicFbm(u, v, 10, 2);
+            const micro = periodicNoise(u, v, 32);
 
             if (isMortar) {
-                const mTone = 194 + (grain - 0.5) * 28 + (micro - 0.5) * 14;
-                out[0] = mTone;
-                out[1] = mTone - 8;
-                out[2] = mTone - 20;
-                out[3] = 0.12 + micro * 0.08;
+                const jVar = (grain - 0.5) * 18 + (micro - 0.5) * 10;
+                out[0] = pal.mortarRgb[0] + jVar;
+                out[1] = pal.mortarRgb[1] + jVar;
+                out[2] = pal.mortarRgb[2] + jVar;
+                out[3] = 0.16 + micro * 0.06;
                 out[4] = 0.94;
             } else {
-                const bev = Math.min(1.0, Math.min((dv - mortarV) / 0.07, (du - mortarU) / 0.05));
+                const bev = Math.min(1.0, Math.min((dv - mortarV) / 0.065, (du - mortarU) / 0.045));
                 const bSeed = hash2(colIdx * 7 + 3, rowIdx * 11 + 5);
-                const clinker = bSeed > 0.84 ? -32 : (bSeed < 0.18 ? 18 : (bSeed - 0.5) * 26);
+                const shift = bSeed > 0.80 ? pal.clinkerDark
+                    : (bSeed < 0.20 ? pal.clinkerWarm : [(bSeed - 0.5) * 20, (bSeed - 0.5) * 14, (bSeed - 0.5) * 10]);
+                const texJitter = (grain - 0.5) * 20 + (micro - 0.5) * 10;
 
-                out[0] = 166 + clinker + (grain - 0.5) * 24;
-                out[1] = 64 + clinker * 0.55 + (grain - 0.5) * 18;
-                out[2] = 43 + clinker * 0.35 + (micro - 0.5) * 14;
-                out[3] = 0.45 + bev * 0.42 + (grain - 0.5) * 0.13;
-                out[4] = 0.72 + (1.0 - bev) * 0.16 + (micro - 0.5) * 0.12;
+                out[0] = pal.brickRgb[0] + shift[0] + texJitter;
+                out[1] = pal.brickRgb[1] + shift[1] + texJitter * 0.72;
+                out[2] = pal.brickRgb[2] + shift[2] + texJitter * 0.52;
+                out[3] = 0.45 + bev * 0.40 + (grain - 0.5) * 0.12;
+                out[4] = 0.74 + (1.0 - bev) * 0.14 + (micro - 0.5) * 0.10;
             }
-        }, 3.2, 1, 1);
+        }, 2.8, 1, 1);
+    }
+
+    static getAshlarSet() {
+        // Dressed Oya-ishi & buff sandstone ashlar masonry blocks for Meiji stone facades
+        return this.buildPBRSet('ashlar', 128, (u, v, out) => {
+            const rows = 6;
+            const cols = 3;
+            const rowIdx = Math.floor(v * rows);
+            const rv = fract(v * rows);
+            const su = fract(u * cols + (rowIdx % 2) * 0.5);
+            const colIdx = Math.floor(u * cols + (rowIdx % 2) * 0.5) % cols;
+
+            const dEdge = Math.min(rv, 1.0 - rv, su, 1.0 - su);
+            const grain = periodicFbm(u, v, 8, 2);
+            const fleck = periodicNoise(u, v, 40);
+            const blockVar = (hash2(colIdx * 5 + 1, rowIdx * 13 + 7) - 0.5) * 20;
+
+            if (dEdge < 0.048) {
+                const jt = 122 + (grain - 0.5) * 16;
+                out[0] = jt + 2;
+                out[1] = jt - 2;
+                out[2] = jt - 10;
+                out[3] = 0.14;
+                out[4] = 0.94;
+            } else {
+                const bev = Math.min(1.0, (dEdge - 0.048) / 0.07);
+                const val = 192 + blockVar + (grain - 0.5) * 18 + (fleck - 0.5) * 12;
+                out[0] = val + 5;
+                out[1] = val;
+                out[2] = val - 12;
+                out[3] = 0.38 + bev * 0.46 + grain * 0.14;
+                out[4] = 0.78 + (1.0 - bev) * 0.14 + (fleck - 0.5) * 0.06;
+            }
+        }, 3.0, 1, 1);
     }
 
     static getPlasterSet() {
@@ -477,62 +538,7 @@ export class PBRTextureGenerator {
         const cacheKey = `particle_${kind}`;
         if (this._sprites.has(cacheKey)) return this._sprites.get(cacheKey);
         if (!this._canRender2D(false)) return null;
-
-        const size = 128;
-        const canvas = document.createElement('canvas');
-        canvas.width = size;
-        canvas.height = size;
-        const ctx = canvas.getContext('2d');
-
-        if (kind === 'flame') {
-            const grad = ctx.createRadialGradient(64, 82, 4, 64, 68, 56);
-            grad.addColorStop(0.0, 'rgba(255, 252, 220, 1.0)');
-            grad.addColorStop(0.28, 'rgba(255, 195, 65, 0.92)');
-            grad.addColorStop(0.62, 'rgba(255, 85, 20, 0.55)');
-            grad.addColorStop(1.0, 'rgba(180, 20, 0, 0.0)');
-            ctx.fillStyle = grad;
-            ctx.fillRect(0, 0, size, size);
-        } else if (kind === 'spark') {
-            const grad = ctx.createRadialGradient(64, 64, 2, 64, 64, 52);
-            grad.addColorStop(0.0, 'rgba(255, 250, 220, 1.0)');
-            grad.addColorStop(0.35, 'rgba(255, 165, 45, 0.85)');
-            grad.addColorStop(1.0, 'rgba(255, 60, 0, 0.0)');
-            ctx.fillStyle = grad;
-            ctx.fillRect(0, 0, size, size);
-        } else if (kind === 'wake') {
-            const grad = ctx.createLinearGradient(0, 0, 0, size);
-            grad.addColorStop(0.0, 'rgba(235, 248, 255, 0.72)');
-            grad.addColorStop(0.45, 'rgba(210, 238, 248, 0.35)');
-            grad.addColorStop(1.0, 'rgba(180, 225, 240, 0.0)');
-            ctx.fillStyle = grad;
-            ctx.beginPath();
-            ctx.moveTo(64, 4);
-            ctx.lineTo(120, 124);
-            ctx.lineTo(8, 124);
-            ctx.closePath();
-            ctx.fill();
-        } else {
-            // Soft turbulent cloud / smoke puff
-            const blobs = [
-                [64, 64, 42, 0.52],
-                [46, 68, 30, 0.38],
-                [82, 66, 30, 0.38],
-                [60, 48, 32, 0.40],
-                [68, 78, 28, 0.30]
-            ];
-            for (const [bx, by, br, alpha] of blobs) {
-                const g = ctx.createRadialGradient(bx, by, 2, bx, by, br);
-                g.addColorStop(0.0, `rgba(255, 255, 255, ${alpha})`);
-                g.addColorStop(0.55, `rgba(245, 245, 248, ${alpha * 0.55})`);
-                g.addColorStop(1.0, 'rgba(240, 240, 245, 0.0)');
-                ctx.fillStyle = g;
-                ctx.fillRect(0, 0, size, size);
-            }
-        }
-
-        const tex = new THREE.CanvasTexture(canvas);
-        if (THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace;
-        tex.userData = { isSharedLibraryTexture: true };
+        const tex = createParticleSpriteTexture(kind);
         this._sprites.set(cacheKey, tex);
         return tex;
     }
@@ -541,76 +547,7 @@ export class PBRTextureGenerator {
         const cacheKey = `foliage_${species}`;
         if (this._sprites.has(cacheKey)) return this._sprites.get(cacheKey);
         if (!this._canRender2D(false)) return null;
-
-        const size = 256;
-        const canvas = document.createElement('canvas');
-        canvas.width = size;
-        canvas.height = size;
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, size, size);
-
-        if (species === 'pine') {
-            // Layered Japanese black pine needle fan tufts
-            for (let i = 0; i < 110; i++) {
-                const h1 = hash2(i, 3);
-                const h2 = hash2(i, 19);
-                const cx = 128 + (h1 - 0.5) * 116;
-                const cy = 128 + (h2 - 0.5) * 86;
-                if (Math.hypot((cx - 128) * 0.85, (cy - 128) * 1.15) > 95) continue;
-                const shade = Math.floor(195 + hash2(i, 41) * 60);
-                ctx.strokeStyle = `rgb(${shade - 15}, ${shade}, ${shade - 20})`;
-                ctx.lineWidth = 2.6;
-                for (let n = -3; n <= 3; n++) {
-                    const ang = -Math.PI * 0.5 + n * 0.24 + (h1 - 0.5) * 0.3;
-                    const len = 16 + hash2(i + n, 7) * 14;
-                    ctx.beginPath();
-                    ctx.moveTo(cx, cy);
-                    ctx.lineTo(cx + Math.cos(ang) * len, cy + Math.sin(ang) * len);
-                    ctx.stroke();
-                }
-            }
-        } else if (species === 'willow') {
-            // Cascading willow leaf strands
-            for (let s = 0; s < 14; s++) {
-                const sx = 28 + (s / 13) * 200;
-                const topY = 12 + hash2(s, 5) * 28;
-                const botY = 210 + hash2(s, 9) * 38;
-                ctx.strokeStyle = 'rgba(215, 232, 185, 0.92)';
-                ctx.lineWidth = 2.0;
-                ctx.beginPath();
-                ctx.moveTo(sx, topY);
-                ctx.lineTo(sx + (hash2(s, 2) - 0.5) * 14, botY);
-                ctx.stroke();
-
-                for (let y = topY + 10; y < botY; y += 11) {
-                    const side = ((y | 0) % 2 === 0) ? 1 : -1;
-                    const shade = 215 + Math.floor(hash2(s, y) * 40);
-                    ctx.fillStyle = `rgb(${shade - 12}, ${shade}, ${shade - 22})`;
-                    ctx.beginPath();
-                    ctx.ellipse(sx + side * 6, y, 7.5, 2.6, side * 0.45, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-            }
-        } else {
-            // Sakura / Deciduous soft clustered leaf/blossom canopy card
-            for (let i = 0; i < 95; i++) {
-                const a = hash2(i, 11) * Math.PI * 2;
-                const r = Math.sqrt(hash2(i, 29)) * 88;
-                const cx = 128 + Math.cos(a) * r;
-                const cy = 128 + Math.sin(a) * r * 0.84;
-                const rad = 11 + hash2(i, 53) * 14;
-                const tone = Math.floor(218 + hash2(i, 71) * 37);
-                ctx.fillStyle = `rgb(${tone}, ${tone - 6}, ${tone - 4})`;
-                ctx.beginPath();
-                ctx.arc(cx, cy, rad, 0, Math.PI * 2);
-                ctx.fill();
-            }
-        }
-
-        const tex = new THREE.CanvasTexture(canvas);
-        if (THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace;
-        tex.anisotropy = this._maxAnisotropy;
-        tex.userData = { isSharedLibraryTexture: true };
+        const tex = createFoliageSpriteTexture(species, this._maxAnisotropy);
         this._sprites.set(cacheKey, tex);
         return tex;
     }

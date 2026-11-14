@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { CONFIG } from '../config.js';
 import { MaterialLibrary } from '../renderer/materialLibrary.js';
 import { MeijiArchitectureKit as Kit } from './meijiArchitectureKit.js';
+import { getFireproofPalette } from './masonryPalette.js';
 
 export class IndustrialMeshes {
     // 1. Industrial Level 1: Craft & Kiln Workshop (工房 / 登り窯)
@@ -13,7 +14,9 @@ export class IndustrialMeshes {
         const sub = new THREE.Group();
         const woodMat = MaterialLibrary.get('woodDark');
         const lightWood = MaterialLibrary.get('woodLight');
-        const brickMat = MaterialLibrary.get('redBrick');
+        const pal = getFireproofPalette(tile, 'industrial');
+        const brickMat = pal.kilnMat;
+        const chimneyMat = pal.chimneyMat;
         const stoneMat = MaterialLibrary.get('stoneGranite');
         const ironMat = MaterialLibrary.get('darkIron');
 
@@ -47,8 +50,8 @@ export class IndustrialMeshes {
         // Glowing kiln firebox mouth at front of Chamber 1
         Kit.addPart(sub, new THREE.BoxGeometry(0.18, 0.18, 0.04), MaterialLibrary.get('hearthFire'), [0.46, 0.22, 0.51], false, null, false, 'Lantern_Glow');
 
-        // Tapered brick smokestack with banded iron collar
-        Kit.addPart(sub, new THREE.CylinderGeometry(0.09, 0.13, 1.35, 8), brickMat, [0.46, 1.04, -0.52], true);
+        // Tapered masonry smokestack with banded iron collar
+        Kit.addPart(sub, new THREE.CylinderGeometry(0.09, 0.13, 1.35, 8), chimneyMat, [0.46, 1.04, -0.52], true);
         const stackCollar = Kit.addPart(sub, new THREE.CylinderGeometry(0.14, 0.14, 0.08, 8), ironMat, [0.46, 1.70, -0.52]);
         stackCollar.userData = { isSmokestack: true, stackHeight: 1.74 };
 
@@ -68,23 +71,29 @@ export class IndustrialMeshes {
         return group;
     }
 
-    // 2. Industrial Level 2: Modern Meiji Red-Brick Silk Reeling Mill (製糸場)
+    // 2. Industrial Level 2: Modern Meiji Silk Reeling Mill (製糸場)
     static createTextileMillL2Mesh(tile, facingAngle = 0) {
         const group = new THREE.Group();
         const sub = new THREE.Group();
-        const brickMat = MaterialLibrary.get('redBrick');
-        const trimMat = MaterialLibrary.get('stoneTrim');
+        const pal = getFireproofPalette(tile, 'industrial');
+        const lowerMat = pal.lowerWallMat;
+        const upperMat = pal.upperWallMat;
+        const trimMat = pal.trimMat;
+        const quoinMat = pal.quoinMat;
+        const chimneyMat = pal.chimneyMat;
         const glassMat = MaterialLibrary.get('glassWindow');
-        const roofMat = MaterialLibrary.get('slateRoof');
+        const roofMat = pal.roofMat;
         const ironMat = MaterialLibrary.get('darkIron');
         const woodMat = MaterialLibrary.get('woodDark');
 
         // 1. Granite plinth foundation
         Kit.addStoneFoundation(sub, 1.62, 1.62, 0.14);
 
-        // 2. Main 2-story brick reeling hall with white timber truss framework
-        Kit.addPart(sub, new THREE.BoxGeometry(1.38, 0.88, 1.06), brickMat, [-0.06, 0.58, 0.14], true, null, true);
+        // 2. Main 2-story reeling hall with varied lower masonry & upper wall/frame
+        Kit.addPart(sub, new THREE.BoxGeometry(1.38, 0.44, 1.06), lowerMat, [-0.06, 0.36, 0.14], true, null, true);
+        Kit.addPart(sub, new THREE.BoxGeometry(1.38, 0.44, 1.06), upperMat, [-0.06, 0.80, 0.14], true, null, true);
         Kit.addPart(sub, new THREE.BoxGeometry(1.42, 0.06, 1.10), trimMat, [-0.06, 0.58, 0.14]); // Belt course
+        Kit.addCornerPillars(sub, 1.40, 1.08, 0.88, 0.58, 0.14, 0.07, quoinMat);
 
         // Clerestory roof monitor along ridge for natural silk-sorting daylight
         Kit.addGabledRoof(sub, 1.48, 1.16, 0.34, 1.02, 0.14, roofMat, -0.06);
@@ -100,13 +109,13 @@ export class IndustrialMeshes {
             Kit.addPart(sub, new THREE.BoxGeometry(0.22, 0.04, 0.06), trimMat, [wx - 0.06, 0.65, 0.69]); // Sill
         }
 
-        // 3. Side boiler annex & tall tapered brick smokestack
-        Kit.addPart(sub, new THREE.BoxGeometry(0.40, 0.46, 0.70), brickMat, [0.54, 0.37, 0.14], true);
+        // 3. Side boiler annex & tall tapered smoked-masonry smokestack
+        Kit.addPart(sub, new THREE.BoxGeometry(0.40, 0.46, 0.70), chimneyMat, [0.54, 0.37, 0.14], true);
         Kit.addPart(sub, new THREE.BoxGeometry(0.44, 0.06, 0.74), trimMat, [0.54, 0.61, 0.14]);
-        Kit.addPart(sub, new THREE.BoxGeometry(0.40, 0.42, 0.42), brickMat, [0.54, 0.35, -0.45], true);
+        Kit.addPart(sub, new THREE.BoxGeometry(0.40, 0.42, 0.42), chimneyMat, [0.54, 0.35, -0.45], true);
 
         // Tapered smokestack with banded iron collar
-        Kit.addPart(sub, new THREE.CylinderGeometry(0.10, 0.16, 1.75, 8), brickMat, [0.54, 1.30, -0.45], true);
+        Kit.addPart(sub, new THREE.CylinderGeometry(0.10, 0.16, 1.75, 8), chimneyMat, [0.54, 1.30, -0.45], true);
         const millCollar = Kit.addPart(sub, new THREE.CylinderGeometry(0.16, 0.16, 0.10, 8), ironMat, [0.54, 2.15, -0.45]);
         millCollar.userData = { isSmokestack: true, stackHeight: 2.20 };
 
@@ -139,6 +148,7 @@ export class IndustrialMeshes {
         sub.add(wheelGroup);
 
         sub.rotation.y = facingAngle;
+        group.userData = { masonryVariant: pal.variantName };
         group.add(sub);
         return group;
     }
@@ -148,7 +158,8 @@ export class IndustrialMeshes {
         const group = new THREE.Group();
         const sub = new THREE.Group();
         const s = CONFIG.TILE_SIZE;
-        const brickMat = MaterialLibrary.get('redBrick');
+        const brickMat = MaterialLibrary.get('clinkerBrick');
+        const stoneMat = MaterialLibrary.get('ashlarStone');
         const ironMat = MaterialLibrary.get('darkIron');
         const trimMat = MaterialLibrary.get('stoneTrim');
         const glassMat = MaterialLibrary.get('glassWindow');
@@ -157,8 +168,11 @@ export class IndustrialMeshes {
         // 1. Heavy granite foundation apron
         Kit.addPart(sub, new THREE.BoxGeometry(s * 1.85, 0.20, s * 1.85), MaterialLibrary.get('stoneGranite'), [0, 0.10, 0], false, null, true);
 
-        // 2. Massive brick turbine generator hall
+        // 2. Massive soot-darkened clinker turbine generator hall with ashlar stone buttress piers
         Kit.addPart(sub, new THREE.BoxGeometry(s * 1.12, 1.48, s * 1.42), brickMat, [-0.26 * s, 0.84, 0], true, null, true);
+        for (const bz of [-0.66 * s, -0.32 * s, 0, 0.32 * s, 0.66 * s]) {
+            Kit.addPart(sub, new THREE.BoxGeometry(s * 1.18, 1.42, 0.11), stoneMat, [-0.26 * s, 0.84, bz], true);
+        }
         Kit.addPart(sub, new THREE.BoxGeometry(s * 1.16, 0.08, s * 1.46), trimMat, [-0.26 * s, 0.88, 0]); // String course
         Kit.addPart(sub, new THREE.BoxGeometry(s * 1.20, 0.22, s * 1.48), ironMat, [-0.26 * s, 1.66, 0], true); // Entablature / roof plate
 
@@ -192,7 +206,7 @@ export class IndustrialMeshes {
         Kit.addPart(sub, pipeGeo, ironMat, [0.12 * s, 1.25, 0.20 * s], true);
         Kit.addPart(sub, pipeGeo, ironMat, [0.12 * s, 1.25, 0.45 * s], true);
 
-        // Twin iron smokestacks on brick octagonal pedestals
+        // Twin iron smokestacks on clinker brick octagonal pedestals
         for (const sz of [0.18 * s, 0.54 * s]) {
             Kit.addPart(sub, new THREE.CylinderGeometry(0.18, 0.22, 0.45, 8), brickMat, [0.55 * s, 0.95, sz], true);
             Kit.addPart(sub, new THREE.CylinderGeometry(0.13, 0.16, 2.50, 8), ironMat, [0.55 * s, 2.40, sz], true);

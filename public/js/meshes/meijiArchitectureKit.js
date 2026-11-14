@@ -246,6 +246,44 @@ export class MeijiArchitectureKit {
     }
 
     /**
+     * Classical triangular pediment prism with projecting raking cornice and horizontal architrave.
+     */
+    static addTriangularPediment(parent, width, height, depth, tympanumMat, corniceMat, pos = [0, 0, 0]) {
+        const hw = width / 2;
+        const hd = depth / 2;
+        const positions = new Float32Array([
+            -hw, 0, hd,   hw, 0, hd,   0, height, hd,
+             hw, 0,-hd,  -hw, 0,-hd,   0, height,-hd,
+            -hw, 0,-hd,  -hw, 0, hd,   0, height, hd,
+            -hw, 0,-hd,   0, height, hd,  0, height,-hd,
+             hw, 0, hd,   hw, 0,-hd,   0, height,-hd,
+             hw, 0, hd,   0, height,-hd,  0, height, hd,
+            -hw, 0,-hd,   hw, 0,-hd,   hw, 0, hd,
+            -hw, 0,-hd,   hw, 0, hd,  -hw, 0, hd
+        ]);
+        const uvs = new Float32Array(24 * 2);
+        for (let i = 0; i < 24; i++) {
+            uvs[i * 2] = (positions[i * 3] + hw) / (width || 1);
+            uvs[i * 2 + 1] = positions[i * 3 + 1] / (height || 1);
+        }
+        const geo = new THREE.BufferGeometry();
+        const AttrClass = THREE.Float32BufferAttribute || THREE.BufferAttribute;
+        if (AttrClass) {
+            geo.setAttribute('position', new AttrClass(positions, 3));
+            geo.setAttribute('uv', new AttrClass(uvs, 2));
+        }
+        geo.computeVertexNormals();
+        this.addPart(parent, geo, tympanumMat, pos, true, null, true, 'Pediment_Tympanum');
+
+        const slopeLen = Math.hypot(hw + 0.08, height + 0.04);
+        const slopeAng = Math.atan2(height, hw);
+        const rakingGeo = new THREE.BoxGeometry(slopeLen, 0.06, depth + 0.08);
+        this.addPart(parent, rakingGeo, corniceMat, [pos[0] - hw * 0.5, pos[1] + height * 0.5 + 0.025, pos[2]], true, [0, 0, slopeAng]);
+        this.addPart(parent, rakingGeo, corniceMat, [pos[0] + hw * 0.5, pos[1] + height * 0.5 + 0.025, pos[2]], true, [0, 0, -slopeAng]);
+        this.addPart(parent, new THREE.BoxGeometry(width + 0.14, 0.055, depth + 0.07), corniceMat, [pos[0], pos[1] + 0.01, pos[2]], true);
+    }
+
+    /**
      * Namako-kabe fireproof diamond-tile wainscoting dado with protective capping beam.
      */
     static addNamakoDado(parent, width, height, depth, yBase, zOffset = 0) {

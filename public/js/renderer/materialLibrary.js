@@ -121,7 +121,10 @@ export class MaterialLibrary {
         };
 
         const kawaraPBR = PBRTextureGenerator.getKawaraSet();
-        const brickPBR = PBRTextureGenerator.getBrickSet();
+        const brickPBR = PBRTextureGenerator.getBrickSet('red');
+        const buffBrickPBR = PBRTextureGenerator.getBrickSet('buff');
+        const clinkerBrickPBR = PBRTextureGenerator.getBrickSet('clinker');
+        const ashlarPBR = PBRTextureGenerator.getAshlarSet();
         const plasterPBR = PBRTextureGenerator.getPlasterSet();
         const namakoPBR = PBRTextureGenerator.getNamakoSet();
         const woodPBR = PBRTextureGenerator.getWoodWallSet();
@@ -155,6 +158,8 @@ export class MaterialLibrary {
 
             plasterWhite: new THREE.MeshStandardMaterial({ name: 'M_Plaster', color: 0xffffff, roughness: 0.85, metalness: 0.02, envMapIntensity: 0.62, ...pbrOpts(plasterPBR, lazyPlaster, 0.32, 0.32) }),
             plasterWarm: new THREE.MeshStandardMaterial({ name: 'M_WarmPlaster', color: 0xebe1cf, roughness: 0.84, metalness: 0.02, envMapIntensity: 0.62, ...pbrOpts(plasterPBR, lazyPlaster, 0.32, 0.32) }),
+            stuccoOchre: new THREE.MeshStandardMaterial({ name: 'M_StuccoOchre', color: 0xd8c7a6, roughness: 0.84, metalness: 0.02, envMapIntensity: 0.62, ...pbrOpts(plasterPBR, lazyPlaster, 0.34, 0.34) }),
+            stuccoSage: new THREE.MeshStandardMaterial({ name: 'M_StuccoSage', color: 0xbcc2b2, roughness: 0.84, metalness: 0.02, envMapIntensity: 0.62, ...pbrOpts(plasterPBR, lazyPlaster, 0.34, 0.34) }),
             plasterBlack: new THREE.MeshStandardMaterial({ name: 'M_BlackPlaster', color: 0x262930, roughness: 0.64, metalness: 0.08, envMapIntensity: 0.78 }),
             namakoWall: new THREE.MeshStandardMaterial({ name: 'M_Namako', color: 0xffffff, roughness: 0.72, metalness: 0.06, envMapIntensity: 0.74, ...pbrOpts(namakoPBR, lazyNamako, 0.55, 0.55) }),
 
@@ -162,9 +167,13 @@ export class MaterialLibrary {
             copperRoof: new THREE.MeshStandardMaterial({ name: 'M_CopperRoof', color: 0x3b6e66, roughness: 0.44, metalness: 0.42, envMapIntensity: 1.25 }),
             slateRoof: new THREE.MeshStandardMaterial({ name: 'M_SlateRoof', color: 0x434d59, roughness: 0.56, metalness: 0.16, envMapIntensity: 0.98, ...pbrOpts(kawaraPBR, lazyKawara, 0.62, 0.62) }),
 
-            redBrick: new THREE.MeshStandardMaterial({ name: 'M_Brick', color: 0xffffff, roughness: 0.82, metalness: 0.05, envMapIntensity: 0.65, ...pbrOpts(brickPBR, lazyBrick, 0.64, 0.64) }),
+            redBrick: new THREE.MeshStandardMaterial({ name: 'M_Brick', color: 0xffffff, roughness: 0.82, metalness: 0.05, envMapIntensity: 0.65, ...pbrOpts(brickPBR, lazyBrick, 0.56, 0.56) }),
+            buffBrick: new THREE.MeshStandardMaterial({ name: 'M_BuffBrick', color: buffBrickPBR.map ? 0xffffff : 0xe0be88, roughness: 0.82, metalness: 0.04, envMapIntensity: 0.65, ...pbrOpts(buffBrickPBR, lazyBrick, 0.54, 0.54) }),
+            clinkerBrick: new THREE.MeshStandardMaterial({ name: 'M_ClinkerBrick', color: clinkerBrickPBR.map ? 0xffffff : 0x8c645a, roughness: 0.86, metalness: 0.06, envMapIntensity: 0.60, ...pbrOpts(clinkerBrickPBR, lazyBrick, 0.58, 0.58) }),
+            ashlarStone: new THREE.MeshStandardMaterial({ name: 'M_AshlarStone', color: 0xffffff, roughness: 0.78, metalness: 0.05, envMapIntensity: 0.68, ...pbrOpts(ashlarPBR, null, 0.58, 0.58) }),
+            pavilionLimestone: new THREE.MeshStandardMaterial({ name: 'M_PavilionStone', color: 0xe6dbc4, roughness: 0.76, metalness: 0.05, envMapIntensity: 0.70, ...pbrOpts(ashlarPBR, null, 0.54, 0.54) }),
             stoneGranite: new THREE.MeshStandardMaterial({ name: 'M_Stone', color: 0xffffff, roughness: 0.84, metalness: 0.06, envMapIntensity: 0.68, ...pbrOpts(stonePBR, null, 0.60, 0.60) }),
-            stoneTrim: new THREE.MeshStandardMaterial({ name: 'M_StoneTrim', color: 0xe2dcd0, roughness: 0.72, metalness: 0.06, envMapIntensity: 0.72, ...pbrOpts({ map: null, normalMap: stonePBR.normalMap, roughnessMap: stonePBR.roughnessMap }, null, 0.32, 0.32) }),
+            stoneTrim: new THREE.MeshStandardMaterial({ name: 'M_StoneTrim', color: 0xd6cdb8, roughness: 0.72, metalness: 0.06, envMapIntensity: 0.72, ...pbrOpts({ map: null, normalMap: ashlarPBR.normalMap || stonePBR.normalMap, roughnessMap: ashlarPBR.roughnessMap || stonePBR.roughnessMap }, null, 0.34, 0.34) }),
             gravel: new THREE.MeshStandardMaterial({ name: 'M_Gravel', color: 0x827d74, roughness: 0.94, metalness: 0.0, envMapIntensity: 0.50 }),
 
             norenIndigo: new THREE.MeshStandardMaterial({ name: 'M_Noren', color: 0x1c3554, roughness: 0.78, metalness: 0.0, envMapIntensity: 0.52 }),
@@ -242,7 +251,7 @@ export class MaterialLibrary {
             mat.userData = { isSharedLibraryMaterial: true };
         }
 
-        for (const key of ['woodDark', 'woodMedium', 'woodLight', 'plasterWhite', 'plasterWarm', 'plasterBlack', 'namakoWall', 'redBrick', 'stoneGranite', 'stoneTrim', 'toriiVermilion']) {
+        for (const key of ['woodDark', 'woodMedium', 'woodLight', 'plasterWhite', 'plasterWarm', 'stuccoOchre', 'stuccoSage', 'plasterBlack', 'namakoWall', 'redBrick', 'buffBrick', 'clinkerBrick', 'ashlarStone', 'pavilionLimestone', 'stoneGranite', 'stoneTrim', 'toriiVermilion']) {
             WeatheringShaderSystem.enhanceBuildingMaterial(this._materials[key], { isRoof: false, aoHeight: 0.42, variation: 0.075 });
         }
         for (const key of ['kawaraRoof', 'copperRoof', 'slateRoof']) {

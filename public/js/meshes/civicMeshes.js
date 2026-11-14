@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { CONFIG } from '../config.js';
 import { MaterialLibrary } from '../renderer/materialLibrary.js';
 import { MeijiArchitectureKit as Kit } from './meijiArchitectureKit.js';
+import { createExhibitionPavilionMesh } from './pavilionMesh.js';
 
 export class CivicBuildingMeshes {
     // 1. Fire Watchtower (Hinomi-yagura / 火の見櫓)
@@ -240,13 +241,14 @@ export class CivicBuildingMeshes {
         const trimMat = MaterialLibrary.get('stoneTrim');
         const glassMat = MaterialLibrary.get('glassWindow');
 
-        // Octagonal granite plinth
+        // Octagonal granite plinth & dressed stone lower dado wainscoting
         Kit.addPart(sub, new THREE.CylinderGeometry(s * 0.38, s * 0.40, 0.14, 8), MaterialLibrary.get('stoneGranite'), [0, 0.07, 0], true);
+        Kit.addPart(sub, new THREE.CylinderGeometry(s * 0.335, s * 0.335, 0.34, 8), MaterialLibrary.get('ashlarStone'), [0, 0.31, 0], true, null, true);
 
-        // Octagonal red-brick body with stone quoins
-        Kit.addPart(sub, new THREE.CylinderGeometry(s * 0.32, s * 0.32, 1.30, 8), MaterialLibrary.get('redBrick'), [0, 0.79, 0], true, null, true);
-        Kit.addPart(sub, new THREE.CylinderGeometry(s * 0.33, 0.33, 0.08, 8), trimMat, [0, 0.26, 0]); // Dado trim
-        Kit.addPart(sub, new THREE.CylinderGeometry(s * 0.34, 0.34, 0.08, 8), trimMat, [0, 1.38, 0]); // Cornice
+        // Octagonal upper brick body with stone dado rail & cornice
+        Kit.addPart(sub, new THREE.CylinderGeometry(s * 0.32, s * 0.32, 0.96, 8), MaterialLibrary.get('redBrick'), [0, 0.96, 0], true, null, true);
+        Kit.addPart(sub, new THREE.CylinderGeometry(s * 0.345, s * 0.345, 0.06, 8), trimMat, [0, 0.48, 0]); // Dado trim
+        Kit.addPart(sub, new THREE.CylinderGeometry(s * 0.34, s * 0.34, 0.08, 8), trimMat, [0, 1.40, 0]); // Cornice
 
         // Wooden front door
         Kit.addPart(sub, new THREE.BoxGeometry(0.36, 0.88, 0.08), woodMat, [0, 0.58, s * 0.30], true);
@@ -435,53 +437,6 @@ export class CivicBuildingMeshes {
 
     // 11. 3x3 Imperial Industrial Exhibition Pavilion (内国勧業博覧会 パビリオン)
     static createPavilionMesh(tile, facingAngle = 0) {
-        const group = new THREE.Group();
-        const sub = new THREE.Group();
-        const s = CONFIG.TILE_SIZE;
-        const plasterMat = MaterialLibrary.get('plasterWhite');
-        const trimMat = MaterialLibrary.get('stoneTrim');
-        const domeMat = MaterialLibrary.get('copperRoof');
-        const goldMat = MaterialLibrary.get('goldLeaf');
-
-        // 1. Grand stepped granite plaza
-        Kit.addPart(sub, new THREE.BoxGeometry(s * 2.80, 0.22, s * 2.80), MaterialLibrary.get('stoneGranite'), [0, 0.11, 0], false, null, true);
-        Kit.addPart(sub, new THREE.BoxGeometry(s * 2.50, 0.08, s * 2.50), trimMat, [0, 0.26, 0], false, null, true);
-
-        // 2. Colonnaded central wing & flanking palace wings
-        Kit.addPart(sub, new THREE.BoxGeometry(s * 2.25, 1.35, s * 1.90), plasterMat, [0, 0.95, -0.05 * s], true, null, true);
-        Kit.addPart(sub, new THREE.BoxGeometry(s * 2.30, 0.08, s * 1.95), trimMat, [0, 1.65, -0.05 * s]);
-
-        // 3. Central triumphal portico with classical Tuscan columns
-        for (const cx of [-0.65 * s, -0.22 * s, 0.22 * s, 0.65 * s]) {
-            Kit.addPart(sub, new THREE.CylinderGeometry(0.06, 0.07, 1.35, 8), plasterMat, [cx, 0.95, 0.95 * s], true);
-            Kit.addPart(sub, new THREE.BoxGeometry(0.18, 0.06, 0.18), trimMat, [cx, 1.64, 0.95 * s]);
-        }
-        Kit.addPart(sub, new THREE.BoxGeometry(1.55 * s, 0.10, 0.40 * s), trimMat, [0, 1.70, 0.95 * s], true);
-
-        // Portico pediment
-        const porticoPed = new THREE.ConeGeometry(0.85 * s, 0.42, 4);
-        porticoPed.rotateY(Math.PI / 4);
-        Kit.addPart(sub, porticoPed, trimMat, [0, 1.94, 0.95 * s]);
-
-        // 4. Second drum tier & soaring ribbed copper dome
-        Kit.addPart(sub, new THREE.BoxGeometry(s * 1.65, 0.90, s * 1.50), plasterMat, [0, 2.10, -0.05 * s], true, null, true);
-        Kit.addPart(sub, new THREE.CylinderGeometry(0.55, 0.60, 0.65, 12), plasterMat, [0, 2.85, -0.05 * s], true);
-
-        // Copper dome with ribs
-        Kit.addPart(sub, new THREE.ConeGeometry(0.68, 0.85, 12), domeMat, [0, 3.50, -0.05 * s], true);
-
-        // Gilded imperial spire & bronze finial
-        Kit.addPart(sub, new THREE.CylinderGeometry(0.02, 0.04, 0.65, 6), goldMat, [0, 4.10, -0.05 * s]);
-        Kit.addPart(sub, new THREE.SphereGeometry(0.08, 8, 8), goldMat, [0, 4.45, -0.05 * s]);
-
-        // Stone corner lanterns on plaza
-        for (const [lx, lz] of [[-1.25 * s, 1.25 * s], [1.25 * s, 1.25 * s]]) {
-            Kit.addPart(sub, new THREE.BoxGeometry(0.14, 0.40, 0.14), trimMat, [lx, 0.45, lz], true);
-            Kit.addPart(sub, new THREE.BoxGeometry(0.10, 0.10, 0.10), MaterialLibrary.get('redLantern'), [lx, 0.70, lz]);
-        }
-
-        sub.rotation.y = facingAngle;
-        group.add(sub);
-        return group;
+        return createExhibitionPavilionMesh(facingAngle);
     }
 }
