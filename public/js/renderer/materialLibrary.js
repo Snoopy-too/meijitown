@@ -149,7 +149,9 @@ export class MaterialLibrary {
         this._materials = {
             woodDark: new THREE.MeshStandardMaterial({ name: 'M_Wood', color: 0x422f22, roughness: 0.78, metalness: 0.05, envMapIntensity: 0.62, ...pbrOpts({ map: null, normalMap: woodPBR.normalMap, roughnessMap: woodPBR.roughnessMap }, null, 0.35, 0.35) }),
             woodMedium: new THREE.MeshStandardMaterial({ name: 'M_Cedar', color: 0xffffff, roughness: 0.78, metalness: 0.05, envMapIntensity: 0.62, ...pbrOpts(woodPBR, lazyWoodWall, 0.48, 0.48) }),
+            woodCharred: new THREE.MeshStandardMaterial({ name: 'M_Yakisugi', color: 0x625a54, roughness: 0.84, metalness: 0.04, envMapIntensity: 0.56, ...pbrOpts(woodPBR, lazyWoodWall, 0.52, 0.52) }),
             woodLight: new THREE.MeshStandardMaterial({ name: 'M_LightWood', color: 0x9e7e52, roughness: 0.74, metalness: 0.05, envMapIntensity: 0.65 }),
+            woodHinoki: new THREE.MeshStandardMaterial({ name: 'M_Hinoki', color: 0xb58d58, roughness: 0.72, metalness: 0.04, envMapIntensity: 0.66, ...pbrOpts({ map: null, normalMap: woodPBR.normalMap, roughnessMap: woodPBR.roughnessMap }, null, 0.30, 0.30) }),
             bamboo: new THREE.MeshStandardMaterial({ name: 'M_Bamboo', color: 0xa8945e, roughness: 0.66, metalness: 0.05, envMapIntensity: 0.68 }),
             reedScreen: new THREE.MeshStandardMaterial({ name: 'M_ReedScreen', color: 0xc2a874, roughness: 0.86, metalness: 0.0, envMapIntensity: 0.55 }),
             hempMat: new THREE.MeshStandardMaterial({ name: 'M_Matting', color: 0x948260, roughness: 0.90, metalness: 0.0, envMapIntensity: 0.52 }),
@@ -158,12 +160,14 @@ export class MaterialLibrary {
 
             plasterWhite: new THREE.MeshStandardMaterial({ name: 'M_Plaster', color: 0xffffff, roughness: 0.85, metalness: 0.02, envMapIntensity: 0.62, ...pbrOpts(plasterPBR, lazyPlaster, 0.32, 0.32) }),
             plasterWarm: new THREE.MeshStandardMaterial({ name: 'M_WarmPlaster', color: 0xebe1cf, roughness: 0.84, metalness: 0.02, envMapIntensity: 0.62, ...pbrOpts(plasterPBR, lazyPlaster, 0.32, 0.32) }),
+            plasterUmber: new THREE.MeshStandardMaterial({ name: 'M_UmberPlaster', color: 0xcab38b, roughness: 0.88, metalness: 0.02, envMapIntensity: 0.58, ...pbrOpts(plasterPBR, lazyPlaster, 0.36, 0.36) }),
             stuccoOchre: new THREE.MeshStandardMaterial({ name: 'M_StuccoOchre', color: 0xd8c7a6, roughness: 0.84, metalness: 0.02, envMapIntensity: 0.62, ...pbrOpts(plasterPBR, lazyPlaster, 0.34, 0.34) }),
             stuccoSage: new THREE.MeshStandardMaterial({ name: 'M_StuccoSage', color: 0xbcc2b2, roughness: 0.84, metalness: 0.02, envMapIntensity: 0.62, ...pbrOpts(plasterPBR, lazyPlaster, 0.34, 0.34) }),
             plasterBlack: new THREE.MeshStandardMaterial({ name: 'M_BlackPlaster', color: 0x262930, roughness: 0.64, metalness: 0.08, envMapIntensity: 0.78 }),
             namakoWall: new THREE.MeshStandardMaterial({ name: 'M_Namako', color: 0xffffff, roughness: 0.72, metalness: 0.06, envMapIntensity: 0.74, ...pbrOpts(namakoPBR, lazyNamako, 0.55, 0.55) }),
 
             kawaraRoof: new THREE.MeshStandardMaterial({ name: 'M_KawaraRoof', color: 0xffffff, roughness: 0.52, metalness: 0.18, envMapIntensity: 1.05, ...pbrOpts(kawaraPBR, lazyKawara, 0.72, 0.72) }),
+            kawaraRusset: new THREE.MeshStandardMaterial({ name: 'M_SekishuRoof', color: 0xb8806e, roughness: 0.54, metalness: 0.12, envMapIntensity: 0.92, ...pbrOpts(kawaraPBR, lazyKawara, 0.68, 0.68) }),
             copperRoof: new THREE.MeshStandardMaterial({ name: 'M_CopperRoof', color: 0x3b6e66, roughness: 0.44, metalness: 0.42, envMapIntensity: 1.25 }),
             slateRoof: new THREE.MeshStandardMaterial({ name: 'M_SlateRoof', color: 0x434d59, roughness: 0.56, metalness: 0.16, envMapIntensity: 0.98, ...pbrOpts(kawaraPBR, lazyKawara, 0.62, 0.62) }),
 
@@ -251,10 +255,10 @@ export class MaterialLibrary {
             mat.userData = { isSharedLibraryMaterial: true };
         }
 
-        for (const key of ['woodDark', 'woodMedium', 'woodLight', 'plasterWhite', 'plasterWarm', 'stuccoOchre', 'stuccoSage', 'plasterBlack', 'namakoWall', 'redBrick', 'buffBrick', 'clinkerBrick', 'ashlarStone', 'pavilionLimestone', 'stoneGranite', 'stoneTrim', 'toriiVermilion']) {
+        for (const key of ['woodDark', 'woodMedium', 'woodCharred', 'woodLight', 'woodHinoki', 'plasterWhite', 'plasterWarm', 'plasterUmber', 'stuccoOchre', 'stuccoSage', 'plasterBlack', 'namakoWall', 'redBrick', 'buffBrick', 'clinkerBrick', 'ashlarStone', 'pavilionLimestone', 'stoneGranite', 'stoneTrim', 'toriiVermilion']) {
             WeatheringShaderSystem.enhanceBuildingMaterial(this._materials[key], { isRoof: false, aoHeight: 0.42, variation: 0.075 });
         }
-        for (const key of ['kawaraRoof', 'copperRoof', 'slateRoof']) {
+        for (const key of ['kawaraRoof', 'kawaraRusset', 'copperRoof', 'slateRoof']) {
             WeatheringShaderSystem.enhanceBuildingMaterial(this._materials[key], { isRoof: true, variation: 0.065 });
         }
         WeatheringShaderSystem.enhanceGlassMaterial(this._materials.glassWindow);

@@ -24,6 +24,22 @@ const VARIANT_TABLES = {
     ]
 };
 
+const MACHIYA_ARCHETYPES = ['hira_cottage', 'tsushi_nikai', 'hon_nikai', 'courtyard_machiya'];
+const MACHIYA_WALLS = ['plasterWarm', 'plasterUmber', 'plasterWhite', 'stuccoOchre'];
+const MACHIYA_TIMBERS = [
+    { timber: 'woodMedium', wainscot: 'woodDark' },
+    { timber: 'woodCharred', wainscot: 'woodDark' },
+    { timber: 'woodHinoki', wainscot: 'woodMedium' },
+    { timber: 'woodDark', wainscot: 'woodCharred' }
+];
+const MACHIYA_ROOFS = ['kawaraRoof', 'kawaraRusset', 'kawaraRoof', 'slateRoof'];
+
+const KURA_STYLES = [
+    { name: 'kawagoe_namako', mainWall: 'plasterWhite', doorWall: 'plasterBlack', dado: 'namakoWall', quoin: 'plasterBlack', wood: 'woodDark', roof: 'kawaraRoof' },
+    { name: 'edo_kuro_shikkui', mainWall: 'plasterBlack', doorWall: 'plasterWhite', dado: 'stoneGranite', quoin: 'stoneTrim', wood: 'woodCharred', roof: 'slateRoof' },
+    { name: 'mise_gura_ochre', mainWall: 'plasterUmber', doorWall: 'woodDark', dado: 'woodCharred', quoin: 'plasterWarm', wood: 'woodMedium', roof: 'kawaraRusset' }
+];
+
 function hashTileCoords(tile) {
     const x = Number.isFinite(tile?.x) ? (tile.x | 0) : 0;
     const y = Number.isFinite(tile?.y) ? (tile.y | 0) : 0;
@@ -44,5 +60,42 @@ export function getFireproofPalette(tile, role = 'residential') {
         roofMat: MaterialLibrary.get(spec.roof),
         chimneyMat: MaterialLibrary.get(spec.chimney || spec.lowerWall),
         kilnMat: MaterialLibrary.get(spec.kiln || spec.lowerWall)
+    };
+}
+
+export function getMachiyaPalette(tile) {
+    const h = hashTileCoords(tile);
+    const archetypeIndex = h & 3;
+    const timberPair = MACHIYA_TIMBERS[(h >>> 5) & 3];
+    return {
+        archetypeIndex,
+        archetypeName: MACHIYA_ARCHETYPES[archetypeIndex],
+        flip: ((h >>> 2) & 1) ? -1 : 1,
+        propVariant: (h >>> 9) & 3,
+        hasSudare: ((h >>> 11) & 1) === 1,
+        upperWindowCount: ((h >>> 12) & 1) ? 3 : 2,
+        lanternIsRed: ((h >>> 13) & 3) === 0,
+        plasterMat: MaterialLibrary.get(MACHIYA_WALLS[(h >>> 3) & 3]),
+        timberMat: MaterialLibrary.get(timberPair.timber),
+        wainscotMat: MaterialLibrary.get(timberPair.wainscot),
+        roofMat: MaterialLibrary.get(MACHIYA_ROOFS[(h >>> 7) & 3]),
+        trimMat: MaterialLibrary.get('stoneTrim')
+    };
+}
+
+export function getKuraPalette(tile) {
+    const h = hashTileCoords(tile);
+    const spec = KURA_STYLES[h % KURA_STYLES.length];
+    return {
+        archetypeName: spec.name,
+        flip: ((h >>> 2) & 1) ? -1 : 1,
+        propVariant: (h >>> 4) & 3,
+        mainWallMat: MaterialLibrary.get(spec.mainWall),
+        doorWallMat: MaterialLibrary.get(spec.doorWall),
+        dadoMat: MaterialLibrary.get(spec.dado),
+        quoinMat: MaterialLibrary.get(spec.quoin),
+        woodMat: MaterialLibrary.get(spec.wood),
+        roofMat: MaterialLibrary.get(spec.roof),
+        trimMat: MaterialLibrary.get('stoneTrim')
     };
 }

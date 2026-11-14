@@ -55,7 +55,7 @@ import { ResidentialMeshes } from '../public/js/meshes/residentialMeshes.js';
 import { CommercialMeshes } from '../public/js/meshes/commercialMeshes.js';
 import { IndustrialMeshes } from '../public/js/meshes/industrialMeshes.js';
 import { CivicBuildingMeshes } from '../public/js/meshes/civicMeshes.js';
-import { getFireproofPalette } from '../public/js/meshes/masonryPalette.js';
+import { getFireproofPalette, getMachiyaPalette, getKuraPalette } from '../public/js/meshes/masonryPalette.js';
 
 function avgRGB(img) {
     assert.ok(img && img.data.length > 0, 'Canvas image data must be populated');
@@ -185,4 +185,78 @@ for (const ang of [Math.PI / 2, Math.PI, -Math.PI / 2]) {
     assert.strictEqual(rotPav.children[0].rotation.y, ang, `Rotated Pavilion must preserve facingAngle=${ang}`);
 }
 console.log(`  ✓ Exhibition Pavilion Option A verified (${partCount} parts, ${glassCount} glazed bays, heights ${minY.toFixed(2)}..${maxY.toFixed(2)})`);
-console.log('✅ Masonry variety & Pavilion overhaul tests PASSED');
+
+// 6. Residential Machiya L1 & Kura L2 variety (new traditional finishes, archetypes, flip, bounds & rotations)
+for (const key of ['woodCharred', 'woodHinoki', 'plasterUmber', 'kawaraRusset']) {
+    assert.ok(mats[key], `MaterialLibrary must initialize residential finish '${key}'`);
+    assert.strictEqual(mats[key].userData?.isSharedLibraryMaterial, true, `${key} must be tagged shared`);
+}
+assert.ok(getMachiyaPalette(null).plasterMat && getKuraPalette(undefined).mainWallMat, 'Residential palettes tolerate null/undefined tiles');
+
+const seenMachiyaArch = new Set();
+const seenMachiyaFlips = new Set();
+const seenMachiyaWalls = new Set();
+const seenMachiyaRoofs = new Set();
+const seenKuraStyles = new Set();
+const heightByArch = new Map();
+
+function inspectBuilding(meshGroup) {
+    let bMinX = Infinity, bMaxX = -Infinity, bMinY = Infinity, bMaxY = -Infinity, bMinZ = Infinity, bMaxZ = -Infinity;
+    let parts = 0, windows = 0;
+    const matsUsed = new Set();
+    function walk(o, ox = 0, oy = 0, oz = 0) {
+        const px = ox + (o.position?.x || 0), py = oy + (o.position?.y || 0), pz = oz + (o.position?.z || 0);
+        if (o.isMesh) {
+            parts++;
+            if (o.material?.name) matsUsed.add(o.material.name);
+            if (o.name === 'Front_Koushi' || o.name === 'Upper_Window') windows++;
+            bMinX = Math.min(bMinX, px); bMaxX = Math.max(bMaxX, px);
+            bMinY = Math.min(bMinY, py); bMaxY = Math.max(bMaxY, py);
+            bMinZ = Math.min(bMinZ, pz); bMaxZ = Math.max(bMaxZ, pz);
+        }
+        if (o.children) for (const c of o.children) walk(c, px, py, pz);
+    }
+    walk(meshGroup);
+    return { bMinX, bMaxX, bMinY, bMaxY, bMinZ, bMaxZ, parts, windows, matsUsed };
+}
+
+for (let x = 0; x < 12; x++) {
+    for (let y = 0; y < 12; y++) {
+        const tile = { x, y };
+        const m = ResidentialMeshes.createMachiyaL1Mesh(tile, 0);
+        const { residentialVariant, flip } = m.userData;
+        seenMachiyaArch.add(residentialVariant);
+        seenMachiyaFlips.add(flip);
+        const stats = inspectBuilding(m);
+        for (const mn of stats.matsUsed) {
+            if (['M_WarmPlaster', 'M_UmberPlaster', 'M_Plaster', 'M_StuccoOchre'].includes(mn)) seenMachiyaWalls.add(mn);
+            if (['M_KawaraRoof', 'M_SekishuRoof', 'M_SlateRoof'].includes(mn)) seenMachiyaRoofs.add(mn);
+        }
+        assert.ok(stats.parts >= 28 && stats.windows >= 1, `Machiya '${residentialVariant}' must have composite detail & lit windows`);
+        assert.ok(stats.bMinX >= -0.90 && stats.bMaxX <= 0.90, `Machiya '${residentialVariant}' X (${stats.bMinX.toFixed(2)}..${stats.bMaxX.toFixed(2)}) inside 1x1 plot`);
+        assert.ok(stats.bMinZ >= -0.90 && stats.bMaxZ <= 0.90, `Machiya '${residentialVariant}' Z (${stats.bMinZ.toFixed(2)}..${stats.bMaxZ.toFixed(2)}) inside 1x1 plot`);
+        assert.ok(stats.bMinY >= 0, `Machiya '${residentialVariant}' grounded (${stats.bMinY.toFixed(2)})`);
+        heightByArch.set(residentialVariant, Math.max(heightByArch.get(residentialVariant) || 0, stats.bMaxY));
+
+        const k = ResidentialMeshes.createKuraL2Mesh(tile, 0);
+        seenKuraStyles.add(k.userData.residentialVariant);
+        const kStats = inspectBuilding(k);
+        assert.ok(kStats.parts >= 24 && kStats.windows >= 2, `Kura '${k.userData.residentialVariant}' has composite detail & upper windows`);
+        assert.ok(kStats.bMinX >= -0.90 && kStats.bMaxX <= 0.90 && kStats.bMinZ >= -0.90 && kStats.bMaxZ <= 0.90, `Kura '${k.userData.residentialVariant}' inside 1x1 plot`);
+    }
+}
+
+assert.strictEqual(seenMachiyaArch.size, 4, `All 4 Machiya archetypes must appear across grid (got ${[...seenMachiyaArch].join(', ')})`);
+assert.strictEqual(seenMachiyaFlips.size, 2, 'Machiya street orientation flip ±1 must both appear');
+assert.strictEqual(seenMachiyaWalls.size, 4, `All 4 Machiya plaster tones must appear (got ${[...seenMachiyaWalls].join(', ')})`);
+assert.strictEqual(seenMachiyaRoofs.size, 3, `All 3 Machiya roof finishes must appear (got ${[...seenMachiyaRoofs].join(', ')})`);
+assert.strictEqual(seenKuraStyles.size, 3, `All 3 Kura styles must appear (got ${[...seenKuraStyles].join(', ')})`);
+assert.ok(heightByArch.get('hon_nikai') > heightByArch.get('hira_cottage') + 0.55,
+    `Hon-nikai (${heightByArch.get('hon_nikai').toFixed(2)}) must stand noticeably taller than Hira-cottage (${heightByArch.get('hira_cottage').toFixed(2)})`);
+
+for (const ang of [Math.PI / 2, Math.PI]) {
+    assert.strictEqual(ResidentialMeshes.createMachiyaL1Mesh({ x: 2, y: 3 }, ang).children[0].rotation.y, ang, `Machiya preserves facingAngle=${ang}`);
+    assert.strictEqual(ResidentialMeshes.createKuraL2Mesh({ x: 2, y: 3 }, ang).children[0].rotation.y, ang, `Kura preserves facingAngle=${ang}`);
+}
+console.log(`  ✓ Machiya L1 (4 archetypes, 4 walls, 3 roofs, ±1 flip) & Kura L2 (3 styles) verified`);
+console.log('✅ Masonry, Pavilion & Residential variety tests PASSED');

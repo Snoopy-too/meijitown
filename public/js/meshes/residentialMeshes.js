@@ -6,6 +6,7 @@ import { CONFIG } from '../config.js';
 import { MaterialLibrary } from '../renderer/materialLibrary.js';
 import { MeijiArchitectureKit as Kit } from './meijiArchitectureKit.js';
 import { getFireproofPalette } from './masonryPalette.js';
+import { createVariedMachiyaL1Mesh, createVariedKuraL2Mesh } from './machiyaMesh.js';
 
 export class ResidentialMeshes {
     // 0. Bamboo & Timber Construction Scaffolding
@@ -63,128 +64,14 @@ export class ResidentialMeshes {
         return group;
     }
 
-    // 1. Residential Level 1: Traditional Wooden Townhouse (Machiya / 町家)
+    // 1. Residential Level 1: Traditional Wooden Townhouse (Machiya / 町家) — 4 structural archetypes + finishes
     static createMachiyaL1Mesh(tile, facingAngle = 0) {
-        const group = new THREE.Group();
-        const sub = new THREE.Group();
-        const plasterMat = MaterialLibrary.get('plasterWarm');
-        const cedarMat = MaterialLibrary.get('woodMedium');
-        const woodMat = MaterialLibrary.get('woodDark');
-        const lightWood = MaterialLibrary.get('woodLight');
-        const stoneMat = MaterialLibrary.get('stoneGranite');
-        const shojiMat = MaterialLibrary.get('shojiWindow');
-
-        // 1. Cut-granite plinth foundation
-        Kit.addStoneFoundation(sub, 1.56, 1.54, 0.13);
-
-        // 2. Ground floor timber-and-plaster body with cedar shitami-ita wainscoting
-        Kit.addPart(sub, new THREE.BoxGeometry(1.36, 0.72, 1.32), plasterMat, [0, 0.48, -0.02], true, null, true);
-        Kit.addPart(sub, new THREE.BoxGeometry(1.38, 0.30, 1.34), cedarMat, [0, 0.28, -0.02], true, null, true);
-        Kit.addCornerPillars(sub, 1.40, 1.36, 0.74, 0.49, -0.02);
-        // Center dividing pillar & horizontal nageshi tie-beam on street facade
-        Kit.addPart(sub, new THREE.BoxGeometry(0.06, 0.74, 0.06), woodMat, [-0.10, 0.49, 0.64], true);
-        Kit.addPart(sub, new THREE.BoxGeometry(1.40, 0.045, 0.05), woodMat, [0, 0.78, 0.64], true);
-
-        // 3. Right side: Fine vertical Kōshi lattice window (proud of z = 0.64 front wall)
-        Kit.addKoushiLattice(sub, 0.68, 0.46, [0.29, 0.46, 0.655]);
-
-        // 4. Left side: Genkan sliding lattice doorway (proud of z = 0.64 front wall, NOT buried inside!)
-        Kit.addPart(sub, new THREE.BoxGeometry(0.50, 0.08, 0.22), stoneMat, [-0.38, 0.07, 0.70]);
-        Kit.addPart(sub, new THREE.BoxGeometry(0.42, 0.60, 0.015), shojiMat, [-0.38, 0.43, 0.65], false, null, false, 'Front_Koushi');
-        // Sliding door perimeter frame & mullions
-        Kit.addPart(sub, new THREE.BoxGeometry(0.46, 0.04, 0.04), woodMat, [-0.38, 0.73, 0.66], true);
-        Kit.addPart(sub, new THREE.BoxGeometry(0.46, 0.03, 0.035), woodMat, [-0.38, 0.44, 0.66]);
-        for (const dx of [-0.58, -0.45, -0.38, -0.31, -0.18]) {
-            Kit.addPart(sub, new THREE.BoxGeometry(0.022, 0.60, 0.035), woodMat, [dx, 0.43, 0.66]);
-        }
-        // Wooden house nameplate (hyōsatsu) beside door
-        Kit.addPart(sub, new THREE.BoxGeometry(0.05, 0.14, 0.02), lightWood, [-0.12, 0.56, 0.67]);
-
-        // 5. Intermediate tiled Hisashi awning sheltering ground floor street front
-        Kit.addHisashiAwning(sub, 1.58, 0.36, 0.86, 0.68);
-
-        // 6. Second-story tsushi-nikai loft with mushiko-mado barred lattice windows & udatsu wing walls
-        Kit.addPart(sub, new THREE.BoxGeometry(1.32, 0.44, 1.26), plasterMat, [0, 1.08, -0.02], true, null, true);
-        Kit.addPart(sub, new THREE.BoxGeometry(1.36, 0.045, 1.30), woodMat, [0, 0.88, -0.02], true);
-        // Side udatsu firebreak wing pillars
-        for (const ux of [-0.66, 0.66]) {
-            Kit.addPart(sub, new THREE.BoxGeometry(0.08, 0.48, 0.26), plasterMat, [ux, 1.08, 0.54], true);
-            Kit.addPart(sub, new THREE.BoxGeometry(0.11, 0.04, 0.30), MaterialLibrary.get('kawaraRoof'), [ux, 1.33, 0.54], true);
-        }
-        // Mushiko-mado windows with recessed shoji and 4 proud vertical lattice mullions
-        for (const wx of [-0.36, 0, 0.36]) {
-            Kit.addPart(sub, new THREE.BoxGeometry(0.20, 0.16, 0.015), shojiMat, [wx, 1.10, 0.618], false, null, false, 'Upper_Window');
-            Kit.addPart(sub, new THREE.BoxGeometry(0.24, 0.028, 0.035), woodMat, [wx, 1.18, 0.628]);
-            Kit.addPart(sub, new THREE.BoxGeometry(0.24, 0.028, 0.035), woodMat, [wx, 1.02, 0.628]);
-            for (const mx of [-0.09, -0.03, 0.03, 0.09]) {
-                Kit.addPart(sub, new THREE.BoxGeometry(0.02, 0.16, 0.032), woodMat, [wx + mx, 1.10, 0.628]);
-            }
-        }
-
-        // 7. Main Japanese Kawara gabled roof with curved sori eaves, taruki rafters, and onigawara
-        Kit.addGabledRoof(sub, 1.68, 1.58, 0.46, 1.30, -0.02);
-
-        // 8. Rear courtyard wooden board fence (Hei) & miniature maple tree accent
-        Kit.addPart(sub, new THREE.BoxGeometry(1.30, 0.48, 0.04), woodMat, [0, 0.36, -0.70], true);
-        Kit.addPart(sub, new THREE.CylinderGeometry(0.08, 0.06, 0.09, 8), stoneMat, [0.42, 0.165, -0.62]);
-        Kit.addPart(sub, new THREE.DodecahedronGeometry(0.11, 0), MaterialLibrary.get('toriiVermilion'), [0.42, 0.28, -0.62]);
-
-        sub.rotation.y = facingAngle;
-        group.add(sub);
-        return group;
+        return createVariedMachiyaL1Mesh(tile, facingAngle);
     }
 
-    // 2. Residential Level 2: Fireproof Earthen Storehouse (Kura-zukuri / 蔵造り)
+    // 2. Residential Level 2: Fireproof Earthen Storehouse (Kura-zukuri / 蔵造り) — 3 regional styles
     static createKuraL2Mesh(tile, facingAngle = 0) {
-        const group = new THREE.Group();
-        const sub = new THREE.Group();
-        const blackPlaster = MaterialLibrary.get('plasterBlack');
-        const whitePlaster = MaterialLibrary.get('plasterWhite');
-        const stoneMat = MaterialLibrary.get('stoneGranite');
-        const ironMat = MaterialLibrary.get('darkIron');
-
-        // 1. Heavy cut-granite foundation
-        Kit.addStoneFoundation(sub, 1.62, 1.62, 0.18);
-
-        // 2. Ground floor: Namako-kabe diamond tile wainscoting dado
-        Kit.addNamakoDado(sub, 1.44, 0.46, 1.44, 0.18);
-
-        // White shikkui plaster mid-body
-        Kit.addPart(sub, new THREE.BoxGeometry(1.42, 0.52, 1.42), whitePlaster, [0, 0.90, 0], true, null, true);
-        Kit.addCornerPillars(sub, 1.46, 1.46, 0.98, 0.67, 0, 0.11, blackPlaster);
-
-        // Recessed double-leaf plaster fire doors with heavy iron hinges
-        Kit.addPart(sub, new THREE.BoxGeometry(0.66, 0.08, 0.16), stoneMat, [0, 0.18, 0.74]);
-        Kit.addPart(sub, new THREE.BoxGeometry(0.30, 0.70, 0.06), blackPlaster, [-0.16, 0.57, 0.72], true);
-        Kit.addPart(sub, new THREE.BoxGeometry(0.30, 0.70, 0.06), blackPlaster, [0.16, 0.57, 0.72], true);
-        // Iron hinge straps and latch
-        Kit.addPart(sub, new THREE.BoxGeometry(0.64, 0.04, 0.08), ironMat, [0, 0.72, 0.73]);
-        Kit.addPart(sub, new THREE.BoxGeometry(0.64, 0.04, 0.08), ironMat, [0, 0.42, 0.73]);
-
-        // 3. Intermediate kawara roof eave (Hisashi) separating floors
-        Kit.addPart(sub, new THREE.BoxGeometry(1.68, 0.08, 1.68), MaterialLibrary.get('kawaraRoof'), [0, 1.18, 0], true);
-
-        // 4. Second floor: White shikkui plaster with corner quoins
-        Kit.addPart(sub, new THREE.BoxGeometry(1.36, 0.76, 1.36), whitePlaster, [0, 1.60, 0], true, null, true);
-        Kit.addCornerPillars(sub, 1.38, 1.38, 0.76, 1.60, 0, 0.09, blackPlaster);
-
-        // Deeply hooded upper Mushiko-mado windows with dark iron security bars & night glow
-        for (const wx of [-0.32, 0.32]) {
-            // Hood eave
-            Kit.addPart(sub, new THREE.BoxGeometry(0.34, 0.05, 0.14), MaterialLibrary.get('kawaraRoof'), [wx, 1.84, 0.71], true);
-            // Window aperture with shoji glow
-            Kit.addPart(sub, new THREE.BoxGeometry(0.24, 0.28, 0.02), MaterialLibrary.get('shojiWindow'), [wx, 1.64, 0.685], false, null, false, 'Upper_Window');
-            // Iron security bars
-            Kit.addPart(sub, new THREE.BoxGeometry(0.02, 0.26, 0.04), ironMat, [wx - 0.06, 1.64, 0.69]);
-            Kit.addPart(sub, new THREE.BoxGeometry(0.02, 0.26, 0.04), ironMat, [wx + 0.06, 1.64, 0.69]);
-        }
-
-        // 5. Massive Kawara roof with taruki rafters and onigawara
-        Kit.addGabledRoof(sub, 1.78, 1.78, 0.54, 1.98);
-
-        sub.rotation.y = facingAngle;
-        group.add(sub);
-        return group;
+        return createVariedKuraL2Mesh(tile, facingAngle);
     }
 
     // 3. Residential Level 3: Ginza Brick / Stone / Giyōfū Fireproof Residence
