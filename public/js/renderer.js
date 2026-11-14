@@ -611,6 +611,16 @@ export class WorldRenderer {
                 }
             }
         }
+        // Canal corner bastions depend on diagonal neighbors as well
+        for (const [dx, dy] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+            const nx = x + dx, ny = y + dy;
+            if (this.grid.isValidCoord(nx, ny)) {
+                const t = this.grid.getTile(nx, ny);
+                if (t && t.type === CONFIG.TYPES.CANAL) {
+                    this.updateTileMesh(nx, ny, t);
+                }
+            }
+        }
     }
 
     refreshAdjacentBuildings(x, y) {
