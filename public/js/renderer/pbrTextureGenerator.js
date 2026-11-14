@@ -184,7 +184,7 @@ export class PBRTextureGenerator {
 
     static getKawaraSet() {
         // Smoked silver-slate Ibushi-gawara curved clay roof tiles
-        return this.buildPBRSet('kawara', 256, (u, v, out) => {
+        return this.buildPBRSet('kawara', 128, (u, v, out) => {
             const cols = 10;
             const rows = 9;
             const cu = fract(u * cols);
@@ -218,7 +218,7 @@ export class PBRTextureGenerator {
 
     static getBrickSet() {
         // Kiln-fired Meiji red brick (Akarenga) with recessed lime mortar
-        return this.buildPBRSet('brick', 256, (u, v, out) => {
+        return this.buildPBRSet('brick', 128, (u, v, out) => {
             const rows = 10;
             const cols = 5;
             const rowIdx = Math.floor(v * rows);
@@ -258,7 +258,7 @@ export class PBRTextureGenerator {
 
     static getPlasterSet() {
         // Hand-troweled Shikkui lime plaster with subtle mineral texture
-        return this.buildPBRSet('plaster', 256, (u, v, out) => {
+        return this.buildPBRSet('plaster', 128, (u, v, out) => {
             const broad = periodicFbm(u, v, 3, 4);
             const fine = periodicFbm(u + 0.37, v + 0.19, 14, 3);
             const trowel = Math.sin(u * Math.PI * 6 + broad * 4.0) * 0.5 + 0.5;
@@ -274,7 +274,7 @@ export class PBRTextureGenerator {
 
     static getNamakoSet() {
         // Raised rounded white plaster kamaboko ridges over dark slate tiles
-        return this.buildPBRSet('namako', 256, (u, v, out) => {
+        return this.buildPBRSet('namako', 128, (u, v, out) => {
             const d1 = Math.abs(fract(u * 4 + v * 4) - 0.5);
             const d2 = Math.abs(fract(u * 4 - v * 4 + 4.0) - 0.5);
             const dMin = Math.min(d1, d2);
@@ -302,7 +302,7 @@ export class PBRTextureGenerator {
 
     static getWoodWallSet() {
         // Horizontal overlapping cedar Shitami-ita clapboard siding with wood grain
-        return this.buildPBRSet('woodWall', 256, (u, v, out) => {
+        return this.buildPBRSet('woodWall', 128, (u, v, out) => {
             const planks = 9;
             const plankIdx = Math.floor(v * planks);
             const pv = fract(v * planks);
@@ -322,7 +322,7 @@ export class PBRTextureGenerator {
 
     static getStoneSet() {
         // Dressed quarry granite with quartz/feldspar/biotite fleck
-        return this.buildPBRSet('stone', 256, (u, v, out) => {
+        return this.buildPBRSet('stone', 128, (u, v, out) => {
             const macro = periodicFbm(u, v, 6, 4);
             const fleck = periodicNoise(u, v, 48);
             const speckle = fleck > 0.78 ? 26 : (fleck < 0.20 ? -28 : 0);
@@ -338,7 +338,7 @@ export class PBRTextureGenerator {
 
     static getIshigakiSet() {
         // Interlocking canal retaining stonework with mossy mortar crevices
-        return this.buildPBRSet('ishigaki', 256, (u, v, out) => {
+        return this.buildPBRSet('ishigaki', 128, (u, v, out) => {
             const rows = 5;
             const cols = 4;
             const r = Math.floor(v * rows);
@@ -375,7 +375,7 @@ export class PBRTextureGenerator {
 
     static getFlagstoneSet() {
         // Staggered Ishidatami granite street paving with worn center polish
-        return this.buildPBRSet('flagstone', 256, (u, v, out) => {
+        return this.buildPBRSet('flagstone', 128, (u, v, out) => {
             const rows = 4;
             const cols = 2;
             const r = Math.floor(v * rows);
@@ -410,7 +410,7 @@ export class PBRTextureGenerator {
 
     static getDirtRoadSet() {
         // Compacted Meiji earth & wagon-rut lane with gravel pebbles
-        return this.buildPBRSet('dirtRoad', 256, (u, v, out) => {
+        return this.buildPBRSet('dirtRoad', 128, (u, v, out) => {
             const rut1 = Math.exp(-Math.pow((u - 0.30) / 0.09, 2));
             const rut2 = Math.exp(-Math.pow((u - 0.70) / 0.09, 2));
             const rutMask = Math.min(1.0, rut1 + rut2);
@@ -429,7 +429,7 @@ export class PBRTextureGenerator {
 
     static getWashiSet() {
         // Translucent mulberry fiber Washi paper for Shoji screens & Chochin lanterns
-        return this.buildPBRSet('washi', 256, (u, v, out) => {
+        return this.buildPBRSet('washi', 128, (u, v, out) => {
             const fiber1 = periodicFbm(u * 2.0, v * 0.5, 10, 3);
             const fiber2 = periodicFbm(u * 0.5, v * 2.0, 10, 3);
             const cloud = periodicFbm(u, v, 4, 3);
@@ -447,7 +447,7 @@ export class PBRTextureGenerator {
     static getMeadowMap() {
         if (this._sprites.has('meadowMap')) return this._sprites.get('meadowMap');
         if (!this._canRender2D(true)) return null;
-        const size = 256;
+        const size = 128;
         const canvas = document.createElement('canvas');
         canvas.width = size;
         canvas.height = size;

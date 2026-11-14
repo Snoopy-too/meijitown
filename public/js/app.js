@@ -22,7 +22,7 @@ import { modalManager } from './ui/modalManager.js';
 import { i18n } from './i18n.js';
 
 class GameStateManager {
-    constructor(rootContainer = null) {
+    constructor(rootContainer = null, options = {}) {
         this.root = rootContainer || (typeof document !== 'undefined' ? document : null);
         this.isLoungeMode = !!rootContainer || (typeof window !== 'undefined' && !!window.__MEIJI_MANUAL_MOUNT__);
         const getEl = (id) => (this.root && this.root.getElementById ? this.root.getElementById(id) : (this.root && this.root.querySelector ? this.root.querySelector('#' + id) : (typeof document !== 'undefined' ? document.getElementById(id) : null)));
@@ -49,7 +49,7 @@ class GameStateManager {
         // Domain & Renderer Core
         this.grid = new CityGridModel(CONFIG.GRID_WIDTH, CONFIG.GRID_HEIGHT);
         const canvasContainer = getEl('canvas-container');
-        this.renderer = new WorldRenderer(canvasContainer, this.grid, this.root);
+        this.renderer = new WorldRenderer(canvasContainer, this.grid, this.root, { deferInitialBuild: true });
         this.renderer.setGameState(this);
 
         // UI Subsystems & Civic Systems
@@ -126,10 +126,39 @@ class GameStateManager {
             });
         }
 
-        this.loadCityFromApi().then(() => {
-            this.isHydrating = false;
-            this.simulation.start();
-        });
+        this._startupFinished = false;
+        if (!options.deferInitialHydration) {
+            this.loadCityFromApi().then(() => {
+                this.finishStartup();
+            });
+        }
+    }
+
+    dismissLoadingOverlay() {
+        const overlay = this.root && this.root.getElementById
+            ? this.root.getElementById('meiji-loading-overlay')
+            : (this.root && this.root.querySelector ? this.root.querySelector('#meiji-loading-overlay') : (typeof document !== 'undefined' ? document.getElementById('meiji-loading-overlay') : null));
+        if (!overlay) return;
+        const hide = () => {
+            overlay.classList.add('loaded');
+            setTimeout(() => { overlay.style.display = 'none'; }, 280);
+        };
+        if (typeof requestAnimationFrame === 'function') {
+            requestAnimationFrame(() => requestAnimationFrame(hide));
+        } else {
+            hide();
+        }
+    }
+
+    finishStartup() {
+        if (this._startupFinished) return;
+        this._startupFinished = true;
+        if (this.renderer && !this.renderer.hasBuiltInitialMeshes) {
+            this.renderer.rebuildAllMeshes();
+        }
+        this.isHydrating = false;
+        this.simulation.start();
+        this.dismissLoadingOverlay();
     }
 
     isLoggedIn() {

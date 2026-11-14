@@ -45,6 +45,8 @@ export class CameraManager {
         this.controls.update();
 
         this.cameraAnim = null;
+        this._lastWidth = width;
+        this._lastHeight = height;
         this.bindEvents();
     }
 
@@ -58,14 +60,24 @@ export class CameraManager {
         }
     }
 
-    rotateCameraBy(angleDelta, durationMs = 200) {
+    rotateCameraBy(angleDelta, durationMs = 240) {
+        // Flush any residual OrbitControls damping delta before sampling current camera angle
+        const prevDamping = this.controls.enableDamping;
+        this.controls.enableDamping = false;
+        this.controls.update();
+        this.controls.enableDamping = prevDamping;
+
         const offset = this.camera.position.clone().sub(this.controls.target);
         const spherical = new THREE.Spherical().setFromVector3(offset);
+        const remainingDelta = this.cameraAnim
+            ? (this.cameraAnim.targetTheta - this.cameraAnim.currentTheta)
+            : 0;
         const startTheta = spherical.theta;
-        const targetTheta = startTheta + angleDelta;
+        const targetTheta = startTheta + remainingDelta + angleDelta;
 
         this.cameraAnim = {
             startTheta,
+            currentTheta: startTheta,
             targetTheta,
             radius: spherical.radius,
             phi: spherical.phi,
@@ -79,13 +91,18 @@ export class CameraManager {
             const now = performance.now();
             const elapsed = now - this.cameraAnim.startTime;
             const progress = Math.min(1.0, elapsed / this.cameraAnim.duration);
-            const eased = 1 - Math.pow(1 - progress, 2);
+            const eased = 1 - Math.pow(1 - progress, 3);
             const currentTheta = THREE.MathUtils.lerp(this.cameraAnim.startTheta, this.cameraAnim.targetTheta, eased);
+            this.cameraAnim.currentTheta = currentTheta;
 
             const spherical = new THREE.Spherical(this.cameraAnim.radius, this.cameraAnim.phi, currentTheta);
             const offset = new THREE.Vector3().setFromSpherical(spherical);
             this.camera.position.copy(this.controls.target).add(offset);
+
+            const prevDamping = this.controls.enableDamping;
+            this.controls.enableDamping = false;
             this.controls.update();
+            this.controls.enableDamping = prevDamping;
 
             if (progress >= 1.0) {
                 this.cameraAnim = null;
@@ -95,12 +112,16 @@ export class CameraManager {
         }
     }
 
-    handleResize(renderer) {
+    handleResize(renderer, force = false) {
         const w = (this.container && this.container.clientWidth > 0) ? this.container.clientWidth : window.innerWidth;
         const h = (this.container && this.container.clientHeight > 0) ? this.container.clientHeight : window.innerHeight;
-        this.camera.aspect = w / h;
+        if (!force && w === this._lastWidth && h === this._lastHeight) return false;
+        this._lastWidth = w;
+        this._lastHeight = h;
+        this.camera.aspect = w / Math.max(1, h);
         this.camera.updateProjectionMatrix();
         renderer.setSize(w, h);
+        return true;
     }
 
     bindEvents() {

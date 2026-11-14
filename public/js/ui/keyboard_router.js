@@ -54,8 +54,18 @@ export function bindKeyboardHotkeys(toolController, stateManager, renderer) {
         }
 
         // Q & E Camera Rotation
-        if (key === 'q') renderer.rotateCameraBy(-Math.PI / 4, 200);
-        if (key === 'e') renderer.rotateCameraBy(Math.PI / 4, 200);
+        if (key === 'q') {
+            e.preventDefault();
+            if (e.repeat && renderer.cameraManager?.cameraAnim) return;
+            renderer.rotateCameraBy(-Math.PI / 4, 240);
+            return;
+        }
+        if (key === 'e') {
+            e.preventDefault();
+            if (e.repeat && renderer.cameraManager?.cameraAnim) return;
+            renderer.rotateCameraBy(Math.PI / 4, 240);
+            return;
+        }
 
         // R: Rotate Structure (Placement in Build mode, or Inspected structure in Survey mode)
         if (key === 'r') {
@@ -88,7 +98,7 @@ export function bindKeyboardHotkeys(toolController, stateManager, renderer) {
         if (key === 'k') toolController.setActiveTool(CONFIG.TOOLS.KOBAN);
         if (key === 'g') toolController.setActiveTool(CONFIG.TOOLS.SCHOOL);
         if (key === 'h') toolController.setActiveTool(CONFIG.TOOLS.HARBOR_PIER);
-        if (key === 'e') toolController.setActiveTool(CONFIG.TOOLS.TELEGRAPH);
+        if (key === 'n') toolController.setActiveTool(CONFIG.TOOLS.TELEGRAPH);
         if (key === 'p') toolController.setActiveTool(CONFIG.TOOLS.RICE_PADDY);
         if (key === 'b' || key === 'x') toolController.setActiveTool(CONFIG.TOOLS.BULLDOZER);
     });

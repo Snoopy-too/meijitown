@@ -57,6 +57,9 @@ export class SceneLighting {
         this.lanternLightPool = [];
         this._lanternPoolScanTimer = 0;
         this._lanternNodes = [];
+        this._emissiveMeshTargets = [];
+        this._sceneDirty = true;
+        this._lastSceneChildrenLen = -1;
         if (typeof THREE.PointLight === 'function') {
             for (let i = 0; i < 6; i++) {
                 const pl = new THREE.PointLight(0xff9e4a, 0, 9.0, 2.0);
@@ -100,6 +103,50 @@ export class SceneLighting {
 
     setStormOverride(isActive) {
         this.isStormOverride = Boolean(isActive);
+    }
+
+    markSceneDirty() {
+        this._sceneDirty = true;
+    }
+
+    setShadowQuality(enabled, mapSize = 1024) {
+        if (!this.sunLight) return;
+        this.sunLight.castShadow = Boolean(enabled);
+        if (this.sunLight.shadow && this.sunLight.shadow.mapSize) {
+            const size = Math.max(256, Number(mapSize) || 1024);
+            if (this.sunLight.shadow.mapSize.width !== size || this.sunLight.shadow.mapSize.height !== size) {
+                this.sunLight.shadow.mapSize.width = size;
+                this.sunLight.shadow.mapSize.height = size;
+                if (this.sunLight.shadow.map && typeof this.sunLight.shadow.map.dispose === 'function') {
+                    this.sunLight.shadow.map.dispose();
+                    this.sunLight.shadow.map = null;
+                }
+            }
+        }
+    }
+
+    _refreshSceneNodeCache() {
+        if (!this.scene || typeof this.scene.traverse !== 'function') return;
+        const childLen = Array.isArray(this.scene.children) ? this.scene.children.length : -1;
+        if (!this._sceneDirty && childLen === this._lastSceneChildrenLen) return;
+        this._sceneDirty = false;
+        this._lastSceneChildrenLen = childLen;
+        this._lanternNodes = [];
+        this._emissiveMeshTargets = [];
+        this.scene.traverse((child) => {
+            if (child.userData && child.userData.isLantern) {
+                this._lanternNodes.push(child);
+            }
+            if (child.isMesh && child.material && !child.material.userData?.isSharedLibraryMaterial) {
+                const matName = child.material.name || '';
+                const nodeName = child.name || '';
+                if (matName === 'M_RedLantern' || nodeName.includes('Lantern_Body')) {
+                    this._emissiveMeshTargets.push({ material: child.material, scale: 1.0 });
+                } else if (nodeName === 'Upper_Window' || nodeName === 'Front_Koushi') {
+                    this._emissiveMeshTargets.push({ material: child.material, scale: 0.75 });
+                }
+            }
+        });
     }
 
     updateMonth(month) {
@@ -187,14 +234,11 @@ export class SceneLighting {
         }
 
         this._lanternPoolScanTimer -= delta;
-        if (this._lanternPoolScanTimer <= 0) {
+        if (this._lanternPoolScanTimer <= 0 || this._sceneDirty) {
             this._lanternPoolScanTimer = 0.35;
-            this._lanternNodes = [];
-            this.scene.traverse((child) => {
-                if (child.userData && child.userData.isLantern) {
-                    this._lanternNodes.push(child);
-                }
-            });
+            this._refreshSceneNodeCache();
+        } else {
+            return;
         }
 
         const refX = cameraTarget ? cameraTarget.x : this.shadowFocus.x;
@@ -306,43 +350,35 @@ export class SceneLighting {
 
         const isGlowing = intensity > 0.05;
         const emissiveHex = isGlowing ? 0xffa040 : 0x000000;
+        const pSys = this._powerSystem || (this.state && this.state.powerSystem);
 
-        this.scene.traverse((child) => {
-            if (child.isMesh && child.material && !child.material.userData?.isSharedLibraryMaterial) {
-                const matName = child.material.name || '';
-                const nodeName = child.name || '';
-                if (matName === 'M_RedLantern' || nodeName.includes('Lantern_Body')) {
-                    if (child.material.emissive) {
-                        child.material.emissive.setHex(emissiveHex);
-                        child.material.emissiveIntensity = intensity;
-                    }
-                } else if (nodeName === 'Upper_Window' || nodeName === 'Front_Koushi') {
-                    if (child.material.emissive) {
-                        child.material.emissive.setHex(emissiveHex);
-                        child.material.emissiveIntensity = intensity * 0.75;
-                    }
-                }
+        this._refreshSceneNodeCache();
+
+        for (const target of this._emissiveMeshTargets) {
+            if (target.material && target.material.emissive) {
+                target.material.emissive.setHex(emissiveHex);
+                target.material.emissiveIntensity = intensity * target.scale;
             }
+        }
 
-            if (child.userData && child.userData.isLantern) {
-                const pSys = this._powerSystem || (this.state && this.state.powerSystem);
-                const isPowered = (pSys && typeof pSys.hasPower === 'function')
-                    ? pSys.hasPower(child.userData.tileX, child.userData.tileY)
-                    : false;
+        for (const child of this._lanternNodes) {
+            if (!child.parent) continue;
+            const isPowered = (pSys && typeof pSys.hasPower === 'function')
+                ? pSys.hasPower(child.userData.tileX, child.userData.tileY)
+                : false;
 
-                const arcEmissive = isGlowing ? (isPowered ? 0xd8eeff : 0xffa040) : 0x000000;
-                const arcLightColor = isPowered ? 0xd8eeff : 0xff9e4a;
-                const arcLightIntensity = isPowered ? intensity * 2.8 : intensity * 1.8;
+            const arcEmissive = isGlowing ? (isPowered ? 0xd8eeff : 0xffa040) : 0x000000;
+            const arcLightColor = isPowered ? 0xd8eeff : 0xff9e4a;
+            const arcLightIntensity = isPowered ? intensity * 2.8 : intensity * 1.8;
 
-                if (child.userData.material && child.userData.material.emissive) {
-                    child.userData.material.emissive.setHex(arcEmissive);
-                    child.userData.material.emissiveIntensity = isPowered ? intensity * 1.5 : intensity;
-                }
-                if (child.userData.light) {
-                    if (child.userData.light.color?.setHex) child.userData.light.color.setHex(arcLightColor);
-                    child.userData.light.intensity = isGlowing ? arcLightIntensity : 0.0;
-                }
+            if (child.userData.material && child.userData.material.emissive) {
+                child.userData.material.emissive.setHex(arcEmissive);
+                child.userData.material.emissiveIntensity = isPowered ? intensity * 1.5 : intensity;
             }
-        });
+            if (child.userData.light) {
+                if (child.userData.light.color?.setHex) child.userData.light.color.setHex(arcLightColor);
+                child.userData.light.intensity = isGlowing ? arcLightIntensity : 0.0;
+            }
+        }
     }
 }

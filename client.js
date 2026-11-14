@@ -20,6 +20,7 @@ function getTemplateHtml(mode = 'standard', playerName = 'Mayor', gameName = 'me
 
       <!-- 3D Three.js Viewport Container -->
       <div id="canvas-container"></div>
+      <div id="meiji-loading-overlay" class="meiji-loading-overlay" style="position:absolute;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:#1a1e22;color:#f4ede2;font-family:serif;transition:opacity 0.25s ease;"><div style="text-align:center;padding:24px 32px;background:#f4ede2;color:#2b1f14;border:3px double #7a5d38;border-radius:8px;box-shadow:0 12px 35px rgba(0,0,0,0.45);"><div style="font-size:1.5rem;font-weight:700;margin-bottom:6px;">⛩️ 明治町建設 · Meiji Town</div><div id="meiji-loading-status" style="font-size:0.88rem;color:#6b5c4d;">${isJa ? '3Dエンジンと町を読み込み中...' : 'Loading 3D Engine & Town...'}</div></div></div>
 
       <!-- Top Chronicle Header: Stats & Era Context -->
       <header id="chronicle-banner" class="hud-topbar chronicle-banner">
@@ -108,6 +109,7 @@ function getTemplateHtml(mode = 'standard', playerName = 'Mayor', gameName = 'me
                 <label class="layer-radio-item"><input type="radio" name="layer-mode" value="flood"><span data-i18n="layer.flood">${isJa ? '🌊 水害危険度' : '🌊 Flood Risk'}</span></label>
                 <div style="margin: 4px 0; border-top: 1px dashed #8c7355; opacity: 0.4;"></div>
                 <label class="layer-radio-item" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;"><span>🧑‍💼 <span data-i18n="hud.advisor_guidance">${isJa ? '助言役の手引き' : 'Advisor Guidance'}</span></span><input type="checkbox" id="toggle-advisor-guidance" checked style="cursor: pointer;"></label>
+                <div class="graphics-quality-row"><label for="select-graphics-quality">🎨 <span data-i18n="hud.graphics_quality">${isJa ? '画質設定' : 'Graphics Quality'}</span></label><select id="select-graphics-quality"><option value="low" data-i18n="graphics.low">${isJa ? '軽量 (高速)' : 'Low (Fast)'}</option><option value="medium" data-i18n="graphics.medium" selected>${isJa ? '標準 (推奨)' : 'Medium (Balanced)'}</option><option value="high" data-i18n="graphics.high">${isJa ? '高画質 (重)' : 'High (Photoreal)'}</option></select></div>
               </div>
             </div>
           </div>
@@ -422,6 +424,7 @@ function mountMeijiClient(container, config) {
   }
 
   let latestSyncState = null;
+  let restoredLocalMarker = null;
   function applySyncState(state) {
     if (!state || !window.game || !state.G) return;
     const G = state.G;
@@ -441,8 +444,12 @@ function mountMeijiClient(container, config) {
     // If this is an unpopulated server match OR the local save on device is newer than the server snapshot,
     // restore the local save and push it to the server rather than overwriting newer progress!
     if ((!hasGridData || localIsNewer) && window.game.saveManager && window.game.saveManager.hasLocalSave() && !window.game.isLoggedIn()) {
-      console.log('[Meiji] Restoring newer/populated local save from player device.');
-      window.game.saveManager.loadLocalCity(true);
+      const marker = localInfo?.savedAt || true;
+      if (restoredLocalMarker !== marker) {
+        console.log('[Meiji] Restoring newer/populated local save from player device.');
+        window.game.saveManager.loadLocalCity(true);
+        restoredLocalMarker = marker;
+      }
       if (typeof window.game.saveMatch === 'function') {
         window.game.saveMatch(true, true, true);
       }
@@ -482,7 +489,7 @@ function mountMeijiClient(container, config) {
       window.game.currentYear = G.chronicle.currentYear;
       window.game.currentMonth = G.chronicle.currentMonth;
     }
-    if (G.gridSnapshot && window.game.grid) {
+    if (G.gridSnapshot && window.game.grid && (hasGridData || window.game.grid.tiles.size > 0)) {
       try {
         window.game.grid.loadFromMap(G.gridSnapshot);
       } catch (e) {}
@@ -521,13 +528,16 @@ function mountMeijiClient(container, config) {
   import(`/game_modules/${gameName}/public/js/app.js`)
     .then(({ GameStateManager }) => {
       if (GameStateManager) {
-        window.game = new GameStateManager(container);
+        window.game = new GameStateManager(container, { deferInitialHydration: true });
         console.log('[Meiji] GameStateManager mounted inside lounge container.');
         if (latestSyncState) {
           applySyncState(latestSyncState);
-        } else if (window.game?.saveManager?.hasLocalSave()) {
+        } else if (window.game?.saveManager?.hasLocalSave() && !window.game.isLoggedIn()) {
+          const localInfo = window.game.saveManager.getLocalSaveInfo();
           window.game.saveManager.loadLocalCity(true);
+          restoredLocalMarker = localInfo?.savedAt || true;
         }
+        window.game.finishStartup();
 
         let lastSaveTime = 0;
         window.game.saveMatch = (isAuto = false, force = false, silent = false) => {
@@ -594,6 +604,11 @@ function mountMeijiClient(container, config) {
     })
     .catch((err) => {
       console.error('[Meiji] Failed to load Meiji Town module:', err);
+      const statusEl = container.querySelector('#meiji-loading-status');
+      if (statusEl) {
+        statusEl.textContent = 'Failed to load game engine. Please reload the page.';
+        statusEl.style.color = '#9e2a2b';
+      }
     });
 }
 

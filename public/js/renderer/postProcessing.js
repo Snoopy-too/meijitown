@@ -119,6 +119,7 @@ export class PostProcessingPipeline {
         this.tiltShiftEnabled = options.tiltShiftEnabled !== false;
         this.ready = false;
         this.disposed = false;
+        this._initPromise = null;
         this.composer = null;
         this.renderTarget = null;
         this.renderPass = null;
@@ -133,9 +134,10 @@ export class PostProcessingPipeline {
     }
 
     async init() {
+        if (this.ready) return true;
+        if (this._initPromise) return this._initPromise;
         if (
             this.disposed ||
-            this.ready ||
             typeof window === 'undefined' ||
             typeof WebGLRenderingContext === 'undefined' ||
             !this.renderer ||
@@ -144,71 +146,78 @@ export class PostProcessingPipeline {
             return false;
         }
 
-        try {
-            const [
-                { EffectComposer },
-                { RenderPass },
-                { UnrealBloomPass },
-                { ShaderPass },
-                { OutputPass }
-            ] = await Promise.all([
-                import('three/addons/postprocessing/EffectComposer.js'),
-                import('three/addons/postprocessing/RenderPass.js'),
-                import('three/addons/postprocessing/UnrealBloomPass.js'),
-                import('three/addons/postprocessing/ShaderPass.js'),
-                import('three/addons/postprocessing/OutputPass.js')
-            ]);
+        this._initPromise = (async () => {
+            try {
+                const [
+                    { EffectComposer },
+                    { RenderPass },
+                    { UnrealBloomPass },
+                    { ShaderPass },
+                    { OutputPass }
+                ] = await Promise.all([
+                    import('three/addons/postprocessing/EffectComposer.js'),
+                    import('three/addons/postprocessing/RenderPass.js'),
+                    import('three/addons/postprocessing/UnrealBloomPass.js'),
+                    import('three/addons/postprocessing/ShaderPass.js'),
+                    import('three/addons/postprocessing/OutputPass.js')
+                ]);
 
-            if (this.disposed) return false;
+                if (this.disposed) return false;
 
-            const gl = this.renderer.getContext();
-            const isWebGL2 = typeof WebGL2RenderingContext !== 'undefined' && gl instanceof WebGL2RenderingContext;
-            const samples = (isWebGL2 && this.preset === 'ultra') ? 4 : 0;
+                const gl = this.renderer.getContext();
+                const isWebGL2 = typeof WebGL2RenderingContext !== 'undefined' && gl instanceof WebGL2RenderingContext;
+                const samples = (isWebGL2 && this.preset === 'ultra') ? 4 : 0;
 
-            const rtParams = {
-                type: THREE.HalfFloatType || THREE.UnsignedByteType,
-                minFilter: THREE.LinearFilter,
-                magFilter: THREE.LinearFilter
-            };
-            if (samples > 0) {
-                rtParams.samples = samples;
+                const rtParams = {
+                    type: THREE.HalfFloatType || THREE.UnsignedByteType,
+                    minFilter: THREE.LinearFilter,
+                    magFilter: THREE.LinearFilter
+                };
+                if (samples > 0) {
+                    rtParams.samples = samples;
+                }
+
+                const bufW = Math.max(1, Math.floor(this.width * this.pixelRatio));
+                const bufH = Math.max(1, Math.floor(this.height * this.pixelRatio));
+                this.renderTarget = new THREE.WebGLRenderTarget(bufW, bufH, rtParams);
+
+                this.composer = new EffectComposer(this.renderer, this.renderTarget);
+                this.composer.setPixelRatio(this.pixelRatio);
+                this.composer.setSize(this.width, this.height);
+
+                this.renderPass = new RenderPass(this.scene, this.camera);
+                this.composer.addPass(this.renderPass);
+
+                const cfg = BLOOM_PHASE_SETTINGS[this.currentPhase] || BLOOM_PHASE_SETTINGS.DAY;
+                this.bloomPass = new UnrealBloomPass(
+                    new THREE.Vector2(this.width, this.height),
+                    cfg.strength,
+                    cfg.radius,
+                    cfg.threshold
+                );
+                this.composer.addPass(this.bloomPass);
+
+                this.lensPass = new ShaderPass(PhotorealLensShader);
+                this.lensPass.uniforms.uResolution.value.set(bufW, bufH);
+                this.lensPass.uniforms.uTiltShiftStrength.value = this.tiltShiftEnabled ? 0.22 : 0.0;
+                this.composer.addPass(this.lensPass);
+
+                this.outputPass = new OutputPass();
+                this.composer.addPass(this.outputPass);
+
+                this.ready = true;
+                this.setPhase(this.currentPhase, this.currentStorm);
+                this.setPreset(this.preset);
+                return true;
+            } catch {
+                this.ready = false;
+                return false;
+            } finally {
+                this._initPromise = null;
             }
+        })();
 
-            const bufW = Math.max(1, Math.floor(this.width * this.pixelRatio));
-            const bufH = Math.max(1, Math.floor(this.height * this.pixelRatio));
-            this.renderTarget = new THREE.WebGLRenderTarget(bufW, bufH, rtParams);
-
-            this.composer = new EffectComposer(this.renderer, this.renderTarget);
-            this.composer.setPixelRatio(this.pixelRatio);
-            this.composer.setSize(this.width, this.height);
-
-            this.renderPass = new RenderPass(this.scene, this.camera);
-            this.composer.addPass(this.renderPass);
-
-            const cfg = BLOOM_PHASE_SETTINGS[this.currentPhase] || BLOOM_PHASE_SETTINGS.DAY;
-            this.bloomPass = new UnrealBloomPass(
-                new THREE.Vector2(this.width, this.height),
-                cfg.strength,
-                cfg.radius,
-                cfg.threshold
-            );
-            this.composer.addPass(this.bloomPass);
-
-            this.lensPass = new ShaderPass(PhotorealLensShader);
-            this.lensPass.uniforms.uResolution.value.set(bufW, bufH);
-            this.lensPass.uniforms.uTiltShiftStrength.value = this.tiltShiftEnabled ? 0.22 : 0.0;
-            this.composer.addPass(this.lensPass);
-
-            this.outputPass = new OutputPass();
-            this.composer.addPass(this.outputPass);
-
-            this.ready = true;
-            this.setPhase(this.currentPhase, this.currentStorm);
-            return true;
-        } catch {
-            this.ready = false;
-            return false;
-        }
+        return this._initPromise;
     }
 
     setPhase(phaseKey = 'DAY', isStorm = false) {

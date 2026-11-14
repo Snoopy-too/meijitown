@@ -31,9 +31,15 @@ import { PostProcessingPipeline } from './renderer/postProcessing.js';
 import { WaterShaderSystem } from './renderer/waterShader.js';
 import { TerrainShaderSystem } from './renderer/terrainShader.js';
 import { WeatheringShaderSystem } from './renderer/weatheringShader.js';
+import {
+    GRAPHICS_PRESETS,
+    normalizeGraphicsPreset,
+    loadSavedGraphicsPreset,
+    saveGraphicsPreset
+} from './renderer/graphicsSettings.js';
 
 export class WorldRenderer {
-    constructor(containerElement, gridModel, rootElement = null) {
+    constructor(containerElement, gridModel, rootElement = null, options = {}) {
         this.root = rootElement || (containerElement && containerElement.getRootNode ? containerElement.getRootNode() : document);
         this.container = containerElement
             || (this.root && this.root.querySelector ? this.root.querySelector('#canvas-container') : null)
@@ -43,31 +49,45 @@ export class WorldRenderer {
         this.tileMeshes = new Map();
         this.modelCache = new Map();
         this.modelsLoaded = true;
+        this.hasBuiltInitialMeshes = false;
+        this._deferInitialBuild = Boolean(options.deferInitialBuild);
+        this._lastCanalSig = null;
+        this._lastPixelRatio = null;
         this.simulation = null;
         this.clock = new THREE.Clock();
+
+        this.graphicsPreset = normalizeGraphicsPreset(options.graphicsPreset || loadSavedGraphicsPreset());
+        const presetCfg = GRAPHICS_PRESETS[this.graphicsPreset] || GRAPHICS_PRESETS.medium;
+        this.pixelRatioCap = presetCfg.pixelRatioCap;
 
         MaterialLibrary.init();
         this.initScene();
         this.cameraManager = new CameraManager(this.container, this.renderer.domElement);
         this.lighting = SceneLighting.initLights(this.scene);
+        this.lighting.setShadowQuality(presetCfg.shadowsEnabled, presetCfg.shadowMapSize);
         this.envIBL = new EnvironmentIBL(this.renderer, this.scene);
-        this.envIBL.setPhase('DAY', false, this.lighting.currentSunOffset);
+        if (!this._deferInitialBuild) {
+            this.envIBL.setPhase('DAY', false, this.lighting.currentSunOffset);
+        }
 
         const initW = (this.container && this.container.clientWidth > 0) ? this.container.clientWidth : (typeof window !== 'undefined' ? window.innerWidth : 1280);
         const initH = (this.container && this.container.clientHeight > 0) ? this.container.clientHeight : (typeof window !== 'undefined' ? window.innerHeight : 720);
-        const initPR = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, 2) : 1;
+        const initPR = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, this.pixelRatioCap) : 1;
         this.postProcessing = new PostProcessingPipeline(this.renderer, this.scene, this.camera, {
             width: initW,
             height: initH,
             pixelRatio: initPR,
-            preset: 'ultra',
-            tiltShiftEnabled: true
+            preset: presetCfg.postPreset,
+            tiltShiftEnabled: presetCfg.tiltShiftEnabled
         });
-        this.postProcessing.init();
-        this._lastEnvSyncKey = 'DAY_0';
+        if (presetCfg.postPreset !== 'off') {
+            this.postProcessing.init();
+        }
+        this._lastEnvSyncKey = this._deferInitialBuild ? '' : 'DAY_0';
 
         if (typeof window !== 'undefined') {
             window.meijiGraphics = {
+                getPreset: () => this.graphicsPreset,
                 setPreset: (preset) => this.setGraphicsPreset(preset),
                 setTiltShift: (enabled) => this.setTiltShift(enabled)
             };
@@ -94,6 +114,8 @@ export class WorldRenderer {
             getFacingAngle: this.getFacingAngleForTile.bind(this)
         });
         this.overlay = new OverlaySystem(this.scene, this.grid, null, this.root);
+        this.overlay.renderer = this;
+        this.overlay.syncGraphicsSelector(this.graphicsPreset);
 
         this.bindEvents();
         this.loadAssets();
@@ -128,9 +150,12 @@ export class WorldRenderer {
         this.scene.background = new THREE.Color(CONFIG.ATMOSPHERE.BACKGROUND);
         this.scene.fog = new THREE.FogExp2(CONFIG.ATMOSPHERE.FOG, CONFIG.ATMOSPHERE.FOG_DENSITY);
 
+        const presetCfg = GRAPHICS_PRESETS[this.graphicsPreset] || GRAPHICS_PRESETS.medium;
         this.renderer = new THREE.WebGLRenderer({ antialias: true });
         this.renderer.setSize(width, height);
-        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        const initPR = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, this.pixelRatioCap) : 1;
+        this._lastPixelRatio = initPR;
+        this.renderer.setPixelRatio(initPR);
         this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
         this.renderer.toneMappingExposure = 1.05;
         if (THREE.SRGBColorSpace) {
@@ -141,8 +166,8 @@ export class WorldRenderer {
             : 8;
         PBRTextureGenerator.setMaxAnisotropy(maxAniso);
 
-        this.renderer.shadowMap.enabled = true;
-        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        this.renderer.shadowMap.enabled = presetCfg.shadowsEnabled;
+        this.renderer.shadowMap.type = THREE[presetCfg.shadowTypeKey] || THREE.PCFShadowMap;
         if (this.container && typeof this.container.appendChild === 'function') {
             this.container.appendChild(this.renderer.domElement);
         } else if (typeof document !== 'undefined' && document.body) {
@@ -150,18 +175,28 @@ export class WorldRenderer {
         }
 
         if (typeof ResizeObserver !== 'undefined' && this.container) {
-            this.resizeObserver = new ResizeObserver(() => {
-                if (this.cameraManager) {
-                    this.cameraManager.handleResize(this.renderer);
-                }
-                if (this.postProcessing && this.container) {
-                    const rw = this.container.clientWidth > 0 ? this.container.clientWidth : (typeof window !== 'undefined' ? window.innerWidth : 1280);
-                    const rh = this.container.clientHeight > 0 ? this.container.clientHeight : (typeof window !== 'undefined' ? window.innerHeight : 720);
-                    const rpr = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, 2) : 1;
-                    this.postProcessing.resize(rw, rh, rpr);
-                }
-            });
+            this.resizeObserver = new ResizeObserver(() => this.handleResize());
             this.resizeObserver.observe(this.container);
+        }
+    }
+
+    handleResize(force = false) {
+        if (!this.renderer || !this.cameraManager) return;
+        const rw = (this.container && this.container.clientWidth > 0)
+            ? this.container.clientWidth
+            : (typeof window !== 'undefined' ? window.innerWidth : 1280);
+        const rh = (this.container && this.container.clientHeight > 0)
+            ? this.container.clientHeight
+            : (typeof window !== 'undefined' ? window.innerHeight : 720);
+        const rpr = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, this.pixelRatioCap) : 1;
+        const prChanged = rpr !== this._lastPixelRatio;
+        if (prChanged) {
+            this._lastPixelRatio = rpr;
+            this.renderer.setPixelRatio(rpr);
+        }
+        const resized = this.cameraManager.handleResize(this.renderer, force || prChanged);
+        if ((resized || prChanged || force) && this.postProcessing) {
+            this.postProcessing.resize(rw, rh, rpr);
         }
     }
 
@@ -192,7 +227,6 @@ export class WorldRenderer {
         gridHelper.visible = false;
         this.gridHelper = gridHelper;
         this.scene.add(gridHelper);
-        this.syncGroundTopography();
     }
 
     syncGroundTopography() {
@@ -246,10 +280,21 @@ export class WorldRenderer {
         }
         pos.needsUpdate = true;
 
-        // Cut out groundMesh grass triangles inside CANAL tiles so sloped turf edges never poke through canal water
-        if (this.groundMesh.geometry.index && typeof this.groundMesh.geometry.setIndex === 'function') {
-            const segsX = CONFIG.GRID_WIDTH * 4;
-            const segsZ = CONFIG.GRID_HEIGHT * 4;
+        // Cut out groundMesh grass triangles inside CANAL tiles only when canal layout changed
+        let canalSig = '';
+        const gw = CONFIG.GRID_WIDTH;
+        const gh = CONFIG.GRID_HEIGHT;
+        for (let y = 0; y < gh; y++) {
+            for (let x = 0; x < gw; x++) {
+                if (isCanal(x, y)) canalSig += `${x},${y};`;
+            }
+        }
+        const canalChanged = canalSig !== this._lastCanalSig;
+        this._lastCanalSig = canalSig;
+
+        if (canalChanged && this.groundMesh.geometry.index && typeof this.groundMesh.geometry.setIndex === 'function') {
+            const segsX = gw * 4;
+            const segsZ = gh * 4;
             const stride = segsX + 1;
             const indices = [];
             for (let iz = 0; iz < segsZ; iz++) {
@@ -272,10 +317,8 @@ export class WorldRenderer {
         }
 
         // Prevent gridHelper lines (y = 0.012) from floating in mid-air across recessed canal trenches
-        if (this.gridHelper?.geometry && typeof this.gridHelper.geometry.setAttribute === 'function' && THREE.Float32BufferAttribute) {
+        if (canalChanged && this.gridHelper?.geometry && typeof this.gridHelper.geometry.setAttribute === 'function' && THREE.Float32BufferAttribute) {
             const verts = [];
-            const gw = CONFIG.GRID_WIDTH;
-            const gh = CONFIG.GRID_HEIGHT;
             for (let x = 0; x <= gw; x++) {
                 const lx = x * s - halfX;
                 for (let y = 0; y < gh; y++) {
@@ -301,7 +344,7 @@ export class WorldRenderer {
     }
 
     bindEvents() {
-        window.addEventListener('resize', () => this.cameraManager.handleResize(this.renderer));
+        window.addEventListener('resize', () => this.handleResize());
     }
 
     setSimulation(simulation) {
@@ -354,10 +397,33 @@ export class WorldRenderer {
         this._syncEnvironmentPhase(!!this.simulation?.typhoon?.isStormActive);
     }
 
-    setGraphicsPreset(preset = 'ultra') {
-        if (this.postProcessing) {
-            this.postProcessing.setPreset(preset);
+    setGraphicsPreset(preset = 'medium') {
+        const normalized = saveGraphicsPreset(preset);
+        this.graphicsPreset = normalized;
+        const cfg = GRAPHICS_PRESETS[normalized] || GRAPHICS_PRESETS.medium;
+        this.pixelRatioCap = cfg.pixelRatioCap;
+
+        if (this.renderer?.shadowMap) {
+            this.renderer.shadowMap.enabled = cfg.shadowsEnabled;
+            this.renderer.shadowMap.type = THREE[cfg.shadowTypeKey] || THREE.PCFShadowMap;
+            this.renderer.shadowMap.needsUpdate = true;
         }
+        if (this.lighting && typeof this.lighting.setShadowQuality === 'function') {
+            this.lighting.setShadowQuality(cfg.shadowsEnabled, cfg.shadowMapSize);
+        }
+        this.handleResize(true);
+
+        if (this.postProcessing) {
+            this.postProcessing.setPreset(cfg.postPreset);
+            this.postProcessing.setTiltShift(cfg.tiltShiftEnabled);
+            if (cfg.postPreset !== 'off' && !this.postProcessing.ready) {
+                this.postProcessing.init();
+            }
+        }
+        if (this.overlay && typeof this.overlay.syncGraphicsSelector === 'function') {
+            this.overlay.syncGraphicsSelector(normalized);
+        }
+        return normalized;
     }
 
     setTiltShift(enabled = true) {
@@ -398,7 +464,9 @@ export class WorldRenderer {
      */
     async loadAssets() {
         this.modelsLoaded = true;
-        this.rebuildAllMeshes();
+        if (!this._deferInitialBuild) {
+            this.rebuildAllMeshes();
+        }
         return true;
     }
 
@@ -596,9 +664,13 @@ export class WorldRenderer {
             this.scene.add(mesh);
             this.tileMeshes.set(key, mesh);
         }
+        if (this.lighting && typeof this.lighting.markSceneDirty === 'function') {
+            this.lighting.markSceneDirty();
+        }
     }
 
     rebuildAllMeshes() {
+        this.hasBuiltInitialMeshes = true;
         if (this.fx?.fireEmitters) {
             for (const key of Array.from(this.fx.fireEmitters.keys())) this.fx.detachFire(key);
         }
@@ -618,6 +690,9 @@ export class WorldRenderer {
         }
         this.rebuildInstancedBatches();
         this.syncGroundTopography();
+        if (this.lighting && typeof this.lighting.markSceneDirty === 'function') {
+            this.lighting.markSceneDirty();
+        }
     }
 
     dispatchBrigadeCart(roadPath, onArrival) { this.traffic.dispatchBrigadeCart(roadPath, onArrival); }

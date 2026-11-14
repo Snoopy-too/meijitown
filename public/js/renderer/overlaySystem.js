@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { CONFIG } from '../config.js';
 import { OverlayRenderer } from './overlayRenderer.js';
+import { loadSavedGraphicsPreset } from './graphicsSettings.js';
 
 export class OverlaySystem {
     constructor(scene, gridModel, stateManager, rootContainer = null) {
@@ -72,7 +73,8 @@ export class OverlaySystem {
             btnToggle: getEl('btn-layers-toggle'),
             popover: getEl('layer-menu-popover'),
             optionBtns: getAll('.layer-option-btn'),
-            radioInputs: getAll('input[name="layer-mode"]')
+            radioInputs: getAll('input[name="layer-mode"]'),
+            graphicsSelect: getEl('select-graphics-quality')
         };
 
         if (this.dom.btnToggle && this.dom.popover) {
@@ -115,6 +117,18 @@ export class OverlaySystem {
             });
         }
 
+        if (this.dom.graphicsSelect) {
+            const currentPreset = this.renderer?.graphicsPreset || loadSavedGraphicsPreset();
+            this.dom.graphicsSelect.value = currentPreset;
+            this.dom.graphicsSelect.addEventListener('change', () => {
+                const targetRenderer = this.renderer || this.state?.renderer;
+                if (targetRenderer && typeof targetRenderer.setGraphicsPreset === 'function') {
+                    const applied = targetRenderer.setGraphicsPreset(this.dom.graphicsSelect.value);
+                    this.dom.graphicsSelect.value = applied;
+                }
+            });
+        }
+
         // [O] Hotkey to cycle layers
         window.addEventListener('keydown', (e) => {
             if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
@@ -123,6 +137,12 @@ export class OverlaySystem {
                 this.cycleNextMode();
             }
         });
+    }
+
+    syncGraphicsSelector(preset) {
+        if (this.dom?.graphicsSelect && preset) {
+            this.dom.graphicsSelect.value = preset;
+        }
     }
 
     cycleNextMode() {

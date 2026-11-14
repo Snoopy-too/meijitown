@@ -14,7 +14,7 @@ export class MaterialLibrary {
     static init() {
         if (this._initialized) return this._materials;
 
-        const plasterTex = this.getProceduralTexture('plaster', (ctx, w, h) => {
+        const lazyPlaster = () => this.getProceduralTexture('plaster', (ctx, w, h) => {
             ctx.fillStyle = '#f0ebe1';
             ctx.fillRect(0, 0, w, h);
             ctx.fillStyle = 'rgba(175, 165, 148, 0.22)';
@@ -27,7 +27,7 @@ export class MaterialLibrary {
             }
         });
 
-        const namakoTex = this.getProceduralTexture('namako', (ctx, w, h) => {
+        const lazyNamako = () => this.getProceduralTexture('namako', (ctx, w, h) => {
             ctx.fillStyle = '#252930';
             ctx.fillRect(0, 0, w, h);
             ctx.strokeStyle = '#ece8df';
@@ -45,7 +45,7 @@ export class MaterialLibrary {
             }
         });
 
-        const brickTex = this.getProceduralTexture('brick', (ctx, w, h) => {
+        const lazyBrick = () => this.getProceduralTexture('brick', (ctx, w, h) => {
             ctx.fillStyle = '#a83c24';
             ctx.fillRect(0, 0, w, h);
             ctx.fillStyle = '#8f301b';
@@ -69,7 +69,7 @@ export class MaterialLibrary {
             }
         });
 
-        const kawaraTex = this.getProceduralTexture('kawara', (ctx, w, h) => {
+        const lazyKawara = () => this.getProceduralTexture('kawara', (ctx, w, h) => {
             // Authentic Ibushi-gawara smoked silver-slate clay roof tiles
             ctx.fillStyle = '#3f4652';
             ctx.fillRect(0, 0, w, h);
@@ -88,7 +88,7 @@ export class MaterialLibrary {
             }
         });
 
-        const woodWallTex = this.getProceduralTexture('woodWall', (ctx, w, h) => {
+        const lazyWoodWall = () => this.getProceduralTexture('woodWall', (ctx, w, h) => {
             ctx.fillStyle = '#5c432e';
             ctx.fillRect(0, 0, w, h);
             for (let y = 0; y < h; y += 12) {
@@ -103,19 +103,22 @@ export class MaterialLibrary {
             }
         });
 
-        const meadowTex = this.getProceduralTexture('meadow', (ctx, w, h) => {
-            ctx.fillStyle = '#587846';
-            ctx.fillRect(0, 0, w, h);
-            for (let i = 0; i < 420; i++) {
-                const px = (i * 47 + (i % 7) * 13) % w;
-                const py = (i * 73 + (i % 11) * 19) % h;
-                ctx.fillStyle = (i % 3 === 0) ? '#4b693b' : ((i % 3 === 1) ? '#648550' : '#5e7042');
-                ctx.fillRect(px, py, 6 + (i % 6), 4 + (i % 5));
+        const lazyMeadow = () => {
+            const tex = this.getProceduralTexture('meadow', (ctx, w, h) => {
+                ctx.fillStyle = '#587846';
+                ctx.fillRect(0, 0, w, h);
+                for (let i = 0; i < 420; i++) {
+                    const px = (i * 47 + (i % 7) * 13) % w;
+                    const py = (i * 73 + (i % 11) * 19) % h;
+                    ctx.fillStyle = (i % 3 === 0) ? '#4b693b' : ((i % 3 === 1) ? '#648550' : '#5e7042');
+                    ctx.fillRect(px, py, 6 + (i % 6), 4 + (i % 5));
+                }
+            }, 128, 128);
+            if (tex && tex.repeat) {
+                tex.repeat.set(24, 24);
             }
-        }, 256, 256);
-        if (meadowTex && meadowTex.repeat) {
-            meadowTex.repeat.set(24, 24);
-        }
+            return tex;
+        };
 
         const kawaraPBR = PBRTextureGenerator.getKawaraSet();
         const brickPBR = PBRTextureGenerator.getBrickSet();
@@ -126,8 +129,8 @@ export class MaterialLibrary {
         const washiPBR = PBRTextureGenerator.getWashiSet();
         const meadowPBRMap = PBRTextureGenerator.getMeadowMap();
 
-        const pbrOpts = (set, fallbackMap, nx = 0.45, ny = 0.45) => {
-            const out = { map: set.map || fallbackMap };
+        const pbrOpts = (set, fallbackFn, nx = 0.45, ny = 0.45) => {
+            const out = { map: set.map || (typeof fallbackFn === 'function' ? fallbackFn() : fallbackFn) };
             if (set.normalMap) {
                 out.normalMap = set.normalMap;
                 out.normalScale = new THREE.Vector2(nx, ny);
@@ -142,24 +145,24 @@ export class MaterialLibrary {
 
         this._materials = {
             woodDark: new THREE.MeshStandardMaterial({ name: 'M_Wood', color: 0x422f22, roughness: 0.78, metalness: 0.05, envMapIntensity: 0.62, ...pbrOpts({ map: null, normalMap: woodPBR.normalMap, roughnessMap: woodPBR.roughnessMap }, null, 0.35, 0.35) }),
-            woodMedium: new THREE.MeshStandardMaterial({ name: 'M_Cedar', color: 0xffffff, roughness: 0.78, metalness: 0.05, envMapIntensity: 0.62, ...pbrOpts(woodPBR, woodWallTex, 0.48, 0.48) }),
+            woodMedium: new THREE.MeshStandardMaterial({ name: 'M_Cedar', color: 0xffffff, roughness: 0.78, metalness: 0.05, envMapIntensity: 0.62, ...pbrOpts(woodPBR, lazyWoodWall, 0.48, 0.48) }),
             woodLight: new THREE.MeshStandardMaterial({ name: 'M_LightWood', color: 0x9e7e52, roughness: 0.74, metalness: 0.05, envMapIntensity: 0.65 }),
             bamboo: new THREE.MeshStandardMaterial({ name: 'M_Bamboo', color: 0xa8945e, roughness: 0.66, metalness: 0.05, envMapIntensity: 0.68 }),
             reedScreen: new THREE.MeshStandardMaterial({ name: 'M_ReedScreen', color: 0xc2a874, roughness: 0.86, metalness: 0.0, envMapIntensity: 0.55 }),
             hempMat: new THREE.MeshStandardMaterial({ name: 'M_Matting', color: 0x948260, roughness: 0.90, metalness: 0.0, envMapIntensity: 0.52 }),
             strawTawara: new THREE.MeshStandardMaterial({ name: 'M_Straw', color: 0xc4a862, roughness: 0.88, metalness: 0.0, envMapIntensity: 0.55 }),
-            meadowGround: new THREE.MeshStandardMaterial({ name: 'M_Meadow', color: 0xffffff, map: meadowPBRMap || meadowTex, roughness: 0.94, metalness: 0.0, envMapIntensity: 0.55 }),
+            meadowGround: new THREE.MeshStandardMaterial({ name: 'M_Meadow', color: 0xffffff, map: meadowPBRMap || lazyMeadow(), roughness: 0.94, metalness: 0.0, envMapIntensity: 0.55 }),
 
-            plasterWhite: new THREE.MeshStandardMaterial({ name: 'M_Plaster', color: 0xffffff, roughness: 0.85, metalness: 0.02, envMapIntensity: 0.62, ...pbrOpts(plasterPBR, plasterTex, 0.32, 0.32) }),
-            plasterWarm: new THREE.MeshStandardMaterial({ name: 'M_WarmPlaster', color: 0xebe1cf, roughness: 0.84, metalness: 0.02, envMapIntensity: 0.62, ...pbrOpts(plasterPBR, plasterTex, 0.32, 0.32) }),
+            plasterWhite: new THREE.MeshStandardMaterial({ name: 'M_Plaster', color: 0xffffff, roughness: 0.85, metalness: 0.02, envMapIntensity: 0.62, ...pbrOpts(plasterPBR, lazyPlaster, 0.32, 0.32) }),
+            plasterWarm: new THREE.MeshStandardMaterial({ name: 'M_WarmPlaster', color: 0xebe1cf, roughness: 0.84, metalness: 0.02, envMapIntensity: 0.62, ...pbrOpts(plasterPBR, lazyPlaster, 0.32, 0.32) }),
             plasterBlack: new THREE.MeshStandardMaterial({ name: 'M_BlackPlaster', color: 0x262930, roughness: 0.64, metalness: 0.08, envMapIntensity: 0.78 }),
-            namakoWall: new THREE.MeshStandardMaterial({ name: 'M_Namako', color: 0xffffff, roughness: 0.72, metalness: 0.06, envMapIntensity: 0.74, ...pbrOpts(namakoPBR, namakoTex, 0.55, 0.55) }),
+            namakoWall: new THREE.MeshStandardMaterial({ name: 'M_Namako', color: 0xffffff, roughness: 0.72, metalness: 0.06, envMapIntensity: 0.74, ...pbrOpts(namakoPBR, lazyNamako, 0.55, 0.55) }),
 
-            kawaraRoof: new THREE.MeshStandardMaterial({ name: 'M_KawaraRoof', color: 0xffffff, roughness: 0.52, metalness: 0.18, envMapIntensity: 1.05, ...pbrOpts(kawaraPBR, kawaraTex, 0.72, 0.72) }),
+            kawaraRoof: new THREE.MeshStandardMaterial({ name: 'M_KawaraRoof', color: 0xffffff, roughness: 0.52, metalness: 0.18, envMapIntensity: 1.05, ...pbrOpts(kawaraPBR, lazyKawara, 0.72, 0.72) }),
             copperRoof: new THREE.MeshStandardMaterial({ name: 'M_CopperRoof', color: 0x3b6e66, roughness: 0.44, metalness: 0.42, envMapIntensity: 1.25 }),
-            slateRoof: new THREE.MeshStandardMaterial({ name: 'M_SlateRoof', color: 0x434d59, roughness: 0.56, metalness: 0.16, envMapIntensity: 0.98, ...pbrOpts(kawaraPBR, kawaraTex, 0.62, 0.62) }),
+            slateRoof: new THREE.MeshStandardMaterial({ name: 'M_SlateRoof', color: 0x434d59, roughness: 0.56, metalness: 0.16, envMapIntensity: 0.98, ...pbrOpts(kawaraPBR, lazyKawara, 0.62, 0.62) }),
 
-            redBrick: new THREE.MeshStandardMaterial({ name: 'M_Brick', color: 0xffffff, roughness: 0.82, metalness: 0.05, envMapIntensity: 0.65, ...pbrOpts(brickPBR, brickTex, 0.64, 0.64) }),
+            redBrick: new THREE.MeshStandardMaterial({ name: 'M_Brick', color: 0xffffff, roughness: 0.82, metalness: 0.05, envMapIntensity: 0.65, ...pbrOpts(brickPBR, lazyBrick, 0.64, 0.64) }),
             stoneGranite: new THREE.MeshStandardMaterial({ name: 'M_Stone', color: 0xffffff, roughness: 0.84, metalness: 0.06, envMapIntensity: 0.68, ...pbrOpts(stonePBR, null, 0.60, 0.60) }),
             stoneTrim: new THREE.MeshStandardMaterial({ name: 'M_StoneTrim', color: 0xe2dcd0, roughness: 0.72, metalness: 0.06, envMapIntensity: 0.72, ...pbrOpts({ map: null, normalMap: stonePBR.normalMap, roughnessMap: stonePBR.roughnessMap }, null, 0.32, 0.32) }),
             gravel: new THREE.MeshStandardMaterial({ name: 'M_Gravel', color: 0x827d74, roughness: 0.94, metalness: 0.0, envMapIntensity: 0.50 }),
