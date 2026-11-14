@@ -504,14 +504,36 @@ export class WorldRenderer {
             return (tile.rotation % 4) * (Math.PI / 2);
         }
 
-        const dirs = [{ dx: 0, dy: 1, a: 0 }, { dx: 1, dy: 0, a: Math.PI / 2 }, { dx: 0, dy: -1, a: Math.PI }, { dx: -1, dy: 0, a: -Math.PI / 2 }];
-        for (const d of dirs) {
-            const t = this.grid.getTile(x + d.dx, y + d.dy);
-            if (t && (t.type === CONFIG.TYPES.ROAD || (t.type === CONFIG.TYPES.CANAL && t.hasBridge))) return d.a;
+        const fw = (tile && tile.footprintW) || 1;
+        const fh = (tile && tile.footprintH) || 1;
+        const isRoadTile = (tx, ty) => {
+            const t = this.grid.getTile(tx, ty);
+            return Boolean(t && (t.type === CONFIG.TYPES.ROAD || (t.type === CONFIG.TYPES.CANAL && t.hasBridge)));
+        };
+
+        // Check all 4 edges of the building's footprint and face the edge with the most adjacent road tiles
+        let bestAngle = null;
+        let bestCount = 0;
+        const edgeChecks = [
+            { a: 0,           coords: Array.from({ length: fw }, (_, i) => [x + i, y + fh]) },     // South (+Z)
+            { a: Math.PI / 2, coords: Array.from({ length: fh }, (_, i) => [x + fw, y + i]) },     // East (+X)
+            { a: Math.PI,     coords: Array.from({ length: fw }, (_, i) => [x + i, y - 1]) },      // North (-Z)
+            { a: -Math.PI / 2, coords: Array.from({ length: fh }, (_, i) => [x - 1, y + i]) },     // West (-X)
+        ];
+        for (const edge of edgeChecks) {
+            let count = 0;
+            for (const [cx, cy] of edge.coords) {
+                if (isRoadTile(cx, cy)) count++;
+            }
+            if (count > bestCount) {
+                bestCount = count;
+                bestAngle = edge.a;
+            }
         }
+        if (bestAngle !== null) return bestAngle;
+
         for (const [dx, dy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) {
-            const t = this.grid.getTile(x + dx, y + dy);
-            if (t && (t.type === CONFIG.TYPES.ROAD || (t.type === CONFIG.TYPES.CANAL && t.hasBridge))) return Math.atan2(dx, dy);
+            if (isRoadTile(x + dx, y + dy)) return Math.atan2(dx, dy);
         }
         return (tile?.rotation ? (tile.rotation % 4) * (Math.PI / 2) : 0);
     }
@@ -624,13 +646,30 @@ export class WorldRenderer {
     }
 
     refreshAdjacentBuildings(x, y) {
+        const refreshed = new Set();
         for (let dx = -1; dx <= 1; dx++) {
             for (let dy = -1; dy <= 1; dy++) {
                 if (dx === 0 && dy === 0) continue;
                 const nx = x + dx, ny = y + dy;
                 if (this.grid.isValidCoord(nx, ny)) {
                     const t = this.grid.getTile(nx, ny);
-                    if (t && t.type === CONFIG.TYPES.ZONE && (t.stage === CONFIG.STAGES.BUILT || t.stage === CONFIG.STAGES.SCAFFOLDING)) this.updateTileMesh(nx, ny, t);
+                    if (!t) continue;
+                    if (t.type === CONFIG.TYPES.ZONE && (t.stage === CONFIG.STAGES.BUILT || t.stage === CONFIG.STAGES.SCAFFOLDING)) {
+                        const key = this.grid.getKey(nx, ny);
+                        if (!refreshed.has(key)) {
+                            refreshed.add(key);
+                            this.updateTileMesh(nx, ny, t);
+                        }
+                    } else if (t.type === CONFIG.TYPES.SERVICE) {
+                        const ox = (t.isOrigin === false && typeof t.originX === 'number') ? t.originX : nx;
+                        const oy = (t.isOrigin === false && typeof t.originY === 'number') ? t.originY : ny;
+                        const originTile = this.grid.getTile(ox, oy);
+                        const key = this.grid.getKey(ox, oy);
+                        if (originTile && !refreshed.has(key)) {
+                            refreshed.add(key);
+                            this.updateTileMesh(ox, oy, originTile);
+                        }
+                    }
                 }
             }
         }
