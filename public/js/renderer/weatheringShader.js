@@ -19,9 +19,12 @@ class WeatheringShaderRegistry {
             uTime: { value: 0 },
             uWindStrength: { value: 1.0 },
             uEmissiveStrength: { value: 0.0 },
+            uSnowAmount: { value: 0.0 },
             uWarmGlowColor: { value: new THREE.Color(0xff9b3d) },
             uShojiGlowColor: { value: new THREE.Color(0xffbe66) }
         };
+        this._targetSnowAmount = 0.0;
+        this._snowInitialized = false;
     }
 
     /**
@@ -39,15 +42,17 @@ class WeatheringShaderRegistry {
         const shared = this._sharedUniforms;
 
         material.userData = { ...(material.userData || {}), weatheringEnhanced: true };
-        material.customProgramCacheKey = () => `meiji_bldg_v1_${isRoof ? 1 : 0}_${aoHeight}_${variationAmt}`;
+        material.customProgramCacheKey = () => `meiji_bldg_v2_${isRoof ? 1 : 0}_${aoHeight}_${variationAmt}`;
 
         material.onBeforeCompile = (shader) => {
             shader.uniforms.uTime = shared.uTime;
+            shader.uniforms.uSnowAmount = shared.uSnowAmount;
 
             shader.vertexShader = shader.vertexShader
                 .replace(
                     '#include <common>',
                     `#include <common>
+                    uniform float uSnowAmount;
                     varying vec3 vBldgWorldPos;
                     varying vec3 vBldgWorldNormal;`
                 )
@@ -67,6 +72,7 @@ class WeatheringShaderRegistry {
                 .replace(
                     '#include <common>',
                     `#include <common>
+                    uniform float uSnowAmount;
                     varying vec3 vBldgWorldPos;
                     varying vec3 vBldgWorldNormal;
 
@@ -107,13 +113,35 @@ class WeatheringShaderRegistry {
                         float upward = clamp(vBldgWorldNormal.y, 0.0, 1.0);
                         float eavesPatina = 1.0 - smoothstep(0.35, 0.85, upward);
                         diffuseColor.rgb *= (1.0 - eavesPatina * 0.14);
+
+                        // Winter snow accumulation piled softly across upward-facing roof pitches
+                        float bldgSnowMask = 0.0;
+                        if (uSnowAmount > 0.01) {
+                            float upFace = smoothstep(0.30, 0.72, vBldgWorldNormal.y);
+                            float driftMacro = meijiNoise21(vBldgWorldPos.xz * 1.65 + vec2(3.7, 8.2));
+                            float driftDetail = meijiNoise21(vBldgWorldPos.xz * 5.2 + vBldgWorldPos.y * 0.8);
+                            float snowPattern = driftMacro * 0.62 + driftDetail * 0.38;
+                            float threshold = mix(0.76, 0.24, clamp(uSnowAmount, 0.0, 1.0));
+                            bldgSnowMask = smoothstep(threshold - 0.16, threshold + 0.18, snowPattern) * upFace * smoothstep(0.02, 0.45, uSnowAmount);
+                            float crestBlend = smoothstep(0.35, 0.88, bldgSnowMask);
+                            vec3 snowCol = mix(vec3(0.76, 0.83, 0.92), vec3(0.95, 0.97, 1.0), crestBlend);
+                            float edgeShadow = smoothstep(0.05, 0.25, bldgSnowMask) * (1.0 - smoothstep(0.25, 0.55, bldgSnowMask));
+                            diffuseColor.rgb *= (1.0 - edgeShadow * 0.24);
+                            diffuseColor.rgb = mix(diffuseColor.rgb, snowCol, bldgSnowMask * 0.94);
+                        }
                     `}`
                 )
                 .replace(
                     '#include <roughnessmap_fragment>',
                     `#include <roughnessmap_fragment>
                     float rPatch = meijiNoise21(vBldgWorldPos.xz * 2.2 + vBldgWorldPos.y);
-                    roughnessFactor = clamp(roughnessFactor + (rPatch - 0.5) * 0.12, 0.14, 0.99);`
+                    roughnessFactor = clamp(roughnessFactor + (rPatch - 0.5) * 0.12, 0.14, 0.99);
+                    ${isRoof ? `if (bldgSnowMask > 0.01) { roughnessFactor = mix(roughnessFactor, 0.88, bldgSnowMask); }` : ''}`
+                )
+                .replace(
+                    '#include <metalnessmap_fragment>',
+                    `#include <metalnessmap_fragment>
+                    ${isRoof ? `if (bldgSnowMask > 0.01) { metalnessFactor = mix(metalnessFactor, 0.02, bldgSnowMask); }` : ''}`
                 );
         };
         material.needsUpdate = true;
@@ -311,14 +339,33 @@ class WeatheringShaderRegistry {
     }
 
     /**
-     * Advances shared wind animation clock and synchronizes emissive/storm intensities.
+     * Computes target roof snow level from calendar month; snaps on initial call, then lerps smoothly.
      */
-    update(delta = 0.016, isStorm = false, emissiveStrength = 0.0) {
+    setSeasonSnow(month = 4, immediate = false) {
+        const m = Math.max(1, Math.min(12, Math.round(month || 4)));
+        const isWinter = (m === 12 || m <= 2);
+        const targetSnow = isWinter ? 0.85 : (m === 3 || m === 11 ? 0.25 : 0.0);
+        this._targetSnowAmount = targetSnow;
+        if (immediate || !this._snowInitialized) {
+            this._sharedUniforms.uSnowAmount.value = targetSnow;
+            this._snowInitialized = true;
+        }
+    }
+
+    /**
+     * Advances shared wind animation clock and synchronizes emissive/storm/snow intensities.
+     */
+    update(delta = 0.016, isStorm = false, emissiveStrength = 0.0, month = null) {
         this._sharedUniforms.uTime.value += delta;
         const targetWind = isStorm ? 2.45 : 1.0;
         this._sharedUniforms.uWindStrength.value +=
             (targetWind - this._sharedUniforms.uWindStrength.value) * Math.min(1.0, delta * 1.5);
         this._sharedUniforms.uEmissiveStrength.value = Math.max(0.0, emissiveStrength || 0.0);
+        if (typeof month === 'number' && Number.isFinite(month)) {
+            this.setSeasonSnow(month, false);
+        }
+        this._sharedUniforms.uSnowAmount.value +=
+            (this._targetSnowAmount - this._sharedUniforms.uSnowAmount.value) * Math.min(1.0, delta * 2.5);
     }
 }
 

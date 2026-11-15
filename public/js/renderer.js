@@ -381,6 +381,7 @@ export class WorldRenderer {
         if (this.seasonalFoliageMaterial) this.seasonalFoliageMaterial.color.setHex(color);
         if (this.instancing) this.instancing.setSeasonalMaterial(this.seasonalFoliageMaterial);
         if (this.backdrop) this.backdrop.updateSeason(month);
+        WeatheringShaderSystem.setSeasonSnow(month);
         if (this.groundMesh?.material && this.groundMesh.material !== this.backdrop?.skirtMaterial) {
             const gCol = (month >= 3 && month <= 5) ? 0x638a53 : (month >= 6 && month <= 8) ? 0x4e7840 : (month >= 9 && month <= 11) ? 0x8a724b : 0x7a7d76;
             this.groundMesh.material.color.setHex(gCol);
@@ -820,7 +821,7 @@ export class WorldRenderer {
         const waterDelta = delta * (isSimRunning ? Math.max(0.5, speedMult * 0.6) : 0.3);
         WaterShaderSystem.update(waterDelta, lightingState, isStorm);
         TerrainShaderSystem.update(lightingState, this.state?.currentMonth || 4);
-        WeatheringShaderSystem.update(delta, isStorm, lightingState ? lightingState.emissiveIntensity : 0.0);
+        WeatheringShaderSystem.update(delta, isStorm, lightingState ? lightingState.emissiveIntensity : 0.0, this.state?.currentMonth || 4);
 
         const lightningFlash = lightingState ? (lightingState.lightningFlash || 0) : 0;
         if (this.backdrop && typeof this.backdrop.update === 'function') this.backdrop.update(delta, isStorm, lightningFlash);

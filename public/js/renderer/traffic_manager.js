@@ -5,6 +5,12 @@ import * as THREE from 'three';
 import { CONFIG } from '../config.js';
 import { SOUND } from '../fx.js';
 import { CanalMesh } from './canal_mesh.js';
+import {
+    initAgentSteering,
+    buildActiveAgentSnapshots,
+    stepAgentNavigation,
+    resolveAgentOverlaps
+} from './trafficSteering.js';
 
 export class TrafficManager {
     constructor(scene, gridModel, getTileWorldPosFn, fxManager) {
@@ -193,7 +199,7 @@ export class TrafficManager {
             return new THREE.Vector3(p.x, 0, p.z);
         });
 
-        this.dispatchedCarts.push({
+        const cartEntry = {
             mesh: cart,
             waypoints,
             waypointIndex: 0,
@@ -202,7 +208,9 @@ export class TrafficManager {
             onArrival,
             isFinished: false,
             despawnTimer: 0
-        });
+        };
+        initAgentSteering(cartEntry, 'fire_cart');
+        this.dispatchedCarts.push(cartEntry);
     }
 
     // Procedural Jinrikisha (Rickshaw 人力車 & Shafu Runner) with PBR lacquer, swinging lantern & knee articulation
@@ -519,7 +527,7 @@ export class TrafficManager {
             return new THREE.Vector3(p.x, 0, p.z);
         });
 
-        this.ambientAgents.push({
+        const agentEntry = {
             mesh,
             waypoints,
             waypointIndex: 0,
@@ -527,13 +535,18 @@ export class TrafficManager {
             speed: isRickshaw ? 2.8 : 1.3,
             isRickshaw,
             reverseOnComplete: Math.random() < 0.50
-        });
+        };
+        initAgentSteering(agentEntry, isRickshaw ? 'rickshaw' : 'pedestrian');
+        this.ambientAgents.push(agentEntry);
     }
 
-    // Advance agent positions, road/bridge surface grounding, and knee-jointed limb animations
+    // Advance agent positions, collision-avoidance steering, road/bridge grounding, and limb animations
     update(speedMult = 1.0, delta = 0.016) {
         if (!delta || delta <= 0) return;
         this.animTime += delta * (speedMult > 0 ? speedMult : 0);
+
+        const getPose = (x, z, dx, dz) => this.getSurfacePose(x, z, dx, dz);
+        const snapshots = buildActiveAgentSnapshots(this.dispatchedCarts, this.ambientAgents);
 
         // Advance emergency brigade hand-pump carts
         for (let i = this.dispatchedCarts.length - 1; i >= 0; i--) {
@@ -547,10 +560,8 @@ export class TrafficManager {
                 continue;
             }
 
-            const from = c.waypoints[c.waypointIndex];
-            const to = c.waypoints[c.waypointIndex + 1];
-
-            if (!to) {
+            const pose = stepAgentNavigation(c, snapshots, speedMult, delta, getPose);
+            if (pose === 'arrived') {
                 c.isFinished = true;
                 const destPos = c.waypoints[c.waypoints.length - 1];
                 if (this.fx) this.fx.spawnWaterSteam(destPos.x, destPos.z);
@@ -558,25 +569,7 @@ export class TrafficManager {
                 if (typeof c.onArrival === 'function') c.onArrival();
                 continue;
             }
-
-            const dist = from.distanceTo(to);
-            const step = (c.speed * speedMult * delta) / Math.max(0.01, dist);
-            c.progress += step;
-
-            if (c.progress >= 1.0) {
-                c.waypointIndex++;
-                c.progress = 0;
-            } else {
-                c.mesh.position.lerpVectors(from, to, c.progress);
-                const dirX = to.x - from.x;
-                const dirZ = to.z - from.z;
-                const pose = this.getSurfacePose(c.mesh.position.x, c.mesh.position.z, dirX, dirZ);
-                c.mesh.position.y = pose.y;
-                if (Math.hypot(dirX, dirZ) > 0.01) {
-                    c.mesh.rotation.y = Math.atan2(dirX, dirZ);
-                }
-                c.mesh.rotation.x = pose.pitch;
-            }
+            c.mesh.rotation.x = pose.pitch;
 
             // Animate runner legs, knees & pump handle
             if (c.mesh.userData.runner?.userData) {
@@ -605,10 +598,9 @@ export class TrafficManager {
 
         for (let i = this.ambientAgents.length - 1; i >= 0; i--) {
             const agent = this.ambientAgents[i];
-            const from = agent.waypoints[agent.waypointIndex];
-            const to = agent.waypoints[agent.waypointIndex + 1];
+            const pose = stepAgentNavigation(agent, snapshots, speedMult, delta, getPose);
 
-            if (!to) {
+            if (pose === 'arrived') {
                 if (agent.reverseOnComplete) {
                     agent.reverseOnComplete = false;
                     agent.waypoints.reverse();
@@ -621,27 +613,8 @@ export class TrafficManager {
                 continue;
             }
 
-            const dist = from.distanceTo(to);
-            const step = (agent.speed * speedMult * delta) / Math.max(0.01, dist);
-            agent.progress += step;
-
-            let dirX = to.x - from.x;
-            let dirZ = to.z - from.z;
-            if (agent.progress >= 1.0) {
-                agent.waypointIndex++;
-                agent.progress = 0;
-            } else {
-                agent.mesh.position.lerpVectors(from, to, agent.progress);
-                if (Math.hypot(dirX, dirZ) > 0.01) {
-                    agent.mesh.rotation.y = Math.atan2(dirX, dirZ);
-                }
-            }
-
-            const pose = this.getSurfacePose(agent.mesh.position.x, agent.mesh.position.z, dirX, dirZ);
-
             // Procedural walking & bridge-climbing animation
             if (agent.isRickshaw) {
-                agent.mesh.position.y = pose.y;
                 agent.mesh.rotation.x = pose.pitch;
                 if (agent.mesh.userData.runner?.userData) {
                     const r = agent.mesh.userData.runner.userData;
@@ -673,6 +646,9 @@ export class TrafficManager {
                 agent.mesh.position.y = pose.y + Math.abs(Math.sin(this.animTime * 14)) * 0.018;
             }
         }
+
+        // Enforce minimum lateral separation after all agents step for this tick
+        resolveAgentOverlaps(snapshots);
     }
 
     clearAllAgents() {
