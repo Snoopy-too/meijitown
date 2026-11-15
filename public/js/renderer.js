@@ -822,8 +822,9 @@ export class WorldRenderer {
         TerrainShaderSystem.update(lightingState, this.state?.currentMonth || 4);
         WeatheringShaderSystem.update(delta, isStorm, lightingState ? lightingState.emissiveIntensity : 0.0);
 
-        if (this.backdrop && typeof this.backdrop.update === 'function') this.backdrop.update(delta, isStorm);
-        if (this.clouds) this.clouds.update(delta, isSimRunning ? speedMult : 1, isStorm);
+        const lightningFlash = lightingState ? (lightingState.lightningFlash || 0) : 0;
+        if (this.backdrop && typeof this.backdrop.update === 'function') this.backdrop.update(delta, isStorm, lightningFlash);
+        if (this.clouds) this.clouds.update(delta, isSimRunning ? speedMult : 1, isStorm, lightningFlash);
 
         if (this.postProcessing) {
             this.postProcessing.render();

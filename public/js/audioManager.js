@@ -8,6 +8,7 @@ export class AudioManager {
         this.isAmbienceActive = false;
         this.isSummerActive = false;
         this.isAutumnActive = false;
+        this.isStormActive = false;
         this.cicadaSwellTimer = null;
         this.cricketTimer = null;
         this.hasInteracted = false;
@@ -283,10 +284,10 @@ export class AudioManager {
 
             this.windFilter = this.ctx.createBiquadFilter();
             this.windFilter.type = 'lowpass';
-            this.windFilter.frequency.setValueAtTime(220, this.ctx.currentTime);
+            this.windFilter.frequency.setValueAtTime(this.isStormActive ? 580 : 220, this.ctx.currentTime);
 
             this.windGain = this.ctx.createGain();
-            this.windGain.gain.setValueAtTime(0.035, this.ctx.currentTime);
+            this.windGain.gain.setValueAtTime(this.isStormActive ? 0.11 : 0.035, this.ctx.currentTime);
 
             this.windSource.connect(this.windFilter);
             this.windFilter.connect(this.windGain);
@@ -383,6 +384,64 @@ export class AudioManager {
                 this.cicadaMasterGain.gain.linearRampToValueAtTime(0.0, now + 1.2);
             }
         }
+    }
+
+    // Swells procedural wind ambience during active typhoons
+    setStormState(isStorm) {
+        this.isStormActive = Boolean(isStorm);
+        if (!this.ctx || !this.windFilter || !this.windGain) return;
+        try {
+            const now = this.ctx.currentTime;
+            const rampDur = this.isStormActive ? 1.5 : 2.2;
+            this.windFilter.frequency.cancelScheduledValues(now);
+            this.windFilter.frequency.setValueAtTime(this.windFilter.frequency.value, now);
+            this.windFilter.frequency.linearRampToValueAtTime(this.isStormActive ? 580 : 220, now + rampDur);
+
+            this.windGain.gain.cancelScheduledValues(now);
+            this.windGain.gain.setValueAtTime(this.windGain.gain.value, now);
+            this.windGain.gain.linearRampToValueAtTime(this.isStormActive ? 0.11 : 0.035, now + rampDur);
+        } catch (_) {}
+    }
+
+    // Procedural distant rolling thunderclap synced to lightning flashes
+    playThunder(intensity = 1.0) {
+        if (!this.ctx || !this.hasInteracted || this.isMuted) return;
+        try {
+            const now = this.ctx.currentTime;
+            const dur = 1.85;
+            const bufSize = Math.floor(this.ctx.sampleRate * dur);
+            const buf = this.ctx.createBuffer(1, bufSize, this.ctx.sampleRate);
+            const data = buf.getChannelData(0);
+            let last = 0;
+            for (let i = 0; i < bufSize; i++) {
+                const white = Math.random() * 2 - 1;
+                last = (last + 0.04 * white) / 1.04;
+                const t = i / this.ctx.sampleRate;
+                const crack = t < 0.28 ? (1.0 - t / 0.28) * 0.45 * white : 0;
+                data[i] = Math.max(-1, Math.min(1, last * 4.5 + crack));
+            }
+
+            const src = this.ctx.createBufferSource();
+            src.buffer = buf;
+
+            const lp = this.ctx.createBiquadFilter();
+            lp.type = 'lowpass';
+            lp.frequency.setValueAtTime(340, now);
+            lp.frequency.exponentialRampToValueAtTime(65, now + dur);
+
+            const gain = this.ctx.createGain();
+            const peak = Math.min(0.45, 0.26 * Math.max(0.5, intensity));
+            gain.gain.setValueAtTime(0.001, now);
+            gain.gain.linearRampToValueAtTime(peak, now + 0.08);
+            gain.gain.exponentialRampToValueAtTime(peak * 0.55, now + 0.45);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+
+            src.connect(lp);
+            lp.connect(gain);
+            gain.connect(this.getDestination());
+            src.start(now);
+            src.stop(now + dur);
+        } catch (_) {}
     }
 }
 

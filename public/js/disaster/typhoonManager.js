@@ -22,6 +22,9 @@ export class TyphoonManager {
 
     setScene(scene) {
         this.scene = scene;
+        if (this.isStormActive && this.scene && !this.rainSystem) {
+            this.initRainFX();
+        }
     }
 
     // 1. Seasonal Trigger & Advance Telegraph Warning (Months 9-10, 35% probability)
@@ -76,6 +79,7 @@ export class TyphoonManager {
 
         this.processInundation();
         this.initRainFX();
+        if (typeof SOUND?.setStormState === 'function') SOUND.setStormState(true);
     }
 
     // 3. End Typhoon Storm Phase & Drain Floodwaters
@@ -83,6 +87,7 @@ export class TyphoonManager {
         this.isStormActive = false;
         this.clearInundation();
         this.removeRainFX();
+        if (typeof SOUND?.setStormState === 'function') SOUND.setStormState(false);
 
         const msgEn = "☀️ The Typhoon has passed. Waters are receding.";
         const msgJa = "☀️ 台風一過。水路の水位が平穏に復帰しました。";
@@ -251,10 +256,9 @@ export class TyphoonManager {
 
         if (this.scene.userData?.lighting?.setStormOverride) {
             this.scene.userData.lighting.setStormOverride(true);
-        }
-        if (this.scene.background && this.scene.background.getHex) {
+        } else if (this.scene.background && this.scene.background.getHex) {
             this.savedSkyColor = this.scene.background.getHex();
-            this.scene.background.setHex(0x2c3e50); // Darkened storm sky
+            this.scene.background.setHex(0x1f2b36); // Darkened storm sky fallback
         }
     }
 
@@ -307,8 +311,7 @@ export class TyphoonManager {
         }
         if (this.scene?.userData?.lighting?.setStormOverride) {
             this.scene.userData.lighting.setStormOverride(false);
-        }
-        if (this.savedSkyColor !== null && this.scene?.background?.setHex) {
+        } else if (this.savedSkyColor !== null && this.scene?.background?.setHex) {
             this.scene.background.setHex(this.savedSkyColor);
             this.savedSkyColor = null;
         }

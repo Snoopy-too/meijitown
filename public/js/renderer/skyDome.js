@@ -62,15 +62,15 @@ const SKY_PALETTES = {
         moonPos: [-110, 62, -48]
     },
     STORM: {
-        zenith: 0x1a2228,
-        midSky: 0x2c3942,
-        horizon: 0x435058,
-        haloColor: 0x52616b,
-        haloStrength: 0.12,
+        zenith: 0x0d1319,
+        midSky: 0x16202a,
+        horizon: 0x1f2b36,
+        haloColor: 0x45586b,
+        haloStrength: 0.08,
         starIntensity: 0.0,
-        sunColor: 0xc8d2d8,
-        sunHalo: 0x7d8b94,
-        sunOpacity: 0.08,
+        sunColor: 0x8ea1b3,
+        sunHalo: 0x566878,
+        sunOpacity: 0.0,
         moonOpacity: 0.0,
         sunPos: [95, 75, 25],
         moonPos: [-110, 45, -48]
@@ -112,6 +112,8 @@ export class SkyDome {
             uCelestialDir: { value: new THREE.Vector3(0.7, 0.5, 0.2).normalize() },
             uHaloStrength: { value: initP.haloStrength },
             uStarIntensity: { value: initP.starIntensity },
+            uStormMix: { value: 0.0 },
+            uLightningFlash: { value: 0.0 },
             uTime: { value: 0.0 }
         };
 
@@ -157,6 +159,8 @@ export class SkyDome {
                     uniform vec3 uCelestialDir;
                     uniform float uHaloStrength;
                     uniform float uStarIntensity;
+                    uniform float uStormMix;
+                    uniform float uLightningFlash;
                     uniform float uTime;
                     varying vec3 vWorldOffset;
 
@@ -199,13 +203,27 @@ export class SkyDome {
                         vec3 skyCol = mix(uHorizonColor, uMidSkyColor, horizonBlend);
                         skyCol = mix(skyCol, uZenithColor, zenithBlend);
 
-                        // Delicate high-altitude wind-sheared cirrus cloud wisps
-                        if (elev > 0.06) {
+                        // Delicate high-altitude wind-sheared cirrus cloud wisps & turbulent typhoon thunderheads
+                        if (elev > 0.03) {
                             vec2 cUv = dir.xz / (elev + 0.22);
-                            float wisp = fbmCirrus(vec2(cUv.x * 1.4 + uTime * 0.008, cUv.y * 3.8));
+                            float drift = uTime * mix(0.008, 0.055, uStormMix);
+                            float wisp = fbmCirrus(vec2(cUv.x * 1.4 + drift, cUv.y * 3.8 + drift * 0.25));
                             float wispyMask = smoothstep(0.56, 0.82, wisp) * smoothstep(0.06, 0.35, elev) * (1.0 - smoothstep(0.75, 0.98, elev));
                             vec3 cirrusCol = mix(uHorizonColor, vec3(1.0, 0.97, 0.93), 0.45);
-                            skyCol = mix(skyCol, cirrusCol, wispyMask * 0.22 * (1.0 - uStarIntensity * 0.65));
+                            skyCol = mix(skyCol, cirrusCol, wispyMask * 0.22 * (1.0 - uStarIntensity * 0.65) * (1.0 - uStormMix));
+
+                            if (uStormMix > 0.01) {
+                                float stormBillow = fbmCirrus(vec2(cUv.x * 2.2 + drift * 1.5, cUv.y * 2.4 - drift * 0.4));
+                                float cloudCover = smoothstep(0.32, 0.76, stormBillow * 0.72 + wisp * 0.38);
+                                float elevBand = smoothstep(0.03, 0.28, elev);
+                                vec3 stormDark = uZenithColor * 0.68;
+                                vec3 stormRidge = mix(uHorizonColor * 1.15, vec3(0.32, 0.39, 0.46), 0.45);
+                                vec3 stormCloudCol = mix(stormDark, stormRidge, smoothstep(0.45, 0.85, stormBillow));
+                                float sheetLight = uLightningFlash * (0.35 + 0.65 * smoothstep(0.42, 0.82, stormBillow));
+                                stormCloudCol += vec3(0.68, 0.82, 1.0) * sheetLight;
+                                skyCol = mix(skyCol, stormCloudCol, cloudCover * elevBand * uStormMix * 0.82);
+                                skyCol += vec3(0.36, 0.48, 0.64) * uLightningFlash * (1.0 - smoothstep(0.0, 0.55, elev)) * uStormMix * 0.55;
+                            }
                         }
 
                         // Mie forward solar/lunar scattering halo + golden/peach horizon scatter
@@ -383,11 +401,13 @@ export class SkyDome {
         this.targetMoonOpacity = p.moonOpacity;
     }
 
-    update(delta = 0.016, isStorm = false) {
+    update(delta = 0.016, isStorm = false, lightningFlash = 0.0) {
         this.time += delta;
         this.uniforms.uTime.value = this.time;
         this.setPhase(this.currentPhase, isStorm);
         const lerpSpeed = Math.min(1.0, delta * 2.2);
+        this.uniforms.uStormMix.value += ((isStorm ? 1.0 : 0.0) - this.uniforms.uStormMix.value) * lerpSpeed;
+        this.uniforms.uLightningFlash.value = Math.max(0.0, Math.min(1.4, lightningFlash || 0.0));
 
         lerpColor(this.uniforms.uZenithColor.value, this.targetZenith, lerpSpeed);
         lerpColor(this.uniforms.uMidSkyColor.value, this.targetMidSky, lerpSpeed);

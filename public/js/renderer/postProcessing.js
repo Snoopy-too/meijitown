@@ -97,11 +97,11 @@ const PhotorealLensShader = {
 };
 
 const BLOOM_PHASE_SETTINGS = {
-    DAWN:     { strength: 0.24, radius: 0.45, threshold: 0.88, exposure: 1.08, clarity: 0.15, warmth: 0.06 },
-    DAY:      { strength: 0.16, radius: 0.36, threshold: 0.94, exposure: 1.05, clarity: 0.16, warmth: 0.025 },
-    TWILIGHT: { strength: 0.32, radius: 0.52, threshold: 0.80, exposure: 1.12, clarity: 0.14, warmth: 0.075 },
-    NIGHT:    { strength: 0.38, radius: 0.58, threshold: 0.76, exposure: 1.18, clarity: 0.12, warmth: 0.04 },
-    STORM:    { strength: 0.18, radius: 0.40, threshold: 0.90, exposure: 0.96, clarity: 0.12, warmth: -0.02 }
+    DAWN:     { strength: 0.24, radius: 0.45, threshold: 0.88, exposure: 1.08, clarity: 0.15, warmth: 0.06,  vignette: 0.20 },
+    DAY:      { strength: 0.16, radius: 0.36, threshold: 0.94, exposure: 1.05, clarity: 0.16, warmth: 0.025, vignette: 0.18 },
+    TWILIGHT: { strength: 0.32, radius: 0.52, threshold: 0.80, exposure: 1.12, clarity: 0.14, warmth: 0.075, vignette: 0.24 },
+    NIGHT:    { strength: 0.38, radius: 0.58, threshold: 0.76, exposure: 1.18, clarity: 0.12, warmth: 0.04,  vignette: 0.28 },
+    STORM:    { strength: 0.25, radius: 0.48, threshold: 0.78, exposure: 0.84, clarity: 0.14, warmth: -0.09, vignette: 0.36 }
 };
 
 /**
@@ -237,6 +237,7 @@ export class PostProcessingPipeline {
         if (this.lensPass && this.lensPass.uniforms) {
             this.lensPass.uniforms.uClarity.value = cfg.clarity;
             this.lensPass.uniforms.uWarmth.value = cfg.warmth;
+            this.lensPass.uniforms.uVignette.value = cfg.vignette ?? 0.22;
             this.lensPass.uniforms.uTiltShiftStrength.value = this.tiltShiftEnabled ? 0.22 : 0.0;
         }
     }

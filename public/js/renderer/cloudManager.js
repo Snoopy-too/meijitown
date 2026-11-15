@@ -121,8 +121,8 @@ export class CloudManager {
         }
     }
 
-    update(delta = 0.016, speedMultiplier = 1, isStormActive = false) {
-        const rate = Math.max(0.2, speedMultiplier);
+    update(delta = 0.016, speedMultiplier = 1, isStormActive = false, lightningFlash = 0.0) {
+        const rate = Math.max(0.2, speedMultiplier) * (isStormActive ? 3.0 : 1.0);
         this.isStorm = !!isStormActive;
 
         const minX = -65;
@@ -145,7 +145,7 @@ export class CloudManager {
             }
         }
 
-        this.applyAtmosphericTint();
+        this.applyAtmosphericTint(lightningFlash);
     }
 
     updateDayNight(month) {
@@ -155,17 +155,26 @@ export class CloudManager {
         else if (phaseIndex === 2) this.currentPhase = 'TWILIGHT';
         else if (phaseIndex === 3) this.currentPhase = 'NIGHT';
 
-        this.applyAtmosphericTint();
+        this.applyAtmosphericTint(0);
     }
 
-    applyAtmosphericTint() {
+    applyAtmosphericTint(lightningFlash = 0.0) {
         if (!this.material) return;
 
         if (this.isStorm) {
-            // Dark charcoal storm clouds
+            // Dark charcoal storm clouds with brief lightning illumination
             this.material.color.setHex(0x3e4247);
-            this.material.opacity = 0.95;
+            this.material.opacity = 0.96;
+            if (this.material.emissive && typeof this.material.emissive.setHex === 'function') {
+                const flash = Math.max(0, Number(lightningFlash) || 0);
+                this.material.emissive.setHex(flash > 0.01 ? 0x6e88a6 : 0x000000);
+                this.material.emissiveIntensity = flash * 0.9;
+            }
             return;
+        }
+        if (this.material.emissive && typeof this.material.emissive.setHex === 'function') {
+            this.material.emissive.setHex(0x000000);
+            this.material.emissiveIntensity = 0.0;
         }
 
         switch (this.currentPhase) {

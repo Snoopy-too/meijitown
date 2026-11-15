@@ -38,13 +38,13 @@ const PHASE_ENV_CONFIG = {
         hemiIntensity: 0.72
     },
     STORM: {
-        zenith: 0x1e2833,
-        midSky: 0x394552,
-        horizon: 0x5d6a75,
-        ground: 0x262b24,
-        sunColor: 0xaab8c4,
-        sunStrength: 0.85,
-        hemiIntensity: 1.0
+        zenith: 0x0d1319,
+        midSky: 0x18222c,
+        horizon: 0x283542,
+        ground: 0x161c18,
+        sunColor: 0x7c90a6,
+        sunStrength: 0.25,
+        hemiIntensity: 0.62
     }
 };
 

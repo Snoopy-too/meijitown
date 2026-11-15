@@ -4,6 +4,40 @@
 import * as THREE from 'three';
 import { CONFIG } from '../config.js';
 import { MaterialLibrary } from './materialLibrary.js';
+import { SOUND } from '../audioManager.js';
+
+const STORM_ATMOSPHERE = {
+    SKY_COLOR: 0x1f2b36,
+    SUN_COLOR: 0x7a8fa6,
+    SUN_INTENSITY: 0.42,
+    HEMI_SKY: 0x4b5f73,
+    HEMI_GROUND: 0x222922,
+    HEMI_INTENSITY: 0.56,
+    FOG_DENSITY: 0.013,
+    EMISSIVE_MIN: 0.65,
+    FLASH_COLOR: 0xdcebff,
+    FLASH_SKY_COLOR: 0x566c82
+};
+
+function sampleLightningEnvelope(age) {
+    if (age < 0 || age > 0.48) return 0;
+    if (age < 0.06) return 1.0 - (age / 0.06) * 0.65;
+    if (age < 0.11) return 0.18;
+    if (age < 0.19) return 0.85 - ((age - 0.11) / 0.08) * 0.4;
+    return 0.45 * Math.pow(1.0 - Math.min(1.0, (age - 0.19) / 0.29), 2.2);
+}
+
+function copyColor(dst, src) {
+    if (!dst || !src) return;
+    if (typeof dst.copy === 'function') dst.copy(src);
+    else if (typeof dst.setHex === 'function' && typeof src.getHex === 'function') dst.setHex(src.getHex());
+}
+
+function lerpColor(dst, src, alpha) {
+    if (!dst || !src) return;
+    if (typeof dst.lerp === 'function') dst.lerp(src, alpha);
+    else if (typeof dst.setHex === 'function' && typeof src.getHex === 'function') dst.setHex(src.getHex());
+}
 
 export class SceneLighting {
     constructor(scene) {
@@ -86,8 +120,27 @@ export class SceneLighting {
         this.targetFogColor = new THREE.Color(initialPreset.FOG);
         this.targetFogDensity = initialPreset.FOG_DENSITY;
 
-        this.stormBgColor = new THREE.Color(0x2c3e50);
+        this.stormBgColor = new THREE.Color(STORM_ATMOSPHERE.SKY_COLOR);
+        this._stormSunColor = new THREE.Color(STORM_ATMOSPHERE.SUN_COLOR);
+        this._stormHemiSky = new THREE.Color(STORM_ATMOSPHERE.HEMI_SKY);
+        this._stormHemiGround = new THREE.Color(STORM_ATMOSPHERE.HEMI_GROUND);
+        this._flashColor = new THREE.Color(STORM_ATMOSPHERE.FLASH_COLOR);
+        this._flashSkyColor = new THREE.Color(STORM_ATMOSPHERE.FLASH_SKY_COLOR);
+
+        this._baseSunColor = new THREE.Color(initialPreset.SUN_COLOR);
+        this._baseSunIntensity = initialPreset.SUN_INTENSITY;
+        this._baseHemiSky = new THREE.Color(initialPreset.HEMI_SKY);
+        this._baseHemiGround = new THREE.Color(initialPreset.HEMI_GROUND);
+        this._baseHemiIntensity = initialPreset.HEMI_INTENSITY;
+        this._baseBgColor = new THREE.Color(initialPreset.BACKGROUND);
+        this._baseFogColor = new THREE.Color(initialPreset.FOG);
+
         this.isStormOverride = false;
+        this._lightningTimer = 2.5;
+        this._lightningAge = -1;
+        this._lightningStrength = 1.0;
+        this._lightningFlash = 0.0;
+        this._pendingThunderDelay = -1;
 
         this.targetEmissiveIntensity = 0.0;
         this.currentEmissiveIntensity = 0.0;
@@ -102,7 +155,51 @@ export class SceneLighting {
     }
 
     setStormOverride(isActive) {
-        this.isStormOverride = Boolean(isActive);
+        const next = Boolean(isActive);
+        if (this.isStormOverride === next) return;
+        this.isStormOverride = next;
+        if (next) {
+            this._lightningTimer = 1.8 + Math.random() * 2.4;
+        } else {
+            this._lightningAge = -1;
+            this._lightningFlash = 0.0;
+            this._pendingThunderDelay = -1;
+        }
+    }
+
+    triggerLightning(strength = 1.0) {
+        this._lightningAge = 0;
+        this._lightningStrength = Math.max(0.4, Math.min(1.4, Number(strength) || 1.0));
+        this._lightningFlash = this._lightningStrength;
+        this._pendingThunderDelay = 0.25 + Math.random() * 0.4;
+    }
+
+    _updateLightning(delta) {
+        if (!this.isStormOverride) {
+            this._lightningFlash = 0.0;
+            return;
+        }
+        if (this._pendingThunderDelay >= 0) {
+            this._pendingThunderDelay -= delta;
+            if (this._pendingThunderDelay <= 0) {
+                this._pendingThunderDelay = -1;
+                SOUND.playThunder(this._lightningStrength);
+            }
+        }
+        if (this._lightningAge >= 0) {
+            this._lightningAge += delta;
+            this._lightningFlash = sampleLightningEnvelope(this._lightningAge) * this._lightningStrength;
+            if (this._lightningAge > 0.48) {
+                this._lightningAge = -1;
+                this._lightningFlash = 0.0;
+            }
+        } else {
+            this._lightningTimer -= delta;
+            if (this._lightningTimer <= 0) {
+                this.triggerLightning(0.75 + Math.random() * 0.45);
+                this._lightningTimer = 4.5 + Math.random() * 6.5;
+            }
+        }
     }
 
     markSceneDirty() {
@@ -285,6 +382,7 @@ export class SceneLighting {
         return {
             phaseKey: this.currentPhaseKey,
             isStorm: this.isStormOverride,
+            lightningFlash: this._lightningFlash,
             sunDir: this._cachedSunDir,
             sunColor: this.sunLight.color,
             skyZenith: this.scene.background || this.hemiLight.color,
@@ -298,14 +396,25 @@ export class SceneLighting {
 
     update(delta = 0.016, cameraTarget = null, cameraDistance = 42) {
         const lerpSpeed = Math.min(1.0, delta * 2.2);
+        this._updateLightning(delta);
+        const storm = this.isStormOverride;
+        const flash = this._lightningFlash;
 
-        const lerpCol = (cObj, tObj) => {
-            if (cObj && typeof cObj.lerp === 'function') cObj.lerp(tObj, lerpSpeed);
-            else if (cObj && typeof cObj.setHex === 'function' && tObj && typeof tObj.getHex === 'function') cObj.setHex(tObj.getHex());
-        };
+        const goalSunColor = storm ? this._stormSunColor : this.targetSunColor;
+        const goalSunInt = storm ? Math.min(this.targetSunIntensity, STORM_ATMOSPHERE.SUN_INTENSITY) : this.targetSunIntensity;
+        const goalHemiSky = storm ? this._stormHemiSky : this.targetHemiSky;
+        const goalHemiGround = storm ? this._stormHemiGround : this.targetHemiGround;
+        const goalHemiInt = storm ? Math.min(this.targetHemiIntensity, STORM_ATMOSPHERE.HEMI_INTENSITY) : this.targetHemiIntensity;
+        const goalBgColor = storm ? this.stormBgColor : this.targetBgColor;
+        const goalFogColor = storm ? this.stormBgColor : this.targetFogColor;
+        const goalFogDensity = storm ? Math.max(this.targetFogDensity, STORM_ATMOSPHERE.FOG_DENSITY) : this.targetFogDensity;
+        const goalEmissive = storm ? Math.max(this.targetEmissiveIntensity, STORM_ATMOSPHERE.EMISSIVE_MIN) : this.targetEmissiveIntensity;
 
-        lerpCol(this.sunLight.color, this.targetSunColor);
-        this.sunLight.intensity += (this.targetSunIntensity - this.sunLight.intensity) * lerpSpeed;
+        lerpColor(this._baseSunColor, goalSunColor, lerpSpeed);
+        this._baseSunIntensity += (goalSunInt - this._baseSunIntensity) * lerpSpeed;
+        copyColor(this.sunLight.color, this._baseSunColor);
+        this.sunLight.intensity = this._baseSunIntensity;
+
         if (typeof this.currentSunOffset.lerp === 'function') {
             this.currentSunOffset.lerp(this.targetSunPos, lerpSpeed);
         } else {
@@ -322,21 +431,39 @@ export class SceneLighting {
             );
         }
 
-        lerpCol(this.hemiLight.color, this.targetHemiSky);
-        lerpCol(this.hemiLight.groundColor, this.targetHemiGround);
-        this.hemiLight.intensity += (this.targetHemiIntensity - this.hemiLight.intensity) * lerpSpeed;
+        lerpColor(this._baseHemiSky, goalHemiSky, lerpSpeed);
+        lerpColor(this._baseHemiGround, goalHemiGround, lerpSpeed);
+        this._baseHemiIntensity += (goalHemiInt - this._baseHemiIntensity) * lerpSpeed;
+        copyColor(this.hemiLight.color, this._baseHemiSky);
+        copyColor(this.hemiLight.groundColor, this._baseHemiGround);
+        this.hemiLight.intensity = this._baseHemiIntensity;
 
-        const activeBgTarget = this.isStormOverride ? this.stormBgColor : this.targetBgColor;
-        lerpCol(this.scene.background, activeBgTarget);
+        lerpColor(this._baseBgColor, goalBgColor, lerpSpeed);
+        copyColor(this.scene.background, this._baseBgColor);
         if (this.scene.fog) {
-            lerpCol(this.scene.fog.color, this.isStormOverride ? this.stormBgColor : this.targetFogColor);
-            this.scene.fog.density += (this.targetFogDensity - this.scene.fog.density) * lerpSpeed;
+            lerpColor(this._baseFogColor, goalFogColor, lerpSpeed);
+            copyColor(this.scene.fog.color, this._baseFogColor);
+            const curDensity = (typeof this.scene.fog.density === 'number' && Number.isFinite(this.scene.fog.density))
+                ? this.scene.fog.density
+                : goalFogDensity;
+            this.scene.fog.density = curDensity + (goalFogDensity - curDensity) * lerpSpeed;
+        }
+
+        if (flash > 0.001) {
+            this.sunLight.intensity += flash * 2.1;
+            lerpColor(this.sunLight.color, this._flashColor, Math.min(1.0, flash * 0.92));
+            this.hemiLight.intensity += flash * 0.72;
+            lerpColor(this.hemiLight.color, this._flashColor, Math.min(1.0, flash * 0.65));
+            lerpColor(this.scene.background, this._flashSkyColor, Math.min(1.0, flash * 0.8));
+            if (this.scene.fog) {
+                lerpColor(this.scene.fog.color, this._flashSkyColor, Math.min(1.0, flash * 0.75));
+            }
         }
 
         const prevEmissive = this.currentEmissiveIntensity;
-        this.currentEmissiveIntensity += (this.targetEmissiveIntensity - this.currentEmissiveIntensity) * Math.min(1.0, delta * 3.5);
+        this.currentEmissiveIntensity += (goalEmissive - this.currentEmissiveIntensity) * Math.min(1.0, delta * 3.5);
 
-        if (Math.abs(prevEmissive - this.currentEmissiveIntensity) > 0.005) {
+        if (Math.abs(prevEmissive - this.currentEmissiveIntensity) > 0.005 || (prevEmissive > 0.05 && this.currentEmissiveIntensity <= 0.05)) {
             this.applyEmissivesToScene(this.currentEmissiveIntensity);
         }
         this.updateLanternLightPool(cameraTarget, delta);

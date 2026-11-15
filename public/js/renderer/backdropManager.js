@@ -317,7 +317,7 @@ export class BackdropManager {
         }
     }
 
-    update(delta = 0.016, isStorm = false) {
+    update(delta = 0.016, isStorm = false, lightningFlash = 0.0) {
         const s = Math.min(1.0, delta * 2.2);
         const lerpC = (c, t) => {
             if (!c || !t) return;
@@ -327,6 +327,6 @@ export class BackdropManager {
         lerpC(this.fujiBodyMaterial?.color, this.targetFujiColor);
         lerpC(this.snowMaterial?.color, this.targetSnowColor);
         if (this.riverMaterial?.color) lerpC(this.riverMaterial.color, this.targetRiverColor);
-        if (this.skyDome) this.skyDome.update(delta, isStorm);
+        if (this.skyDome) this.skyDome.update(delta, isStorm, lightningFlash);
     }
 }
